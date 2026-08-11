@@ -6,6 +6,8 @@ import {
   MapPin, FileText, CheckCircle2, AlertCircle, LogIn 
 } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 const AuthPage = () => {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
@@ -34,7 +36,7 @@ const AuthPage = () => {
     const payload = isLogin ? { phone: formData.phone, password: formData.password } : { ...formData, role };
 
     try {
-      const response = await fetch(`http://127.0.0.1:3000${endpoint}`, {
+      const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -42,6 +44,9 @@ const AuthPage = () => {
       const data = await response.json();
 
       if (response.ok) {
+        // Save JWT to localStorage
+        localStorage.setItem('token', data.token);
+        
         if (data.user.role === 'admin') navigate('/admin', { state: { user: data.user } });
         else if (data.user.role === 'owner') navigate('/owner', { state: { user: data.user } });
         else navigate('/student', { state: { user: data.user } });
