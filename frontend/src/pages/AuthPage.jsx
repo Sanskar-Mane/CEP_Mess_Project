@@ -17,8 +17,9 @@ const AuthPage = () => {
   const [error, setError] = useState('');
 
   const [formData, setFormData] = useState({
-    name: '', phone: '', password: '', yearBranch: '', hostelRoom: '', messName: '', messAddress: '', fssaiNumber: '',
+    name: '', phone: '', password: '', yearBranch: '', hostelRoom: '', messName: '', messAddress: '', fssaiNumber: '', latitude: null, longitude: null,
   });
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -168,6 +169,21 @@ const AuthPage = () => {
                         <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input type="text" name="messAddress" placeholder="Full Address / Landmark" required className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:border-orange-500 font-bold text-slate-800 shadow-sm" onChange={handleInputChange} value={formData.messAddress} />
                       </div>
+                      <button
+                        type="button"
+                        disabled={isGettingLocation}
+                        onClick={() => {
+                          setIsGettingLocation(true);
+                          navigator.geolocation.getCurrentPosition(
+                            (pos) => { setFormData(prev => ({ ...prev, latitude: pos.coords.latitude, longitude: pos.coords.longitude })); setIsGettingLocation(false); },
+                            () => setIsGettingLocation(false),
+                            { enableHighAccuracy: true, timeout: 10000 }
+                          );
+                        }}
+                        className="w-full bg-indigo-50 text-indigo-600 font-bold py-3 rounded-2xl flex items-center justify-center gap-2 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50 text-sm"
+                      >
+                        <MapPin size={16} /> {formData.latitude ? `✅ Location captured (${formData.latitude.toFixed(4)}, ${formData.longitude.toFixed(4)})` : isGettingLocation ? 'Detecting...' : '📍 Use My Current Location (Optional)'}
+                      </button>
                       <div className="flex gap-3">
                         <button type="button" onClick={prevStep} className="w-1/3 bg-slate-200 text-slate-700 font-bold py-4 rounded-2xl flex items-center justify-center hover:bg-slate-300 transition-colors"><ChevronLeft size={20} /></button>
                         <button type="button" onClick={nextStep} className="w-2/3 bg-slate-900 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg hover:bg-slate-800 active:scale-[0.98] transition-all">Next Step <ChevronRight size={20} /></button>

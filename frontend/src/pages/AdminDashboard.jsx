@@ -9,15 +9,6 @@ const AdminDashboard = () => {
   const location = useLocation();
   const adminData = location.state?.user;
 
-  if (!adminData || adminData.role !== 'admin') {
-    return (
-      <div className="min-h-screen flex items-center justify-center flex-col gap-4 font-sans">
-        <p>Unauthorized access.</p>
-        <button onClick={() => navigate('/')} className="text-indigo-600 underline font-bold">Go to Login</button>
-      </div>
-    );
-  }
-
   const [users, setUsers] = useState([]);
   const [directory, setDirectory] = useState([]);
   const [activeTab, setActiveTab] = useState('pending');
@@ -26,9 +17,20 @@ const AdminDashboard = () => {
   const [dirForm, setDirForm] = useState({ category: 'rickshaws', name: '', phone: '', area: '', tag: '' });
 
   useEffect(() => {
-    fetchUsers();
-    fetchDirectory();
+    if (adminData && adminData.role === 'admin') {
+      fetchUsers();
+      fetchDirectory();
+    }
   }, []);
+
+  if (!adminData || adminData.role !== 'admin') {
+    return (
+      <div className="min-h-screen flex items-center justify-center flex-col gap-4 font-sans">
+        <p>Unauthorized access.</p>
+        <button onClick={() => navigate('/')} className="text-indigo-600 underline font-bold">Go to Login</button>
+      </div>
+    );
+  }
 
   const fetchUsers = async () => {
     const token = localStorage.getItem('token');

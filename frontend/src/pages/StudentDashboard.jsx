@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Utensils, MapPin, Navigation, Home, Phone, CheckCircle2, XCircle, LogOut, Loader2, IndianRupee, Star, AlertTriangle, Sparkles, CalendarDays, Trophy, MessageSquareQuote } from 'lucide-react';
+import { Utensils, MapPin, Navigation, Home, Phone, CheckCircle2, XCircle, LogOut, Loader2, IndianRupee, Star, AlertTriangle, Sparkles, CalendarDays, Trophy, MessageSquareQuote, Map } from 'lucide-react';
+import MessMap from '../components/MessMap';
 import ThemeToggle from '../components/ThemeToggle';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -174,12 +175,6 @@ const StudentDashboard = () => {
   const navigate = useNavigate();
   const user = location.state?.user;
 
-  if (!user || user.role !== 'student') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900"><button onClick={() => navigate('/')} className="text-indigo-400 font-bold underline">Go to Login</button></div>
-    );
-  }
-
   const [activeTab, setActiveTab] = useState('menus');
   const [targetDate, setTargetDate] = useState(getLocalDateString(0));
   
@@ -189,6 +184,13 @@ const StudentDashboard = () => {
   const [leaderboard, setLeaderboard] = useState([]);
   const [directory, setDirectory] = useState({ rickshaws: [], rooms: [], emergency: [] });
   const [isLoading, setIsLoading] = useState(true);
+  const [nearbyMesses, setNearbyMesses] = useState([]);
+
+  if (!user || user.role !== 'student') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900"><button onClick={() => navigate('/')} className="text-indigo-400 font-bold underline">Go to Login</button></div>
+    );
+  }
 
   useEffect(() => {
     fetchData(false); 
@@ -234,6 +236,14 @@ const StudentDashboard = () => {
     } catch (e) { console.error(e); }
   };
 
+  const fetchNearbyMesses = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/messes/nearby`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (res.ok) setNearbyMesses(await res.json());
+    } catch (e) { console.error(e); }
+  };
+
   const getAttendanceStatus = (messName) => {
     const record = myAttendance.find(a => a.messName === messName);
     return record ? record.status : null;
@@ -269,6 +279,7 @@ const StudentDashboard = () => {
           <div className="bg-slate-200/50 dark:bg-slate-800/80 backdrop-blur-md p-1.5 rounded-full shadow-inner mb-6 flex relative z-20 w-fit">
             <button onClick={() => setActiveTab('menus')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all flex gap-2 ${activeTab === 'menus' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}><Utensils size={18} /> Daily Menus</button>
             <button onClick={() => setActiveTab('directory')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all flex gap-2 ${activeTab === 'directory' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}><MapPin size={18} /> Directory</button>
+            <button onClick={() => { setActiveTab('map'); fetchNearbyMesses(); }} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all flex gap-2 ${activeTab === 'map' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}><Map size={18} /> Map</button>
           </div>
 
           {activeTab === 'menus' && (
@@ -305,6 +316,10 @@ const StudentDashboard = () => {
               <DirectoryCard title="PGs & Rooms" icon={Home} colorClass="bg-gradient-to-br from-emerald-500 to-teal-600" items={directory.rooms} />
               <DirectoryCard title="Emergency Contacts" icon={AlertTriangle} colorClass="bg-gradient-to-br from-rose-500 to-pink-600" items={directory.emergency} />
             </div>
+          )}
+
+          {activeTab === 'map' && (
+            <MessMap messes={nearbyMesses} />
           )}
         </div>
 

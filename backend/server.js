@@ -34,26 +34,31 @@ const UserSchema = new mongoose.Schema({
   fssaiNumber: String,
   isVerified: { type: Boolean, default: false },
   yearBranch: String,
+  location: {
+    type: { type: String, enum: ['Point'], default: 'Point' },
+    coordinates: { type: [Number], default: [0, 0] } // [longitude, latitude]
+  },
   rating: { type: Number, default: 0 },
-  ratingCount: { type: Number, default: 0 }
+  ratingCount: { type: Number, default: 0 },
+  ratingTotal: { type: Number, default: 0 }
 });
 const User = mongoose.model('User', UserSchema);
 
 const MenuSchema = new mongoose.Schema({
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   messName: { type: String, required: true },
-  date: { type: String, required: true }, // Target Date YYYY-MM-DD
+  date: { type: String, required: true },
   items: [{ type: String }],
   price: { type: Number }
 });
 const Menu = mongoose.model('Menu', MenuSchema);
 
 const AttendanceSchema = new mongoose.Schema({
-  messId: String,
+  messId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   messName: String,
-  status: String,
-  userId: String,
-  targetDate: { type: String, required: true }, // The date the meal is for
+  status: { type: String, enum: ['coming', 'not_coming'] },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  targetDate: { type: String, required: true },
   timestamp: { type: Date, default: Date.now }
 });
 const Attendance = mongoose.model('Attendance', AttendanceSchema);
@@ -89,6 +94,11 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+const authenticateAdmin = (req, res, next) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required.' });
+  next();
+};
+
 // ==========================================
 // 4. ROUTES
 // ==========================================
@@ -96,12 +106,21 @@ const authenticateToken = (req, res, next) => {
 // --- AUTH ROUTES ---
 app.post('/api/register', async (req, res) => {
   try {
-    const { role, name, phone, password, messName, messAddress, fssaiNumber, yearBranch } = req.body;
+    const { role, name, phone, password, messName, messAddress, fssaiNumber, yearBranch, latitude, longitude } = req.body;
     if (await User.findOne({ phone })) return res.status(400).json({ error: 'Phone number already registered' });
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    const newUser = new User({ role, name, phone, password: hashedPassword, messName, messAddress, fssaiNumber, yearBranch });
+
+    const userData = { role, name, phone, password: hashedPassword, messName, messAddress, fssaiNumber, yearBranch };
+
+    if (latitude && longitude) {
+      userData.location = { type: 'Point', coordinates: [longitude, latitude] };
+    }
+
+    const newUser = new User(userData);
     await newUser.save();
+
     const token = jwt.sign({ id: newUser._id, role: newUser.role }, JWT_SECRET, { expiresIn: '7d' });
     const userResponse = { ...newUser._doc }; delete userResponse.password;
     res.status(201).json({ message: 'Registration successful', user: userResponse, token });
@@ -120,11 +139,52 @@ app.post('/api/login', async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Server error' }); }
 });
 
+app.get('/api/me', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.status(200).json(user);
+  } catch (error) { res.status(500).json({ error: 'Failed to fetch user profile' }); }
+});
+
+// --- ADMIN ROUTES ---
+app.get('/api/admin/users', authenticateToken, authenticateAdmin, async (req, res) => {
+  try { res.status(200).json(await User.find().select('-password').sort({ createdAt: -1 })); }
+  catch (error) { res.status(500).json({ error: 'Failed to fetch users' }); }
+});
+
+app.put('/api/admin/verify/:id', authenticateToken, authenticateAdmin, async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(req.params.id, { isVerified: true }, { new: true });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.status(200).json({ message: 'Owner verified successfully', user });
+  } catch (error) { res.status(500).json({ error: 'Failed to verify owner' }); }
+});
+
+app.delete('/api/admin/users/:id', authenticateToken, authenticateAdmin, async (req, res) => {
+  try { await User.findByIdAndDelete(req.params.id); res.status(200).json({ message: 'User deleted' }); }
+  catch (error) { res.status(500).json({ error: 'Failed to delete user' }); }
+});
+
+app.post('/api/admin/directory', authenticateToken, authenticateAdmin, async (req, res) => {
+  try {
+    const newDir = new Directory(req.body);
+    await newDir.save();
+    res.status(201).json({ message: 'Directory item added', item: newDir });
+  } catch (error) { res.status(500).json({ error: 'Failed to add directory item' }); }
+});
+
+app.delete('/api/admin/directory/:id', authenticateToken, authenticateAdmin, async (req, res) => {
+  try { await Directory.findByIdAndDelete(req.params.id); res.status(200).json({ message: 'Directory item deleted' }); }
+  catch (error) { res.status(500).json({ error: 'Failed to delete directory item' }); }
+});
+
 // --- MENU ROUTES ---
 app.post('/api/menus', authenticateToken, async (req, res) => {
   if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized.' });
   try {
-    const { ownerId, messName, date, items, price } = req.body;
+    const ownerId = req.user.id;
+    const { messName, date, items, price } = req.body;
     const existingMenu = await Menu.findOne({ ownerId, date });
     if (existingMenu) {
       existingMenu.items = items; existingMenu.price = price;
@@ -138,32 +198,26 @@ app.post('/api/menus', authenticateToken, async (req, res) => {
 });
 
 app.get('/api/menus/:date', authenticateToken, async (req, res) => {
-  try {
-    const menus = await Menu.find({ date: req.params.date }).populate('ownerId', 'rating ratingCount');
-    res.status(200).json(menus);
-  } catch (error) { res.status(500).json({ error: 'Failed to fetch menus' }); }
+  try { res.status(200).json(await Menu.find({ date: req.params.date }).populate('ownerId', 'rating ratingCount')); }
+  catch (error) { res.status(500).json({ error: 'Failed to fetch menus' }); }
 });
 
 // --- ATTENDANCE ROUTES ---
 app.post('/api/attendance', authenticateToken, async (req, res) => {
   try {
-    const { status, targetDate } = req.body;
-    if (status === 'coming') {
-      const records = await Attendance.find({ userId: req.user.id, targetDate });
-      const hasCommitted = records.some(r => r.status === 'coming');
-      if (hasCommitted) return res.status(400).json({ success: false, error: "You are already attending a mess on this date." });
-    }
-    const newRecord = new Attendance({ ...req.body, userId: req.user.id });
-    await newRecord.save();
-    res.status(200).json({ success: true, message: "Attendance saved!" });
+    const { messId, messName, status, targetDate } = req.body;
+    await Attendance.findOneAndUpdate(
+      { userId: req.user.id, targetDate },
+      { messId, messName, status, timestamp: new Date() },
+      { upsert: true, new: true }
+    );
+    res.status(200).json({ success: true, message: "Attendance saved successfully!" });
   } catch (error) { res.status(500).json({ success: false, message: "Failed to save attendance." }); }
 });
 
 app.get('/api/attendance/me/:date', authenticateToken, async (req, res) => {
-  try {
-    const records = await Attendance.find({ userId: req.user.id, targetDate: req.params.date });
-    res.status(200).json(records);
-  } catch (error) { res.status(500).json({ error: 'Failed to fetch your attendance' }); }
+  try { res.status(200).json(await Attendance.find({ userId: req.user.id, targetDate: req.params.date })); }
+  catch (error) { res.status(500).json({ error: 'Failed to fetch your attendance' }); }
 });
 
 app.get('/api/attendance/stats/:messName/:date', authenticateToken, async (req, res) => {
@@ -177,41 +231,28 @@ app.get('/api/attendance/stats/:messName/:date', authenticateToken, async (req, 
 
 app.get('/api/attendance/history/:messName', authenticateToken, async (req, res) => {
   try {
-    const { messName } = req.params;
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    const records = await Attendance.find({
-      messName: decodeURIComponent(messName),
-      timestamp: { $gte: sevenDaysAgo }
-    });
-
-    const history = {};
+    const history = {}; const dateStrings = [];
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const dateStr = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
       history[dateStr] = { date: dateStr, coming: 0, notComing: 0 };
+      dateStrings.push(dateStr);
     }
-
+    const records = await Attendance.find({ messName: decodeURIComponent(req.params.messName), targetDate: { $in: dateStrings } });
     records.forEach(r => {
-      const dateStr = new Date(r.timestamp).toISOString().split('T')[0];
-      if (history[dateStr]) {
-        if (r.status === 'coming') history[dateStr].coming++;
-        if (r.status === 'not_coming') history[dateStr].notComing++;
+      if (history[r.targetDate]) {
+        if (r.status === 'coming') history[r.targetDate].coming++;
+        if (r.status === 'not_coming') history[r.targetDate].notComing++;
       }
     });
-
     res.status(200).json(Object.values(history));
   } catch (error) { res.status(500).json({ error: 'Failed to fetch history' }); }
 });
 
 // --- LEADERBOARD & RATING ROUTES ---
 app.get('/api/messes/leaderboard', authenticateToken, async (req, res) => {
-  try {
-    const topMesses = await User.find({ role: 'owner', ratingCount: { $gt: 0 } }).sort({ rating: -1 }).limit(3).select('messName rating ratingCount');
-    res.status(200).json(topMesses);
-  } catch (error) { res.status(500).json({ error: 'Failed to fetch leaderboard' }); }
+  try { res.status(200).json(await User.find({ role: 'owner', ratingCount: { $gt: 0 } }).sort({ rating: -1 }).limit(3).select('messName rating ratingCount')); }
+  catch (error) { res.status(500).json({ error: 'Failed to fetch leaderboard' }); }
 });
 
 app.post('/api/messes/:ownerId/rate', authenticateToken, async (req, res) => {
@@ -220,31 +261,38 @@ app.post('/api/messes/:ownerId/rate', authenticateToken, async (req, res) => {
     const owner = await User.findById(req.params.ownerId);
     const student = await User.findById(req.user.id);
     if (!owner || owner.role !== 'owner') return res.status(404).json({ error: 'Owner not found' });
-
-    const newTotal = (owner.rating * owner.ratingCount) + rating;
-    owner.ratingCount += 1;
-    owner.rating = newTotal / owner.ratingCount;
+    owner.ratingTotal = (owner.ratingTotal || 0) + rating; owner.ratingCount += 1; owner.rating = owner.ratingTotal / owner.ratingCount;
     await owner.save();
-
-    if (comment) {
-      const review = new Review({ messId: owner._id, studentName: student.name, rating, comment });
-      await review.save();
-    }
+    if (comment) { const review = new Review({ messId: owner._id, studentName: student.name, rating, comment }); await review.save(); }
     res.status(200).json({ message: 'Rating submitted' });
   } catch (error) { res.status(500).json({ error: 'Failed to submit rating' }); }
 });
 
 app.get('/api/messes/:ownerId/reviews', authenticateToken, async (req, res) => {
-  try {
-    const reviews = await Review.find({ messId: req.params.ownerId }).sort({ date: -1 }).limit(5);
-    res.status(200).json(reviews);
-  } catch (error) { res.status(500).json({ error: 'Failed to fetch reviews' }); }
+  try { res.status(200).json(await Review.find({ messId: req.params.ownerId }).sort({ date: -1 }).limit(5)); }
+  catch (error) { res.status(500).json({ error: 'Failed to fetch reviews' }); }
 });
 
-// --- DIRECTORY ROUTES ---
+// --- DIRECTORY & MAP ROUTES ---
 app.get('/api/directory', authenticateToken, async (req, res) => {
   try { res.json(await Directory.find()); } catch (error) { res.status(500).json({ error: 'Failed to fetch' }); }
 });
 
+app.get('/api/messes/nearby', authenticateToken, async (req, res) => {
+  try {
+    res.status(200).json(await User.find({ role: 'owner', isVerified: true, 'location.coordinates': { $ne: [0, 0] } }).select('messName messAddress location rating ratingCount'));
+  } catch (error) { res.status(500).json({ error: 'Failed to fetch nearby messes' }); }
+});
+
+app.put('/api/owner/location', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized.' });
+  try {
+    const { latitude, longitude } = req.body;
+    if (!latitude || !longitude) return res.status(400).json({ error: 'Coordinates required.' });
+    await User.findByIdAndUpdate(req.user.id, { location: { type: 'Point', coordinates: [longitude, latitude] } });
+    res.status(200).json({ message: 'Location updated successfully!' });
+  } catch (error) { res.status(500).json({ error: 'Failed to update location' }); }
+});
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Backend Server is running at http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Backend Server running at http://localhost:${PORT}`));

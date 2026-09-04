@@ -1,6 +1,5 @@
 Directory structure:
 └── CEP_Mess_Project/
-    ├── digest.txtgit
     ├── backend/
     │   ├── package.json
     │   └── server.js
@@ -12,22 +11,16 @@ Directory structure:
         ├── .oxlintrc.json
         └── src/
             ├── App.jsx
-            ├── data.js
+            ├── index.css
             ├── main.jsx
             ├── components/
-            │   ├── MessCard.jsx
-            │   └── Navbar.jsx
+            │   ├── MessMap.jsx
+            │   └── ThemeToggle.jsx
             └── pages/
                 ├── AdminDashboard.jsx
                 ├── AuthPage.jsx
                 ├── OwnerDashboard.jsx
                 └── StudentDashboard.jsx
-
-================================================
-FILE: digest.txtgit
-================================================
-[Empty file]
-
 
 ================================================
 FILE: backend/package.json
@@ -36,7 +29,7 @@ FILE: backend/package.json
   "name": "backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -50,6 +43,7 @@ FILE: backend/package.json
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.5.0",
     "mongoose": "^9.9.1"
   },
@@ -71,14 +65,13 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
-app.use(cors({
-  origin: '*', // Allow requests from any origin
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization'] }));
 app.use(express.json());
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
 // ==========================================
 // 1. DATABASE CONNECTION
@@ -90,8 +83,6 @@ mongoose.connect(process.env.MONGO_URI)
 // ==========================================
 // 2. SCHEMAS & MODELS
 // ==========================================
-
-// User Schema (Students, Owners, Admins)
 const UserSchema = new mongoose.Schema({
   role: { type: String, required: true, enum: ['student', 'owner', 'admin'] },
   name: { type: String, required: true },
@@ -102,57 +93,97 @@ const UserSchema = new mongoose.Schema({
   fssaiNumber: String,
   isVerified: { type: Boolean, default: false },
   yearBranch: String,
-  hostelRoom: String
+  location: {
+    type: { type: String, enum: ['Point'], default: 'Point' },
+    coordinates: { type: [Number], default: [0, 0] } // [longitude, latitude]
+  },
+  rating: { type: Number, default: 0 },
+  ratingCount: { type: Number, default: 0 },
+  ratingTotal: { type: Number, default: 0 }
 });
 const User = mongoose.model('User', UserSchema);
 
-// Menu Schema
 const MenuSchema = new mongoose.Schema({
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   messName: { type: String, required: true },
-  date: { type: String, required: true }, // Format: YYYY-MM-DD
+  date: { type: String, required: true },
   items: [{ type: String }],
-  price: { type: Number },
+  price: { type: Number }
 });
 const Menu = mongoose.model('Menu', MenuSchema);
 
-// Attendance Schema
 const AttendanceSchema = new mongoose.Schema({
-  messId: String,
+  messId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   messName: String,
-  status: String,
+  status: { type: String, enum: ['coming', 'not_coming'] },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  targetDate: { type: String, required: true },
   timestamp: { type: Date, default: Date.now }
 });
 const Attendance = mongoose.model('Attendance', AttendanceSchema);
 
+const ReviewSchema = new mongoose.Schema({
+  messId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  studentName: { type: String, required: true },
+  rating: { type: Number, required: true },
+  comment: { type: String },
+  date: { type: Date, default: Date.now }
+});
+const Review = mongoose.model('Review', ReviewSchema);
+
+const DirectorySchema = new mongoose.Schema({
+  category: { type: String, required: true, enum: ['rickshaws', 'rooms', 'emergency'] },
+  name: { type: String, required: true },
+  phone: { type: String, required: true },
+  area: String, status: String, tag: String
+});
+const Directory = mongoose.model('Directory', DirectorySchema);
 
 // ==========================================
-// 3. ROUTES
+// 3. MIDDLEWARE
+// ==========================================
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Access denied.' });
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: 'Invalid token.' });
+    req.user = user;
+    next();
+  });
+};
+
+const authenticateAdmin = (req, res, next) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required.' });
+  next();
+};
+
+// ==========================================
+// 4. ROUTES
 // ==========================================
 
 // --- AUTH ROUTES ---
 app.post('/api/register', async (req, res) => {
   try {
-    const { role, name, phone, password, messName, messAddress, fssaiNumber, yearBranch, hostelRoom } = req.body;
-    const existingUser = await User.findOne({ phone });
-    if (existingUser) return res.status(400).json({ error: 'Phone number already registered' });
+    const { role, name, phone, password, messName, messAddress, fssaiNumber, yearBranch, latitude, longitude } = req.body;
+    if (await User.findOne({ phone })) return res.status(400).json({ error: 'Phone number already registered' });
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const newUser = new User({
-      role, name, phone, password: hashedPassword,
-      messName, messAddress, fssaiNumber, yearBranch, hostelRoom
-    });
+    const userData = { role, name, phone, password: hashedPassword, messName, messAddress, fssaiNumber, yearBranch };
 
+    if (latitude && longitude) {
+      userData.location = { type: 'Point', coordinates: [longitude, latitude] };
+    }
+
+    const newUser = new User(userData);
     await newUser.save();
-    const userResponse = { ...newUser._doc };
-    delete userResponse.password;
-    
-    res.status(201).json({ message: 'Registration successful', user: userResponse });
-  } catch (error) {
-    res.status(500).json({ error: 'Server error during registration' });
-  }
+
+    const token = jwt.sign({ id: newUser._id, role: newUser.role }, JWT_SECRET, { expiresIn: '7d' });
+    const userResponse = { ...newUser._doc }; delete userResponse.password;
+    res.status(201).json({ message: 'Registration successful', user: userResponse, token });
+  } catch (error) { res.status(500).json({ error: 'Server error' }); }
 });
 
 app.post('/api/login', async (req, res) => {
@@ -160,128 +191,170 @@ app.post('/api/login', async (req, res) => {
     const { phone, password } = req.body;
     const user = await User.findOne({ phone });
     if (!user) return res.status(404).json({ error: 'User not found' });
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ error: 'Invalid password' });
-
-    const userResponse = { ...user._doc };
-    delete userResponse.password;
-
-    res.status(200).json({ message: 'Login successful', user: userResponse });
-  } catch (error) {
-    res.status(500).json({ error: 'Server error during login' });
-  }
+    if (!(await bcrypt.compare(password, user.password))) return res.status(400).json({ error: 'Invalid password' });
+    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    const userResponse = { ...user._doc }; delete userResponse.password;
+    res.status(200).json({ message: 'Login successful', user: userResponse, token });
+  } catch (error) { res.status(500).json({ error: 'Server error' }); }
 });
 
-// --- MENU ROUTES ---
-app.post('/api/menus', async (req, res) => {
+app.get('/api/me', authenticateToken, async (req, res) => {
   try {
-    const { ownerId, messName, date, items, price } = req.body;
-    const existingMenu = await Menu.findOne({ ownerId, date });
-    
-    if (existingMenu) {
-      existingMenu.items = items;
-      existingMenu.price = price;
-      await existingMenu.save();
-      return res.status(200).json({ message: 'Menu updated successfully!', menu: existingMenu });
-    }
-
-    const newMenu = new Menu({ ownerId, messName, date, items, price });
-    await newMenu.save();
-    res.status(201).json({ message: 'Menu published successfully!', menu: newMenu });
-  } catch (error) {
-    console.error("❌ Menu Publish Error:", error);
-    res.status(500).json({ error: 'Failed to publish menu' });
-  }
-});
-
-app.get('/api/menus/:date', async (req, res) => {
-  try {
-    const menus = await Menu.find({ date: req.params.date });
-    res.status(200).json(menus);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch menus' });
-  }
-});
-
-// --- ATTENDANCE ROUTE ---
-app.post('/api/attendance', async (req, res) => {
-  try {
-    const newRecord = new Attendance(req.body);
-    await newRecord.save();
-    res.status(200).json({ success: true, message: "Attendance saved!" });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to save attendance." });
-  }
-});
-
-// --- GET ATTENDANCE STATS ---
-app.get('/api/attendance/stats/:messName/:date', async (req, res) => {
-  try {
-    const { messName, date } = req.params;
-    
-    // Fetch all attendance records matching this mess name
-    const records = await Attendance.find({ messName: decodeURIComponent(messName) });
-
-    let coming = 0;
-    let notComing = 0;
-
-    records.forEach(r => {
-      // Compare only the YYYY-MM-DD portion of the timestamp string
-      const recordDate = new Date(r.timestamp).toISOString().split('T')[0];
-      if (recordDate === date) {
-        if (r.status === 'coming') coming++;
-        if (r.status === 'not_coming') notComing++;
-      }
-    });
-
-    res.status(200).json({
-      coming,
-      notComing,
-      total: coming + notComing
-    });
-
-  } catch (error) {
-    console.error("Stats Error:", error);
-    res.status(500).json({ error: 'Failed to fetch stats' });
-  }
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.status(200).json(user);
+  } catch (error) { res.status(500).json({ error: 'Failed to fetch user profile' }); }
 });
 
 // --- ADMIN ROUTES ---
-app.get('/api/admin/users', async (req, res) => {
-  try {
-    const users = await User.find().select('-password');
-    res.json(users);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch users' });
-  }
+app.get('/api/admin/users', authenticateToken, authenticateAdmin, async (req, res) => {
+  try { res.status(200).json(await User.find().select('-password').sort({ createdAt: -1 })); }
+  catch (error) { res.status(500).json({ error: 'Failed to fetch users' }); }
 });
 
-app.put('/api/admin/verify/:id', async (req, res) => {
+app.put('/api/admin/verify/:id', authenticateToken, authenticateAdmin, async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(req.params.id, { isVerified: true }, { new: true });
-    res.json({ message: 'Owner verified successfully', user });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to verify user' });
-  }
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.status(200).json({ message: 'Owner verified successfully', user });
+  } catch (error) { res.status(500).json({ error: 'Failed to verify owner' }); }
 });
 
-app.delete('/api/admin/users/:id', async (req, res) => {
+app.delete('/api/admin/users/:id', authenticateToken, authenticateAdmin, async (req, res) => {
+  try { await User.findByIdAndDelete(req.params.id); res.status(200).json({ message: 'User deleted' }); }
+  catch (error) { res.status(500).json({ error: 'Failed to delete user' }); }
+});
+
+app.post('/api/admin/directory', authenticateToken, authenticateAdmin, async (req, res) => {
   try {
-    await User.findByIdAndDelete(req.params.id);
-    res.json({ message: 'User deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to delete user' });
-  }
+    const newDir = new Directory(req.body);
+    await newDir.save();
+    res.status(201).json({ message: 'Directory item added', item: newDir });
+  } catch (error) { res.status(500).json({ error: 'Failed to add directory item' }); }
 });
 
-// ==========================================
-// 4. START SERVER
-// ==========================================
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Backend Server is running at http://localhost:${PORT}`);
+app.delete('/api/admin/directory/:id', authenticateToken, authenticateAdmin, async (req, res) => {
+  try { await Directory.findByIdAndDelete(req.params.id); res.status(200).json({ message: 'Directory item deleted' }); }
+  catch (error) { res.status(500).json({ error: 'Failed to delete directory item' }); }
 });
+
+// --- MENU ROUTES ---
+app.post('/api/menus', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized.' });
+  try {
+    const ownerId = req.user.id;
+    const { messName, date, items, price } = req.body;
+    const existingMenu = await Menu.findOne({ ownerId, date });
+    if (existingMenu) {
+      existingMenu.items = items; existingMenu.price = price;
+      await existingMenu.save();
+      return res.status(200).json({ message: 'Menu updated!' });
+    }
+    const newMenu = new Menu({ ownerId, messName, date, items, price });
+    await newMenu.save();
+    res.status(201).json({ message: 'Menu published!' });
+  } catch (error) { res.status(500).json({ error: 'Failed to publish' }); }
+});
+
+app.get('/api/menus/:date', authenticateToken, async (req, res) => {
+  try { res.status(200).json(await Menu.find({ date: req.params.date }).populate('ownerId', 'rating ratingCount')); }
+  catch (error) { res.status(500).json({ error: 'Failed to fetch menus' }); }
+});
+
+// --- ATTENDANCE ROUTES ---
+app.post('/api/attendance', authenticateToken, async (req, res) => {
+  try {
+    const { messId, messName, status, targetDate } = req.body;
+    await Attendance.findOneAndUpdate(
+      { userId: req.user.id, targetDate },
+      { messId, messName, status, timestamp: new Date() },
+      { upsert: true, new: true }
+    );
+    res.status(200).json({ success: true, message: "Attendance saved successfully!" });
+  } catch (error) { res.status(500).json({ success: false, message: "Failed to save attendance." }); }
+});
+
+app.get('/api/attendance/me/:date', authenticateToken, async (req, res) => {
+  try { res.status(200).json(await Attendance.find({ userId: req.user.id, targetDate: req.params.date })); }
+  catch (error) { res.status(500).json({ error: 'Failed to fetch your attendance' }); }
+});
+
+app.get('/api/attendance/stats/:messName/:date', authenticateToken, async (req, res) => {
+  try {
+    const records = await Attendance.find({ messName: decodeURIComponent(req.params.messName), targetDate: req.params.date });
+    const coming = records.filter(r => r.status === 'coming').length;
+    const notComing = records.filter(r => r.status === 'not_coming').length;
+    res.status(200).json({ coming, notComing, total: coming + notComing });
+  } catch (error) { res.status(500).json({ error: 'Failed to fetch stats' }); }
+});
+
+app.get('/api/attendance/history/:messName', authenticateToken, async (req, res) => {
+  try {
+    const history = {}; const dateStrings = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const dateStr = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+      history[dateStr] = { date: dateStr, coming: 0, notComing: 0 };
+      dateStrings.push(dateStr);
+    }
+    const records = await Attendance.find({ messName: decodeURIComponent(req.params.messName), targetDate: { $in: dateStrings } });
+    records.forEach(r => {
+      if (history[r.targetDate]) {
+        if (r.status === 'coming') history[r.targetDate].coming++;
+        if (r.status === 'not_coming') history[r.targetDate].notComing++;
+      }
+    });
+    res.status(200).json(Object.values(history));
+  } catch (error) { res.status(500).json({ error: 'Failed to fetch history' }); }
+});
+
+// --- LEADERBOARD & RATING ROUTES ---
+app.get('/api/messes/leaderboard', authenticateToken, async (req, res) => {
+  try { res.status(200).json(await User.find({ role: 'owner', ratingCount: { $gt: 0 } }).sort({ rating: -1 }).limit(3).select('messName rating ratingCount')); }
+  catch (error) { res.status(500).json({ error: 'Failed to fetch leaderboard' }); }
+});
+
+app.post('/api/messes/:ownerId/rate', authenticateToken, async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+    const owner = await User.findById(req.params.ownerId);
+    const student = await User.findById(req.user.id);
+    if (!owner || owner.role !== 'owner') return res.status(404).json({ error: 'Owner not found' });
+    owner.ratingTotal = (owner.ratingTotal || 0) + rating; owner.ratingCount += 1; owner.rating = owner.ratingTotal / owner.ratingCount;
+    await owner.save();
+    if (comment) { const review = new Review({ messId: owner._id, studentName: student.name, rating, comment }); await review.save(); }
+    res.status(200).json({ message: 'Rating submitted' });
+  } catch (error) { res.status(500).json({ error: 'Failed to submit rating' }); }
+});
+
+app.get('/api/messes/:ownerId/reviews', authenticateToken, async (req, res) => {
+  try { res.status(200).json(await Review.find({ messId: req.params.ownerId }).sort({ date: -1 }).limit(5)); }
+  catch (error) { res.status(500).json({ error: 'Failed to fetch reviews' }); }
+});
+
+// --- DIRECTORY & MAP ROUTES ---
+app.get('/api/directory', authenticateToken, async (req, res) => {
+  try { res.json(await Directory.find()); } catch (error) { res.status(500).json({ error: 'Failed to fetch' }); }
+});
+
+app.get('/api/messes/nearby', authenticateToken, async (req, res) => {
+  try {
+    res.status(200).json(await User.find({ role: 'owner', isVerified: true, 'location.coordinates': { $ne: [0, 0] } }).select('messName messAddress location rating ratingCount'));
+  } catch (error) { res.status(500).json({ error: 'Failed to fetch nearby messes' }); }
+});
+
+app.put('/api/owner/location', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized.' });
+  try {
+    const { latitude, longitude } = req.body;
+    if (!latitude || !longitude) return res.status(400).json({ error: 'Coordinates required.' });
+    await User.findByIdAndUpdate(req.user.id, { location: { type: 'Point', coordinates: [longitude, latitude] } });
+    res.status(200).json({ message: 'Location updated successfully!' });
+  } catch (error) { res.status(500).json({ error: 'Failed to update location' }); }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Backend Server running at http://localhost:${PORT}`));
 
 
 ================================================
@@ -317,8 +390,7 @@ FILE: frontend/index.html
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Avasari Connect</title>
     
-    <!-- THIS IS THE MAGIC LINE that gives us all the colors, shadows, and layout -->
-    <script src="https://cdn.tailwindcss.com"></script>
+
     
   </head>
   <body>
@@ -344,11 +416,16 @@ FILE: frontend/package.json
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "framer-motion": "^13.1.0",
+    "leaflet": "^1.9.4",
     "lucide-react": "^1.28.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.18.2",
-    "tailwindcss": "^4.3.3"
+    "recharts": "^3.10.1",
+    "tailwindcss": "^4.3.3",
+    "vite-plugin-pwa": "^1.3.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",
@@ -364,14 +441,41 @@ FILE: frontend/package.json
 ================================================
 FILE: frontend/vite.config.js
 ================================================
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
+import tailwindcss from '@tailwindcss/vite';
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
-})
-
+  plugins: [
+    react(),
+    tailwindcss(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['vite.svg'],
+      manifest: {
+        name: 'Avasari Connect',
+        short_name: 'Avasari',
+        description: 'Your campus dining and living network',
+        theme_color: '#ffffff',
+        background_color: '#ffffff',
+        display: 'standalone',
+        icons: [
+          {
+            src: 'vite.svg', // Using your existing Vite logo as a placeholder
+            sizes: '192x192',
+            type: 'image/svg+xml'
+          },
+          {
+            src: 'vite.svg',
+            sizes: '512x512',
+            type: 'image/svg+xml'
+          }
+        ]
+      }
+    })
+  ],
+});
 
 
 ================================================
@@ -422,47 +526,10 @@ export default App;
 
 
 ================================================
-FILE: frontend/src/data.js
+FILE: frontend/src/index.css
 ================================================
-export const MOCK_MESSES = [
-  {
-    id: 1,
-    name: "Shree Swami Samarth",
-    location: "Near GCOEARA Main Gate",
-    distance: "200m away",
-    menu: ["Dal Tadka 🍛", "Paneer Butter Masala 🥘", "Hot Chapati 🫓", "Jeera Rice 🍚", "Gulab Jamun 🧁"],
-    ownerPhone: "+91 9876543210",
-    time: "Dinner: 7:00 PM - 9:30 PM",
-    rating: "4.8",
-    status: "Open Now",
-    tag: "Most Popular",
-    color: "from-orange-500 to-rose-500"
-  },
-  {
-    id: 2,
-    name: "Annapurna Bhojnalaya",
-    location: "Market Square, Avasari",
-    distance: "1.2km away",
-    menu: ["Matki Usal 🍲", "Aloo Gobi 🥔", "Bhakri 🫓", "Plain Rice 🍚", "Taak (Buttermilk) 🥛"],
-    ownerPhone: "+91 9123456789",
-    time: "Dinner: 7:30 PM - 10:00 PM",
-    rating: "4.5",
-    status: "Opening Soon",
-    tag: "Healthy",
-    color: "from-emerald-500 to-teal-500"
-  }
-];
-
-export const MOCK_DIRECTORY = {
-  rickshaws: [
-    { name: "Ramesh Bhai", phone: "9876500001", area: "College to Stand", tag: "Fast", rating: "4.9" },
-    { name: "Suresh Auto", phone: "9876500002", area: "Night Emergency", tag: "24/7", rating: "4.7" }
-  ],
-  rooms: [
-    { name: "Sai PG for Boys", phone: "9998887771", status: "2 Beds Left", price: "₹1500/mo", features: ["Wifi", "Hot Water"] },
-    { name: "Gajanan Rooms", phone: "9998887772", status: "Full", price: "₹1200/mo", features: ["Parking"] }
-  ]
-};
+@import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
 
 
 ================================================
@@ -471,6 +538,7 @@ FILE: frontend/src/main.jsx
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
+import './index.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -480,164 +548,53 @@ createRoot(document.getElementById('root')).render(
 
 
 ================================================
-FILE: frontend/src/components/MessCard.jsx
+FILE: frontend/src/components/MessMap.jsx
 ================================================
-import React, { useState } from 'react';
-import { Utensils, MapPin, Navigation, Star, CheckCircle2, XCircle } from 'lucide-react';
+Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8d in position 3615: character maps to <undefined>
 
-const MessCard = ({ mess }) => {
-  const [attendance, setAttendance] = useState(null); 
-  const [isHovered, setIsHovered] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleAttendance = async (status) => {
-    setIsSubmitting(true);
-    
-    const dataToSend = {
-      messId: mess.id,
-      messName: mess.name,
-      status: status,
-      timestamp: new Date().toISOString()
-    };
+================================================
+FILE: frontend/src/components/ThemeToggle.jsx
+================================================
+import React, { useEffect, useState } from 'react';
+import { Moon, Sun } from 'lucide-react';
 
-    try {
-      const response = await fetch('http://localhost:3000/api/attendance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dataToSend)
-      });
+const ThemeToggle = () => {
+  const [isDark, setIsDark] = useState(false);
 
-      if (response.ok) {
-        setAttendance(status);
-      }
-    } catch (error) {
-      console.error("Failed to connect to backend.", error);
-    } finally {
-      setIsSubmitting(false);
+  useEffect(() => {
+    // Check local storage or system preference on load
+    const storedTheme = localStorage.getItem('theme');
+    if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      setIsDark(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    if (isDark) {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+      setIsDark(false);
+    } else {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+      setIsDark(true);
     }
   };
 
   return (
-    <div 
-      className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/80 mb-8 overflow-hidden transition-all duration-500 hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] hover:-translate-y-1 group"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+    <button 
+      onClick={toggleTheme} 
+      className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shadow-sm"
+      aria-label="Toggle Dark Mode"
     >
-      <div className={`h-3 w-full bg-gradient-to-r ${mess.color}`}></div>
-      
-      <div className="p-6 sm:p-8 pb-4">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
-                <Star size={10} className="text-amber-500 fill-amber-500" /> {mess.rating}
-              </span>
-              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${mess.status === 'Open Now' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                {mess.status}
-              </span>
-            </div>
-            <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">{mess.name}</h3>
-          </div>
-          <div className={`bg-gradient-to-br ${mess.color} p-3 rounded-2xl shadow-lg opacity-90 group-hover:opacity-100 transition-opacity`}>
-            <Utensils size={24} className="text-white" />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-x-6 gap-y-2 mb-6">
-          <p className="text-slate-500 flex items-center gap-1.5 text-sm font-semibold">
-            <MapPin size={16} className="text-indigo-400" /> {mess.location}
-          </p>
-          <p className="text-slate-500 flex items-center gap-1.5 text-sm font-semibold">
-            <Navigation size={16} className="text-indigo-400" /> {mess.distance}
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-slate-50/80 px-6 sm:px-8 py-6 border-y border-slate-100/50 relative overflow-hidden">
-        <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${mess.color} opacity-[0.03] rounded-full blur-2xl transform translate-x-10 -translate-y-10`}></div>
-        <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">
-          Today's Feast
-        </h4>
-        <div className="flex flex-wrap gap-2">
-          {mess.menu.map((item, idx) => (
-            <span key={idx} className="bg-white text-slate-700 shadow-sm border border-slate-200/60 px-4 py-2 rounded-2xl text-sm font-bold hover:scale-105 transition-transform cursor-default">
-              {item}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <div className="p-6 sm:p-8 pt-6 bg-white/50">
-        <div className="flex gap-4">
-          <button
-            onClick={() => handleAttendance('coming')}
-            disabled={isSubmitting || attendance === 'coming'}
-            className={`flex-1 flex justify-center items-center gap-2 py-4 rounded-2xl font-bold transition-all duration-300 active:scale-95 text-sm sm:text-base ${
-              attendance === 'coming'
-                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
-                : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:shadow-md'
-            }`}
-          >
-            <CheckCircle2 size={20} /> I'm Coming
-          </button>
-
-          <button
-            onClick={() => handleAttendance('not_coming')}
-            disabled={isSubmitting || attendance === 'not_coming'}
-            className={`flex-1 flex justify-center items-center gap-2 py-4 rounded-2xl font-bold transition-all duration-300 active:scale-95 text-sm sm:text-base ${
-              attendance === 'not_coming'
-                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30'
-                : 'bg-rose-50 text-rose-600 hover:bg-rose-100 hover:shadow-md'
-            }`}
-          >
-            <XCircle size={20} /> Not Today
-          </button>
-        </div>
-        
-        <div className={`overflow-hidden transition-all duration-500 ease-in-out ${attendance ? 'max-h-20 opacity-100 mt-5' : 'max-h-0 opacity-0'}`}>
-          <div className="p-3.5 bg-slate-900 text-white text-sm font-bold rounded-xl flex items-center justify-center shadow-lg">
-            <CheckCircle2 size={18} className="mr-2 text-emerald-400" /> 
-            Status sent! The owner has been notified.
-          </div>
-        </div>
-      </div>
-    </div>
+      {isDark ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
   );
 };
 
-export default MessCard;
-
-
-================================================
-FILE: frontend/src/components/Navbar.jsx
-================================================
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { BookOpen, LogIn } from 'lucide-react';
-
-const Navbar = () => {
-  return (
-    <nav className="sticky top-4 z-50 px-4">
-      <div className="max-w-4xl mx-auto bg-white/70 backdrop-blur-xl border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-3xl px-5 py-3 flex justify-between items-center transition-all">
-        <Link to="/" className="flex items-center gap-3 no-underline group">
-          <div className="bg-gradient-to-br from-indigo-600 to-violet-600 p-2.5 rounded-2xl shadow-lg shadow-indigo-500/30 group-hover:scale-105 transition-transform duration-300">
-            <BookOpen size={22} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-600 tracking-tight m-0">Avasari Connect</h1>
-            <p className="text-indigo-600 font-bold text-[9px] uppercase tracking-widest m-0 opacity-80">GCOEARA Project</p>
-          </div>
-        </Link>
-        
-        <Link to="/login" className="px-5 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-2xl hover:bg-slate-800 hover:shadow-lg hover:shadow-slate-900/20 transition-all active:scale-95 flex items-center gap-2">
-          <LogIn size={16} /> Login
-        </Link>
-      </div>
-    </nav>
-  );
-};
-
-export default Navbar;
+export default ThemeToggle;
 
 
 ================================================
@@ -645,13 +602,28 @@ FILE: frontend/src/pages/AdminDashboard.jsx
 ================================================
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-// Added Phone and User to the lucide-react imports
-import { Shield, CheckCircle, Trash2, Users, Store, Clock, LogOut, Phone, User } from 'lucide-react';
+import { Shield, CheckCircle, Trash2, Users, Store, Clock, LogOut, Phone, User, BookOpen, Plus } from 'lucide-react';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const adminData = location.state?.user;
+
+  const [users, setUsers] = useState([]);
+  const [directory, setDirectory] = useState([]);
+  const [activeTab, setActiveTab] = useState('pending');
+  
+  // Form state for new directory item
+  const [dirForm, setDirForm] = useState({ category: 'rickshaws', name: '', phone: '', area: '', tag: '' });
+
+  useEffect(() => {
+    if (adminData && adminData.role === 'admin') {
+      fetchUsers();
+      fetchDirectory();
+    }
+  }, []);
 
   if (!adminData || adminData.role !== 'admin') {
     return (
@@ -662,39 +634,62 @@ const AdminDashboard = () => {
     );
   }
 
-  const [users, setUsers] = useState([]);
-  const [activeTab, setActiveTab] = useState('pending');
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
   const fetchUsers = async () => {
+    const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://127.0.0.1:3000/api/admin/users');
+      const response = await fetch(`${API_URL}/api/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
       if(response.ok) setUsers(await response.json());
-    } catch (error) {
-      console.error(error);
-    }
+    } catch (error) { console.error(error); }
+  };
+
+  const fetchDirectory = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_URL}/api/directory`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if(response.ok) setDirectory(await response.json());
+    } catch (error) { console.error(error); }
   };
 
   const verifyOwner = async (id) => {
+    const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://127.0.0.1:3000/api/admin/verify/${id}`, { method: 'PUT' });
+      const response = await fetch(`${API_URL}/api/admin/verify/${id}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) fetchUsers();
-    } catch (error) {
-      console.error(error);
-    }
+    } catch (error) { console.error(error); }
   };
 
   const deleteUser = async (id) => {
     if (!window.confirm("Delete this user? This cannot be undone.")) return;
+    const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://127.0.0.1:3000/api/admin/users/${id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_URL}/api/admin/users/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) fetchUsers();
-    } catch (error) {
-      console.error(error);
-    }
+    } catch (error) { console.error(error); }
+  };
+
+  const addDirectoryItem = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_URL}/api/admin/directory`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(dirForm)
+      });
+      if (response.ok) {
+        setDirForm({ category: 'rickshaws', name: '', phone: '', area: '', tag: '' });
+        fetchDirectory();
+      }
+    } catch (error) { console.error(error); }
+  };
+
+  const deleteDirectoryItem = async (id) => {
+    if (!window.confirm("Delete this service?")) return;
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_URL}/api/admin/directory/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+      if (response.ok) fetchDirectory();
+    } catch (error) { console.error(error); }
   };
 
   const pendingOwners = users.filter(u => u.role === 'owner' && !u.isVerified);
@@ -708,19 +703,22 @@ const AdminDashboard = () => {
             <div className="bg-white/10 p-2 rounded-xl backdrop-blur-md border border-white/10"><Shield className="text-orange-400" size={24} /></div>
             <h1 className="text-2xl font-extrabold tracking-tight">Admin Control Panel</h1>
           </div>
-          <button onClick={() => navigate('/')} className="flex items-center gap-2 text-sm font-bold bg-white/10 hover:bg-rose-500/20 hover:text-rose-400 px-4 py-2.5 rounded-xl transition-all">
+          <button onClick={() => { localStorage.removeItem('token'); navigate('/'); }} className="flex items-center gap-2 text-sm font-bold bg-white/10 hover:bg-rose-500/20 hover:text-rose-400 px-4 py-2.5 rounded-xl transition-all">
             <LogOut size={16} /> Logout
           </button>
         </div>
       </nav>
 
       <div className="max-w-7xl mx-auto p-4 sm:p-6 mt-6">
-        <div className="flex gap-4 mb-8 border-b border-slate-200/60 pb-2">
-          <button onClick={() => setActiveTab('pending')} className={`flex items-center gap-2 px-6 py-3 font-extrabold rounded-t-2xl transition-all ${activeTab === 'pending' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'}`}>
+        <div className="flex gap-4 mb-8 border-b border-slate-200/60 pb-2 overflow-x-auto">
+          <button onClick={() => setActiveTab('pending')} className={`flex items-center gap-2 px-6 py-3 font-extrabold rounded-t-2xl whitespace-nowrap transition-all ${activeTab === 'pending' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'}`}>
             <Clock size={18} /> Pending Approvals <span className="bg-white/20 px-2 py-0.5 rounded-md ml-1">{pendingOwners.length}</span>
           </button>
-          <button onClick={() => setActiveTab('directory')} className={`flex items-center gap-2 px-6 py-3 font-extrabold rounded-t-2xl transition-all ${activeTab === 'directory' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'}`}>
-            <Users size={18} /> User Directory <span className="bg-white/20 px-2 py-0.5 rounded-md ml-1">{directoryUsers.length}</span>
+          <button onClick={() => setActiveTab('users')} className={`flex items-center gap-2 px-6 py-3 font-extrabold rounded-t-2xl whitespace-nowrap transition-all ${activeTab === 'users' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'}`}>
+            <Users size={18} /> User Accounts
+          </button>
+          <button onClick={() => setActiveTab('directory')} className={`flex items-center gap-2 px-6 py-3 font-extrabold rounded-t-2xl whitespace-nowrap transition-all ${activeTab === 'directory' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'}`}>
+            <BookOpen size={18} /> Service Directory
           </button>
         </div>
 
@@ -735,25 +733,19 @@ const AdminDashboard = () => {
             ) : (
               <div className="grid gap-6">
                 {pendingOwners.map(owner => (
-                  <div key={owner._id} className="border border-amber-200/60 bg-amber-50/40 p-6 rounded-3xl flex flex-col md:flex-row justify-between md:items-center gap-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div key={owner._id} className="border border-amber-200/60 bg-amber-50/40 p-6 rounded-3xl flex flex-col md:flex-row justify-between md:items-center gap-6 shadow-sm">
+                    {/* ... (Existing pending code) ... */}
                     <div>
                       <h3 className="text-2xl font-black text-slate-900 mb-2">{owner.messName}</h3>
                       <div className="flex flex-wrap gap-4 text-sm font-semibold text-slate-600">
                         <span className="flex items-center gap-1.5"><User size={16} className="text-slate-400"/> {owner.name}</span>
                         <span className="flex items-center gap-1.5"><Phone size={16} className="text-slate-400"/> {owner.phone}</span>
                       </div>
-                      <div className="mt-3 inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-amber-100 shadow-sm text-xs font-bold text-slate-700">
-                        <Shield size={14} className="text-amber-500"/> FSSAI: {owner.fssaiNumber || 'Not Provided'}
-                      </div>
-                      <p className="text-xs font-bold text-slate-400 mt-2 ml-1">Address: {owner.messAddress}</p>
+                      <p className="text-xs font-bold text-slate-400 mt-2 ml-1">FSSAI: {owner.fssaiNumber || 'None'}</p>
                     </div>
-                    <div className="flex gap-3 md:flex-col lg:flex-row">
-                      <button onClick={() => verifyOwner(owner._id)} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-95">
-                        <CheckCircle size={18} /> Approve
-                      </button>
-                      <button onClick={() => deleteUser(owner._id)} className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 px-6 py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 border border-rose-100">
-                        <Trash2 size={18} /> Reject
-                      </button>
+                    <div className="flex gap-3">
+                      <button onClick={() => verifyOwner(owner._id)} className="bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2"><CheckCircle size={18} /> Approve</button>
+                      <button onClick={() => deleteUser(owner._id)} className="bg-rose-50 text-rose-600 px-6 py-3 rounded-xl font-bold flex items-center gap-2"><Trash2 size={18} /> Reject</button>
                     </div>
                   </div>
                 ))}
@@ -762,48 +754,70 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {activeTab === 'directory' && (
-          <div className="bg-white/70 backdrop-blur-xl rounded-[2.5rem] p-6 sm:p-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/80 overflow-x-auto animate-in fade-in duration-500">
-            <h2 className="text-2xl font-extrabold mb-8 text-slate-800 flex items-center gap-3"><div className="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl"><Users size={24}/></div> Complete Community Directory</h2>
-            <div className="min-w-[700px]">
-              <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-slate-100/80 rounded-2xl text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">
-                <div className="col-span-2">Role</div>
-                <div className="col-span-4">Name / Mess</div>
-                <div className="col-span-3">Phone</div>
-                <div className="col-span-2">Status</div>
-                <div className="col-span-1 text-right">Action</div>
-              </div>
-              <div className="space-y-3">
+        {activeTab === 'users' && (
+          <div className="bg-white/70 backdrop-blur-xl rounded-[2.5rem] p-6 sm:p-10 shadow-sm border border-white/80 overflow-x-auto animate-in fade-in">
+             <h2 className="text-2xl font-extrabold mb-8 text-slate-800 flex items-center gap-3"><div className="p-2.5 bg-slate-100 text-slate-600 rounded-xl"><Users size={24}/></div> All Users</h2>
+             {/* ... (Keep existing User table loop here, simplified for brevity) ... */}
+             <div className="space-y-3">
                 {directoryUsers.map(user => (
-                  <div key={user._id} className="grid grid-cols-12 gap-4 px-6 py-5 bg-white border border-slate-100 rounded-2xl items-center shadow-sm hover:shadow-md transition-all hover:border-indigo-100 group">
-                    <div className="col-span-2">
-                      <span className={`px-3 py-1.5 rounded-xl text-xs font-extrabold uppercase ${user.role === 'owner' ? 'bg-orange-100 text-orange-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                        {user.role}
-                      </span>
-                    </div>
-                    <div className="col-span-4">
-                      <div className="font-extrabold text-slate-800 text-base">{user.role === 'owner' ? user.messName : (user.name || user.fullName || 'Student')}</div>
-                      <div className="text-xs text-slate-400 font-bold mt-0.5">{user.role === 'owner' ? `Owner: ${user.name || user.fullName || 'Unknown'}` : user.yearBranch || 'Student'}</div>
-                    </div>
-                    <div className="col-span-3 font-bold text-slate-600 flex items-center gap-2">
-                      <Phone size={14} className="text-slate-300"/> {user.phone}
-                    </div>
-                    <div className="col-span-2 text-sm">
-                      {user.role === 'owner' ? (
-                        user.isVerified ? <span className="text-emerald-600 font-bold flex items-center gap-1.5 bg-emerald-50 px-2 py-1 rounded-lg w-fit"><CheckCircle size={14}/> Verified</span> : <span className="text-amber-600 font-bold flex items-center gap-1.5 bg-amber-50 px-2 py-1 rounded-lg w-fit"><Clock size={14}/> Pending</span>
-                      ) : (
-                        <span className="text-slate-300 font-bold">â€”</span>
-                      )}
-                    </div>
-                    <div className="col-span-1 text-right">
-                      <button onClick={() => deleteUser(user._id)} className="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-2.5 rounded-xl transition-all">
-                        <Trash2 size={18} />
-                      </button>
+                  <div key={user._id} className="grid grid-cols-12 gap-4 px-6 py-4 bg-white border border-slate-100 rounded-2xl items-center shadow-sm">
+                    <div className="col-span-3 font-extrabold text-slate-800">{user.role === 'owner' ? user.messName : user.name}</div>
+                    <div className="col-span-2 text-xs font-bold uppercase">{user.role}</div>
+                    <div className="col-span-3 font-bold text-slate-600">{user.phone}</div>
+                    <div className="col-span-4 text-right">
+                      <button onClick={() => deleteUser(user._id)} className="text-rose-500 hover:bg-rose-50 p-2 rounded-lg"><Trash2 size={18} /></button>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
+          </div>
+        )}
+
+        {activeTab === 'directory' && (
+          <div className="bg-white/70 backdrop-blur-xl rounded-[2.5rem] p-6 sm:p-10 shadow-sm border border-white/80 animate-in fade-in">
+             <h2 className="text-2xl font-extrabold mb-8 text-slate-800 flex items-center gap-3"><div className="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl"><BookOpen size={24}/></div> Service Directory Manager</h2>
+             
+             {/* Form to Add Service */}
+             <form onSubmit={addDirectoryItem} className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 mb-8 grid md:grid-cols-5 gap-4 items-end">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Category</label>
+                  <select value={dirForm.category} onChange={e => setDirForm({...dirForm, category: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200">
+                    <option value="rickshaws">Auto Rickshaws</option>
+                    <option value="rooms">PGs & Rooms</option>
+                    <option value="emergency">Emergency</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Service Name</label>
+                  <input required value={dirForm.name} onChange={e => setDirForm({...dirForm, name: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200" placeholder="e.g. Ramesh Auto"/>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Phone Number</label>
+                  <input required value={dirForm.phone} onChange={e => setDirForm({...dirForm, phone: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200" placeholder="e.g. 9876543210"/>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">Area / Details</label>
+                  <input value={dirForm.area} onChange={e => setDirForm({...dirForm, area: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200" placeholder="e.g. College Stand"/>
+                </div>
+                <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                  <Plus size={18} /> Add Service
+                </button>
+             </form>
+
+             {/* List Directory */}
+             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+               {directory.map(item => (
+                 <div key={item._id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-start">
+                   <div>
+                     <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase mb-2 inline-block ${item.category === 'emergency' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>{item.category}</span>
+                     <h4 className="font-extrabold text-slate-800">{item.name}</h4>
+                     <p className="text-sm font-bold text-slate-500 flex items-center gap-1 mt-1"><Phone size={14}/> {item.phone}</p>
+                     <p className="text-xs text-slate-400 mt-1">{item.area}</p>
+                   </div>
+                   <button onClick={() => deleteDirectoryItem(item._id)} className="text-slate-300 hover:text-rose-500 p-2"><Trash2 size={18}/></button>
+                 </div>
+               ))}
+             </div>
           </div>
         )}
       </div>
@@ -817,214 +831,13 @@ export default AdminDashboard;
 ================================================
 FILE: frontend/src/pages/AuthPage.jsx
 ================================================
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  ShieldCheck, UserPlus, ChevronRight, ChevronLeft, 
-  User, Phone, Lock, BookOpen, ChefHat, 
-  MapPin, FileText, CheckCircle2, AlertCircle, LogIn 
-} from 'lucide-react';
-
-const AuthPage = () => {
-  const navigate = useNavigate();
-  const [isLogin, setIsLogin] = useState(true);
-  const [role, setRole] = useState('student');
-  const [step, setStep] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const [formData, setFormData] = useState({
-    name: '', phone: '', password: '', yearBranch: '', hostelRoom: '', messName: '', messAddress: '', fssaiNumber: '',
-  });
-
-  const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const nextStep = () => setStep(step + 1);
-  const prevStep = () => setStep(step - 1);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    const endpoint = isLogin ? '/api/login' : '/api/register';
-    const payload = isLogin ? { phone: formData.phone, password: formData.password } : { ...formData, role };
-
-    try {
-      const response = await fetch(`http://127.0.0.1:3000${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await response.json();
-
-      if (response.ok) {
-        if (data.user.role === 'admin') navigate('/admin', { state: { user: data.user } });
-        else if (data.user.role === 'owner') navigate('/owner', { state: { user: data.user } });
-        else navigate('/student', { state: { user: data.user } });
-      } else {
-        setError(data.error || 'Authentication failed');
-      }
-    } catch (err) {
-      setError('Cannot connect to server. Ensure backend is running.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-[85vh] flex items-center justify-center p-4 font-sans relative z-10">
-      <div className="bg-white/70 backdrop-blur-2xl p-8 sm:p-10 rounded-[2.5rem] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] border border-white/80 w-full max-w-md relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
-
-        <div className="text-center mb-8 mt-2">
-          <div className="inline-flex bg-gradient-to-br from-indigo-50 to-purple-50 p-4 rounded-[2rem] mb-4 shadow-inner border border-white">
-            {isLogin ? <LogIn size={36} className="text-indigo-600" /> : <UserPlus size={36} className="text-purple-600" />}
-          </div>
-          <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">{isLogin ? 'Welcome Back' : 'Join AvasariConnect'}</h2>
-          <p className="text-slate-500 font-medium text-sm mt-1">Your campus dining and living network</p>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-2xl mb-6 flex items-center gap-2 text-sm font-semibold border border-red-100 animate-in fade-in">
-            <AlertCircle size={18} /> {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {isLogin ? (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">Phone Number</label>
-                <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input type="tel" name="phone" placeholder="9876543210" required className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-800 shadow-sm transition-all" onChange={handleInputChange} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input type="password" name="password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-800 shadow-sm transition-all" onChange={handleInputChange} />
-                </div>
-              </div>
-              <button type="submit" disabled={isLoading} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-2xl shadow-xl shadow-slate-900/10 transition-all flex items-center justify-center gap-2 text-lg active:scale-[0.98] disabled:opacity-50">
-                {isLoading ? 'Signing In...' : <><LogIn size={20} /> Sign In</>}
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex bg-slate-200/50 p-1 rounded-2xl mb-6">
-                <button type="button" onClick={() => setRole('student')} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${role === 'student' ? 'bg-white shadow-sm text-indigo-600 scale-100' : 'text-slate-500 hover:text-slate-700 scale-95 hover:scale-100'}`}>Student</button>
-                <button type="button" onClick={() => setRole('owner')} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${role === 'owner' ? 'bg-white shadow-sm text-purple-600 scale-100' : 'text-slate-500 hover:text-slate-700 scale-95 hover:scale-100'}`}>Mess Owner</button>
-              </div>
-
-              {role === 'student' ? (
-                <div className="space-y-4 animate-in fade-in zoom-in-95">
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input type="text" name="name" placeholder="Full Name" required className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 font-bold text-slate-800 shadow-sm transition-all" onChange={handleInputChange} />
-                  </div>
-                  <div className="relative">
-                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input type="tel" name="phone" placeholder="Mobile Number" required className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 font-bold text-slate-800 shadow-sm transition-all" onChange={handleInputChange} />
-                  </div>
-                  <div className="relative">
-                    <BookOpen className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input type="text" name="yearBranch" placeholder="Year & Branch (e.g. 2nd Yr Computer)" className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 font-bold text-slate-800 shadow-sm transition-all" onChange={handleInputChange} />
-                  </div>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input type="password" name="password" placeholder="Create Password" required className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 font-bold text-slate-800 shadow-sm transition-all" onChange={handleInputChange} />
-                  </div>
-                  <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold py-4 rounded-2xl shadow-xl shadow-indigo-500/30 transition-all flex items-center justify-center gap-2 text-lg active:scale-[0.98] disabled:opacity-50">
-                    {isLoading ? 'Creating...' : <><UserPlus size={20} /> Register Student</>}
-                  </button>
-                </div>
-              ) : (
-                <div className="animate-in fade-in zoom-in-95">
-                  <div className="flex justify-between mb-6 relative">
-                    <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-200 -z-10 -translate-y-1/2 rounded"></div>
-                    <div className={`absolute top-1/2 left-0 h-1 bg-orange-500 -z-10 -translate-y-1/2 rounded transition-all duration-300 ${step === 1 ? 'w-0' : step === 2 ? 'w-1/2' : 'w-full'}`}></div>
-                    {[1, 2, 3].map((num) => (
-                      <div key={num} className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border-2 transition-colors duration-300 ${step >= num ? 'bg-orange-500 border-orange-500 text-white' : 'bg-white border-slate-300 text-slate-400'}`}>
-                        {step > num ? <CheckCircle2 size={16} /> : num}
-                      </div>
-                    ))}
-                  </div>
-
-                  {step === 1 && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                      <div className="relative">
-                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input type="text" name="name" placeholder="Owner Full Name" required className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:border-orange-500 font-bold text-slate-800 shadow-sm" onChange={handleInputChange} value={formData.name} />
-                      </div>
-                      <div className="relative">
-                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input type="tel" name="phone" placeholder="Mobile Number" required className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:border-orange-500 font-bold text-slate-800 shadow-sm" onChange={handleInputChange} value={formData.phone} />
-                      </div>
-                      <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input type="password" name="password" placeholder="Create Password" required className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:border-orange-500 font-bold text-slate-800 shadow-sm" onChange={handleInputChange} value={formData.password} />
-                      </div>
-                      <button type="button" onClick={nextStep} className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg hover:bg-slate-800 active:scale-[0.98] transition-all">Next Step <ChevronRight size={20} /></button>
-                    </div>
-                  )}
-                  {step === 2 && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                      <div className="relative">
-                        <ChefHat className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input type="text" name="messName" placeholder="Mess Name" required className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:border-orange-500 font-bold text-slate-800 shadow-sm" onChange={handleInputChange} value={formData.messName} />
-                      </div>
-                      <div className="relative">
-                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input type="text" name="messAddress" placeholder="Full Address / Landmark" required className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:border-orange-500 font-bold text-slate-800 shadow-sm" onChange={handleInputChange} value={formData.messAddress} />
-                      </div>
-                      <div className="flex gap-3">
-                        <button type="button" onClick={prevStep} className="w-1/3 bg-slate-200 text-slate-700 font-bold py-4 rounded-2xl flex items-center justify-center hover:bg-slate-300 transition-colors"><ChevronLeft size={20} /></button>
-                        <button type="button" onClick={nextStep} className="w-2/3 bg-slate-900 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-lg hover:bg-slate-800 active:scale-[0.98] transition-all">Next Step <ChevronRight size={20} /></button>
-                      </div>
-                    </div>
-                  )}
-                  {step === 3 && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                      <div className="relative">
-                        <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input type="text" name="fssaiNumber" placeholder="FSSAI License Number (Optional)" className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:border-orange-500 font-bold text-slate-800 shadow-sm" onChange={handleInputChange} value={formData.fssaiNumber} />
-                      </div>
-                      <div className="flex gap-3">
-                        <button type="button" onClick={prevStep} className="w-1/3 bg-slate-200 text-slate-700 font-bold py-4 rounded-2xl flex items-center justify-center hover:bg-slate-300 transition-colors"><ChevronLeft size={20} /></button>
-                        <button type="submit" disabled={isLoading} className="w-2/3 bg-gradient-to-r from-orange-500 to-rose-500 text-white font-bold py-4 rounded-2xl shadow-xl flex items-center justify-center gap-2 disabled:opacity-70 hover:shadow-orange-500/30 active:scale-[0.98] transition-all">
-                          {isLoading ? 'Submitting...' : <><ShieldCheck size={20} /> Complete</>}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </form>
-
-        <div className="mt-8 text-center border-t border-slate-100 pt-6">
-          <button onClick={() => { setIsLogin(!isLogin); setError(''); }} className="text-sm font-extrabold text-indigo-600 hover:text-indigo-700 transition-colors">
-            {isLogin ? "Don't have an account? Sign up here" : "Already have an account? Sign in"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default AuthPage;
+Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8d in position 14128: character maps to <undefined>
 
 
 ================================================
 FILE: frontend/src/pages/OwnerDashboard.jsx
 ================================================
-Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8f in position 3787: character maps to <undefined>
+Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8f in position 9775: character maps to <undefined>
 
 
 ================================================
@@ -1032,86 +845,147 @@ FILE: frontend/src/pages/StudentDashboard.jsx
 ================================================
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Utensils, MapPin, Navigation, Home, Phone, CheckCircle2, XCircle, LogOut, Loader2, IndianRupee, Star, AlertTriangle } from 'lucide-react';
+import { Utensils, MapPin, Navigation, Home, Phone, CheckCircle2, XCircle, LogOut, Loader2, IndianRupee, Star, AlertTriangle, Sparkles, CalendarDays, Trophy, MessageSquareQuote, Map } from 'lucide-react';
+import MessMap from '../components/MessMap';
+import ThemeToggle from '../components/ThemeToggle';
 
-const MOCK_DIRECTORY = {
-  rickshaws: [
-    { name: "Ramesh Auto", phone: "9876500001", area: "College to Stand", rating: "4.9", tag: "Fast" },
-    { name: "Suresh Auto", phone: "9876500002", area: "Night Emergency", rating: "4.8", tag: "24/7" }
-  ],
-  rooms: [
-    { name: "Sai PG for Boys", phone: "9998887771", status: "2 Beds Left", price: "â‚¹1500/mo", features: ["Wifi", "Water"] },
-    { name: "Gajanan Rooms", phone: "9998887772", status: "Full", price: "â‚¹1200/mo", features: ["Parking"] }
-  ],
-  emergency: [
-    { name: "Avasari Hospital", phone: "108", status: "24/7 Ambulance", tag: "Urgent" },
-    { name: "Campus Security", phone: "9999900000", status: "Main Gate Guard", tag: "On Duty" }
-  ]
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+const getLocalDateString = (offsetDays = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 };
 
-const MessCard = ({ mess }) => {
-  const [attendance, setAttendance] = useState(null); 
+const MessCard = ({ mess, initialAttendance, targetDate, globalHasCommitted, onAttendanceUpdate }) => {
+  const [attendance, setAttendance] = useState(initialAttendance || null); 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [hasRated, setHasRated] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [showReviews, setShowReviews] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const handleAttendance = async (status) => {
-    setIsSubmitting(true);
+  useEffect(() => {
+    setAttendance(initialAttendance || null);
+  }, [initialAttendance]);
+
+  const fetchReviews = async () => {
+    const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://127.0.0.1:3000/api/attendance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messId: mess._id, messName: mess.messName, status, timestamp: new Date().toISOString() })
-      });
-      if (response.ok) setAttendance(status);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsSubmitting(false);
-    }
+      const res = await fetch(`${API_URL}/api/messes/${mess.ownerId._id}/reviews`, { headers: { 'Authorization': `Bearer ${token}` }});
+      if (res.ok) setReviews(await res.json());
+      setShowReviews(!showReviews);
+    } catch (e) { console.error(e); }
   };
 
+  const handleAttendance = async (status) => {
+    setIsSubmitting(true); setErrorMsg('');
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_URL}/api/attendance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ messId: mess._id, messName: mess.messName, status, targetDate, timestamp: new Date().toISOString() })
+      });
+      const data = await response.json();
+      if (response.ok) { setAttendance(status); onAttendanceUpdate(true); } 
+      else setErrorMsg(data.error || "Action not allowed.");
+    } catch (error) { setErrorMsg("Connection failed."); } 
+    finally { setIsSubmitting(false); }
+  };
+
+  const handleRating = async (e) => {
+    e.preventDefault();
+    if(rating === 0) return;
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_URL}/api/messes/${mess.ownerId._id}/rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ rating, comment })
+      });
+      if (response.ok) setHasRated(true);
+    } catch (error) { console.error("Failed to submit rating"); }
+  };
+
+  const currentRating = mess.ownerId?.rating ? Number(mess.ownerId.rating).toFixed(1) : 'New';
+  const isLocked = attendance !== null; 
+  const disableComing = isSubmitting || isLocked || (globalHasCommitted && attendance !== 'coming');
+  const disableSkip = isSubmitting || isLocked;
+
   return (
-    <div className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/80 mb-8 overflow-hidden transition-all hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] hover:-translate-y-1 group">
-      <div className="h-3 w-full bg-gradient-to-r from-orange-500 to-rose-500"></div>
+    <div className={`relative bg-white/60 dark:bg-slate-800/60 backdrop-blur-2xl rounded-[2rem] border transition-all duration-300 hover:shadow-2xl group mb-8 overflow-hidden
+      ${attendance === 'coming' ? 'border-emerald-400 dark:border-emerald-500 shadow-[0_0_40px_rgba(16,185,129,0.15)]' : 
+        attendance === 'not_coming' ? 'border-rose-200 dark:border-rose-900/50 opacity-80' : 'border-white/80 dark:border-slate-700 shadow-xl'}`}>
       
-      <div className="p-6 sm:p-8 pb-4">
+      <div className={`h-2 w-full transition-colors duration-500 ${attendance === 'coming' ? 'bg-emerald-500' : attendance === 'not_coming' ? 'bg-rose-500' : 'bg-gradient-to-r from-orange-500 to-rose-500'}`}></div>
+      
+      <div className="p-6 sm:p-8 pb-2">
         <div className="flex justify-between items-start mb-4">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">Open Now</span>
-              <span className="bg-orange-100 text-orange-700 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1"><IndianRupee size={12}/> {mess.price || '60'} Thali</span>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-1 shadow-sm"><Star size={10} className="fill-amber-400 text-amber-400" /> {currentRating}</span>
+              <span className="bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400 text-[10px] font-bold px-3 py-1 rounded-full uppercase flex items-center gap-1"><IndianRupee size={12}/> {mess.price || '60'} Thali</span>
             </div>
-            <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">{mess.messName}</h3>
-          </div>
-          <div className="bg-gradient-to-br from-orange-500 to-rose-500 p-3 rounded-2xl shadow-lg shadow-orange-500/30 text-white group-hover:scale-105 transition-transform">
-            <Utensils size={24} />
+            <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">{mess.messName}</h3>
           </div>
         </div>
-      </div>
 
-      <div className="bg-slate-50/80 px-6 sm:px-8 py-6 border-y border-slate-100/50 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500 opacity-[0.03] rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
-        <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">Today's Feast</h4>
-        <div className="flex flex-wrap gap-2">
-          {mess.items.map((item, idx) => (
-            <span key={idx} className="bg-white text-slate-700 shadow-sm border border-slate-200/60 px-4 py-2 rounded-2xl text-sm font-bold cursor-default hover:border-orange-300 transition-colors">
-              {item}
-            </span>
-          ))}
+        <div className="bg-slate-50/80 dark:bg-slate-900/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-700/50 relative overflow-hidden mb-6">
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl"></div>
+          <h4 className="font-bold text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-2 text-xs uppercase tracking-widest"><Sparkles size={14} className="text-orange-400"/> Feast Menu</h4>
+          <div className="flex flex-wrap gap-2 relative z-10">
+            {mess.items.map((item, idx) => (
+              <span key={idx} className="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm border border-slate-200 dark:border-slate-600 px-3.5 py-1.5 rounded-xl text-sm font-semibold">{item}</span>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="p-6 sm:p-8 pt-6 bg-white/50">
-        <div className="flex gap-4">
-          <button onClick={() => handleAttendance('coming')} disabled={isSubmitting || attendance === 'coming'} className={`flex-1 flex justify-center items-center gap-2 py-4 rounded-2xl font-bold transition-all active:scale-[0.98] ${attendance === 'coming' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}>
-            <CheckCircle2 size={20} /> Coming
-          </button>
-          <button onClick={() => handleAttendance('not_coming')} disabled={isSubmitting || attendance === 'not_coming'} className={`flex-1 flex justify-center items-center gap-2 py-4 rounded-2xl font-bold transition-all active:scale-[0.98] ${attendance === 'not_coming' ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}`}>
-            <XCircle size={20} /> Skip
-          </button>
+        <div className="flex gap-3">
+          <button onClick={() => handleAttendance('coming')} disabled={disableComing} className={`flex-1 flex justify-center items-center gap-2 py-3.5 rounded-xl font-bold transition-all duration-300 ${attendance === 'coming' ? 'bg-emerald-500 text-white shadow-lg ring-4 ring-emerald-500/20' : disableComing ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-300 dark:text-slate-600 cursor-not-allowed border border-transparent' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-500/20 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-600 active:scale-95 shadow-sm hover:shadow'}`}><CheckCircle2 size={20} /> Coming</button>
+          <button onClick={() => handleAttendance('not_coming')} disabled={disableSkip} className={`flex-1 flex justify-center items-center gap-2 py-3.5 rounded-xl font-bold transition-all duration-300 ${attendance === 'not_coming' ? 'bg-rose-500 text-white shadow-lg ring-4 ring-rose-500/20' : disableSkip ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-300 dark:text-slate-600 cursor-not-allowed border border-transparent' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 hover:bg-rose-50 dark:hover:bg-rose-500/20 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-600 active:scale-95 shadow-sm hover:shadow'}`}><XCircle size={20} /> Skip</button>
         </div>
-        {attendance && (
-          <div className="mt-5 p-3.5 bg-slate-900 text-white text-sm font-bold rounded-xl flex items-center justify-center shadow-lg animate-in slide-in-from-bottom-2">
-            <CheckCircle2 size={18} className="mr-2 text-emerald-400" /> Attendance sent to owner!
+
+        {errorMsg && <p className="text-rose-500 dark:text-rose-400 text-sm font-bold text-center mt-4">{errorMsg}</p>}
+        
+        {attendance === 'coming' && (
+          <div className="mt-6 border-t border-slate-100 dark:border-slate-700 pt-6 animate-in slide-in-from-bottom-2">
+            {!hasRated ? (
+              <form onSubmit={handleRating} className="bg-slate-50 dark:bg-slate-900/50 p-5 rounded-2xl border border-slate-200 dark:border-slate-700">
+                <p className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">Leave a review!</p>
+                <div className="flex gap-1 mb-3">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button key={star} type="button" onClick={() => setRating(star)} className="focus:outline-none transition-transform hover:scale-110">
+                      <Star size={24} className={star <= rating ? "text-amber-400 fill-amber-400 drop-shadow-md" : "text-slate-300 dark:text-slate-600"} />
+                    </button>
+                  ))}
+                </div>
+                <textarea rows="2" placeholder="How was the food?" value={comment} onChange={e => setComment(e.target.value)} className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none mb-3 dark:text-white" />
+                <button type="submit" disabled={rating === 0} className="w-full bg-slate-900 dark:bg-orange-500 text-white font-bold py-2.5 rounded-xl disabled:opacity-50">Submit Review</button>
+              </form>
+            ) : (
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl border border-emerald-100 dark:border-emerald-500/20 text-center text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center gap-2"><CheckCircle2 size={18}/> Review Submitted</div>
+            )}
+          </div>
+        )}
+
+        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-center">
+          <button onClick={fetchReviews} className="text-xs font-bold text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 flex items-center gap-1"><MessageSquareQuote size={14}/> {showReviews ? 'Hide' : 'Read'} Student Reviews</button>
+        </div>
+
+        {showReviews && (
+          <div className="mt-4 space-y-3 animate-in fade-in">
+            {reviews.length === 0 ? <p className="text-xs text-center text-slate-400">No reviews yet.</p> : reviews.map(r => (
+              <div key={r._id} className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl text-sm border border-slate-100 dark:border-slate-800">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-bold text-slate-700 dark:text-slate-300">{r.studentName}</span>
+                  <span className="flex text-amber-400"><Star size={12} className="fill-amber-400"/> {r.rating}</span>
+                </div>
+                <p className="text-slate-500 dark:text-slate-400 text-xs italic">"{r.comment || 'No comment provided'}"</p>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -1119,127 +993,201 @@ const MessCard = ({ mess }) => {
   );
 };
 
-const DirectoryCard = ({ title, items, icon: Icon, colorClass }) => (
-  <div className="mb-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
-    <h3 className="text-2xl font-extrabold text-slate-800 mb-6 flex items-center gap-3">
-      <div className={`p-2.5 rounded-2xl text-white shadow-lg ${colorClass}`}><Icon size={24} /></div>
-      {title}
-    </h3>
-    <div className="grid sm:grid-cols-2 gap-5">
-      {items.map((item, idx) => (
-        <div key={idx} className="bg-white/70 backdrop-blur-xl p-6 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/80 hover:-translate-y-1 transition-all hover:shadow-lg group">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h4 className="font-extrabold text-slate-800 text-lg mb-1">{item.name}</h4>
-              <p className="text-slate-500 font-medium text-sm">{item.area || item.status}</p>
+const DirectoryCard = ({ title, items, icon: Icon, colorClass }) => {
+  if (items.length === 0) return null;
+  return (
+    <div className="mb-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
+      <h3 className="text-xl font-black text-slate-800 dark:text-white mb-6 flex items-center gap-3"><div className={`p-3 rounded-2xl text-white shadow-lg ${colorClass}`}><Icon size={20} /></div> {title}</h3>
+      <div className="grid sm:grid-cols-2 gap-4">
+        {items.map((item, idx) => (
+          <div key={idx} className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl p-5 rounded-3xl border border-slate-200/60 dark:border-slate-700 hover:-translate-y-1 transition-all hover:shadow-xl group flex flex-col justify-between">
+            <div className="mb-4">
+              <h4 className="font-extrabold text-slate-900 dark:text-white text-lg">{item.name}</h4>
+              <p className="text-slate-500 dark:text-slate-400 font-medium text-sm mt-1">{item.area || item.status}</p>
             </div>
-            {item.rating && (
-              <span className="bg-slate-100 text-slate-700 text-xs font-bold px-2 py-1 rounded-lg flex items-center gap-1">
-                <Star size={12} className="text-amber-500 fill-amber-500"/> {item.rating}
-              </span>
-            )}
+            <a href={`tel:${item.phone}`} className="w-full flex items-center justify-center gap-2 py-3 bg-slate-900 dark:bg-slate-700 hover:bg-indigo-600 text-white font-bold rounded-xl transition-all shadow-md">
+              <Phone size={16} /> Call {item.phone}
+            </a>
           </div>
-          
-          <div className="mb-5 flex gap-2">
-            {item.tag && <span className="bg-indigo-50 text-indigo-600 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase">{item.tag}</span>}
-            {item.price && <span className="bg-emerald-50 text-emerald-600 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase">{item.price}</span>}
-            {item.features && item.features.map(f => <span key={f} className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded-md uppercase">{f}</span>)}
-          </div>
-
-          <a href={`tel:${item.phone}`} className="w-full flex items-center justify-center gap-2 py-3 bg-slate-50 hover:bg-slate-900 hover:text-white text-slate-700 font-bold rounded-xl transition-colors">
-            <Phone size={16} /> Call {item.phone}
-          </a>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const StudentDashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const user = location.state?.user;
 
+  const [activeTab, setActiveTab] = useState('menus');
+  const [targetDate, setTargetDate] = useState(getLocalDateString(0));
+  
+  const [menus, setMenus] = useState([]);
+  const [myAttendance, setMyAttendance] = useState([]);
+  const [globalHasCommitted, setGlobalHasCommitted] = useState(false);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [directory, setDirectory] = useState({ rickshaws: [], rooms: [], emergency: [] });
+  const [isLoading, setIsLoading] = useState(true);
+  const [nearbyMesses, setNearbyMesses] = useState([]);
+
   if (!user || user.role !== 'student') {
     return (
-      <div className="min-h-screen flex items-center justify-center flex-col gap-4 font-sans">
-        <p>Unauthorized access.</p>
-        <button onClick={() => navigate('/')} className="text-indigo-600 font-bold underline">Go to Login</button>
-      </div>
+      <div className="min-h-screen flex items-center justify-center bg-slate-900"><button onClick={() => navigate('/')} className="text-indigo-400 font-bold underline">Go to Login</button></div>
     );
   }
 
-  const [activeTab, setActiveTab] = useState('menus');
-  const [menus, setMenus] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-
   useEffect(() => {
-    fetchMenus();
-  }, []);
+    fetchData(false); 
+    fetchLeaderboard();
 
-  const fetchMenus = async () => {
+    const intervalId = setInterval(() => {
+      fetchData(true);
+      fetchLeaderboard();
+    }, 10000);
+
+    return () => clearInterval(intervalId);
+  }, [targetDate]);
+
+  const fetchData = async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
+    const token = localStorage.getItem('token');
+    const headers = { 'Authorization': `Bearer ${token}` };
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const response = await fetch(`http://127.0.0.1:3000/api/menus/${today}`);
-      if (response.ok) setMenus(await response.json());
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
+      const menuRes = await fetch(`${API_URL}/api/menus/${targetDate}`, { headers });
+      if (menuRes.ok) setMenus(await menuRes.json());
+
+      const attRes = await fetch(`${API_URL}/api/attendance/me/${targetDate}`, { headers });
+      if (attRes.ok) {
+        const myAtt = await attRes.json();
+        setMyAttendance(myAtt);
+        setGlobalHasCommitted(myAtt.some(a => a.status === 'coming'));
+      }
+
+      const dirRes = await fetch(`${API_URL}/api/directory`, { headers });
+      if (dirRes.ok) {
+        const rawDir = await dirRes.json();
+        setDirectory({ rickshaws: rawDir.filter(d => d.category === 'rickshaws'), rooms: rawDir.filter(d => d.category === 'rooms'), emergency: rawDir.filter(d => d.category === 'emergency') });
+      }
+    } catch (error) { console.error(error); } 
+    finally { if (!isSilent) setIsLoading(false); }
   };
 
-  const studentName = (user.name || user.fullName || 'Engineer').split(' ')[0];
+  const fetchLeaderboard = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/messes/leaderboard`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (res.ok) setLeaderboard(await res.json());
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchNearbyMesses = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/messes/nearby`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (res.ok) setNearbyMesses(await res.json());
+    } catch (e) { console.error(e); }
+  };
+
+  const getAttendanceStatus = (messName) => {
+    const record = myAttendance.find(a => a.messName === messName);
+    return record ? record.status : null;
+  };
+
+  const studentName = (user.name || user.fullName || 'Student').split(' ')[0];
 
   return (
-    <div className="pb-20 font-sans relative z-10">
-      <nav className="bg-white/70 backdrop-blur-xl border-b border-slate-100 p-4 sticky top-0 z-40 mb-8 shadow-sm">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <h1 className="font-extrabold text-slate-800 text-lg flex items-center gap-2"><Utensils className="text-indigo-600"/>AvasariConnect</h1>
-          <button onClick={() => navigate('/')} className="flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-rose-600 hover:bg-rose-50 px-4 py-2 rounded-xl transition-colors">
-            <LogOut size={16} /> Logout
-          </button>
+    <div className="font-sans relative z-10 min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-500 overflow-hidden">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-indigo-500/10 dark:bg-indigo-500/5 rounded-[100%] blur-[100px] -z-10 pointer-events-none"></div>
+      
+      <nav className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-b border-white dark:border-slate-800 p-4 sticky top-0 z-50 transition-colors duration-500">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-600/20"><Utensils size={20} /></div>
+            <h1 className="font-black text-slate-900 dark:text-white text-xl tracking-tight hidden sm:block">AvasariConnect</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <button onClick={() => { localStorage.removeItem('token'); navigate('/'); }} className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-rose-600 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 px-4 py-2.5 rounded-xl transition-all"><LogOut size={16} /> Logout</button>
+          </div>
         </div>
       </nav>
 
-      <div className="pt-2 pb-12 px-4 text-center">
-        <h2 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight mb-4 animate-in fade-in slide-in-from-top-4 duration-500">Welcome, {studentName}! ðŸš€</h2>
-        <p className="text-slate-500 font-medium text-lg max-w-xl mx-auto animate-in fade-in slide-in-from-top-4 duration-700">Your one-stop dashboard for daily campus meals & local services.</p>
-      </div>
+      <main className="max-w-6xl mx-auto px-4 pt-8 pb-24 grid grid-cols-1 lg:grid-cols-4 gap-8">
+        
+        <div className="lg:col-span-3">
+          <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Hello, {studentName} ðŸ‘‹</h2>
+            <p className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-2">Book your meals and discover campus services. <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span> Live</p>
+          </div>
 
-      <main className="max-w-3xl mx-auto px-4">
-        <div className="bg-white/60 backdrop-blur-xl p-1.5 rounded-[2rem] shadow-lg border border-white/80 mb-10 max-w-md mx-auto flex animate-in zoom-in-95 duration-500">
-          <button onClick={() => setActiveTab('menus')} className={`flex-1 py-3.5 text-sm font-bold rounded-[1.5rem] transition-all flex items-center justify-center gap-2 ${activeTab === 'menus' ? 'bg-slate-900 text-white shadow-md scale-100' : 'text-slate-500 hover:text-slate-800 scale-95 hover:scale-100'}`}>
-            <Utensils size={18} /> Daily Menus
-          </button>
-          <button onClick={() => setActiveTab('directory')} className={`flex-1 py-3.5 text-sm font-bold rounded-[1.5rem] transition-all flex items-center justify-center gap-2 ${activeTab === 'directory' ? 'bg-slate-900 text-white shadow-md scale-100' : 'text-slate-500 hover:text-slate-800 scale-95 hover:scale-100'}`}>
-            <MapPin size={18} /> Directory
-          </button>
-        </div>
+          <div className="bg-slate-200/50 dark:bg-slate-800/80 backdrop-blur-md p-1.5 rounded-full shadow-inner mb-6 flex relative z-20 w-fit">
+            <button onClick={() => setActiveTab('menus')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all flex gap-2 ${activeTab === 'menus' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}><Utensils size={18} /> Daily Menus</button>
+            <button onClick={() => setActiveTab('directory')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all flex gap-2 ${activeTab === 'directory' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}><MapPin size={18} /> Directory</button>
+            <button onClick={() => { setActiveTab('map'); fetchNearbyMesses(); }} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all flex gap-2 ${activeTab === 'map' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}><Map size={18} /> Map</button>
+          </div>
 
-        <div className="min-h-[500px]">
-          {activeTab === 'menus' ? (
+          {activeTab === 'menus' && (
             <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+              
+              <div className="flex mb-8 bg-white dark:bg-slate-800 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm w-fit">
+                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl">
+                  <button onClick={() => setTargetDate(getLocalDateString(0))} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${targetDate === getLocalDateString(0) ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>Today</button>
+                  <button onClick={() => setTargetDate(getLocalDateString(1))} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1 ${targetDate === getLocalDateString(1) ? 'bg-orange-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>Tomorrow <Sparkles size={14}/></button>
+                </div>
+              </div>
+
               {isLoading ? (
-                <div className="flex justify-center py-20 text-indigo-600"><Loader2 className="animate-spin" size={40}/></div>
+                <div className="flex flex-col items-center justify-center py-24 text-indigo-600 dark:text-indigo-400"><Loader2 className="animate-spin mb-4" size={48}/><p className="font-bold text-slate-500 dark:text-slate-400">Loading menus...</p></div>
               ) : menus.length === 0 ? (
-                <div className="bg-white/80 backdrop-blur-xl p-12 rounded-[2.5rem] text-center border border-white/80 shadow-sm">
-                  <Utensils className="mx-auto text-slate-300 mb-4" size={56} />
-                  <h3 className="font-extrabold text-slate-700 text-xl">No menus published yet.</h3>
-                  <p className="text-slate-400 text-sm mt-2">Mess owners are still preparing today's meals. Check back soon!</p>
+                <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl p-16 rounded-[2.5rem] text-center border border-white dark:border-slate-700 shadow-xl">
+                  <div className="bg-slate-100 dark:bg-slate-700 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"><CalendarDays className="text-slate-400 dark:text-slate-500" size={40} /></div>
+                  <h3 className="font-black text-slate-900 dark:text-white text-2xl mb-2">No Menus Found</h3>
+                  <p className="text-slate-500 dark:text-slate-400">Owners haven't published meals for this date yet.</p>
                 </div>
               ) : (
-                menus.map(mess => <MessCard key={mess._id} mess={mess} />)
+                <div className="space-y-8">
+                  {menus.map(mess => (
+                    <MessCard key={mess._id} mess={mess} targetDate={targetDate} initialAttendance={getAttendanceStatus(mess.messName)} globalHasCommitted={globalHasCommitted} onAttendanceUpdate={(silent = true) => fetchData(silent)} />
+                  ))}
+                </div>
               )}
             </div>
-          ) : (
-            <div>
-              <DirectoryCard title="Auto Rickshaws" icon={Navigation} colorClass="bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-500/30" items={MOCK_DIRECTORY.rickshaws} />
-              <DirectoryCard title="PGs & Rooms" icon={Home} colorClass="bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/30" items={MOCK_DIRECTORY.rooms} />
-              <DirectoryCard title="Emergency Contacts" icon={AlertTriangle} colorClass="bg-gradient-to-br from-rose-500 to-pink-600 shadow-rose-500/30" items={MOCK_DIRECTORY.emergency} />
+          )}
+
+          {activeTab === 'directory' && (
+            <div className="animate-in fade-in slide-in-from-bottom-8">
+              <DirectoryCard title="Auto Rickshaws" icon={Navigation} colorClass="bg-gradient-to-br from-blue-500 to-indigo-600" items={directory.rickshaws} />
+              <DirectoryCard title="PGs & Rooms" icon={Home} colorClass="bg-gradient-to-br from-emerald-500 to-teal-600" items={directory.rooms} />
+              <DirectoryCard title="Emergency Contacts" icon={AlertTriangle} colorClass="bg-gradient-to-br from-rose-500 to-pink-600" items={directory.emergency} />
             </div>
           )}
+
+          {activeTab === 'map' && (
+            <MessMap messes={nearbyMesses} />
+          )}
         </div>
+
+        <div className="lg:col-span-1">
+          <div className="bg-gradient-to-b from-amber-100 to-orange-50 dark:from-amber-900/40 dark:to-orange-900/10 p-6 rounded-[2rem] border border-amber-200 dark:border-amber-700/50 shadow-xl shadow-amber-500/10 sticky top-24">
+            <h3 className="font-black text-amber-900 dark:text-amber-400 text-xl mb-5 flex items-center gap-2"><Trophy size={24} className="text-amber-500"/> Top Rated Messes</h3>
+            <div className="space-y-4">
+              {leaderboard.length === 0 ? <p className="text-sm text-amber-700/60 dark:text-amber-500/60 font-bold text-center py-4">No ratings yet.</p> : leaderboard.map((mess, i) => (
+                <div key={mess._id} className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-sm p-4 rounded-2xl flex items-center justify-between border border-white dark:border-slate-700 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${i===0 ? 'bg-amber-400 text-white shadow-lg shadow-amber-400/40' : i===1 ? 'bg-slate-300 text-slate-700' : 'bg-orange-300 text-orange-900'}`}>{i+1}</div>
+                    <div>
+                      <p className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-[120px]">{mess.messName}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase">{mess.ratingCount} Reviews</p>
+                    </div>
+                  </div>
+                  <div className="bg-amber-50 dark:bg-amber-500/10 px-2 py-1 rounded-lg flex items-center gap-1 text-xs font-black text-amber-600 dark:text-amber-400"><Star size={12} className="fill-amber-500"/> {Number(mess.rating).toFixed(1)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
       </main>
     </div>
   );

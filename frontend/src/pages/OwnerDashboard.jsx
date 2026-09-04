@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChefHat, Users, CheckCircle2, XCircle, LogOut, Loader2, PlusCircle, TrendingUp, CalendarDays, LineChart, Calculator } from 'lucide-react';
+import { ChefHat, Users, CheckCircle2, XCircle, LogOut, Loader2, PlusCircle, TrendingUp, CalendarDays, LineChart, Calculator, MapPin, Navigation } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import ThemeToggle from '../components/ThemeToggle';
 
@@ -16,32 +16,59 @@ const OwnerDashboard = () => {
   const navigate = useNavigate();
   const user = location.state?.user;
 
+  // Publish Form State
+  const [menuDate, setMenuDate] = useState(getLocalDateString(0));
+  const [menuItems, setMenuItems] = useState('');
+  const [price, setPrice] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  // Analytics State
+  const [stats, setStats] = useState({ coming: 0, notComing: 0, total: 0 });
+  const [historyData, setHistoryData] = useState([]);
+
+  // Calculator State
+  const [estThalis, setEstThalis] = useState('');
+
+  // Location State
+  const [isSettingLocation, setIsSettingLocation] = useState(false);
+  const [locationMsg, setLocationMsg] = useState('');
+  const [savedLocation, setSavedLocation] = useState(null); // Persist map state
+
   if (!user || user.role !== 'owner') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900"><button onClick={() => navigate('/')} className="text-orange-600 font-bold underline">Go to Login</button></div>
     );
   }
 
-  // Publish Form State
-  const [menuDate, setMenuDate] = useState(getLocalDateString(0));
-  const [menuItems, setMenuItems] = useState('');
-  const [price, setPrice] = useState('');
-  const [isPublishing, setIsPublishing] = useState(false);
-  
-  // Analytics State
-  const [stats, setStats] = useState({ coming: 0, notComing: 0, total: 0 });
-  const [historyData, setHistoryData] = useState([]);
-  
-  // Calculator State
-  const [estThalis, setEstThalis] = useState('');
-
   const displayDate = new Date(menuDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 
-  // REAL TIME POLLING LOGIC
+  // FETCH PROFILE FOR EXISTING LOCATION
   useEffect(() => {
-    fetchStats(); 
+    const fetchProfile = async () => {
+      const token = localStorage.getItem('token');
+      try {
+        const res = await fetch(`${API_URL}/api/me`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (res.ok) {
+          const data = await res.json();
+          // Check if coordinates exist and are not the default [0,0]
+          if (data.location && data.location.coordinates && data.location.coordinates[0] !== 0) {
+            setSavedLocation({
+              lng: data.location.coordinates[0],
+              lat: data.location.coordinates[1]
+            });
+          }
+        }
+      } catch (e) { console.error("Failed to fetch profile", e); }
+    };
+    fetchProfile();
+  }, []);
+
+  // REAL TIME POLLING LOGIC & MENU FETCHING
+  useEffect(() => {
+    fetchStats();
     fetchHistory();
-    
+    fetchExistingMenu(); // Fetch menu for the selected date
+
     // Background silent fetch every 10 seconds for LIVE attendance
     const intervalId = setInterval(() => {
       fetchStats();
@@ -51,10 +78,29 @@ const OwnerDashboard = () => {
     return () => clearInterval(intervalId);
   }, [menuDate]);
 
+  const fetchExistingMenu = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_URL}/api/menus/${menuDate}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (response.ok) {
+        const menus = await response.json();
+        // Find this specific owner's menu for the day
+        const myMenu = menus.find(m => (m.ownerId._id === user._id || m.ownerId === user._id));
+        if (myMenu) {
+          setMenuItems(myMenu.items.join(', '));
+          setPrice(myMenu.price.toString());
+        } else {
+          setMenuItems('');
+          setPrice('');
+        }
+      }
+    } catch (e) { console.error("Failed to fetch menus", e); }
+  };
+
   const fetchStats = async () => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`${API_URL}/api/attendance/stats/${encodeURIComponent(user.messName)}/${menuDate}`, { headers: { 'Authorization': `Bearer ${token}` }});
+      const response = await fetch(`${API_URL}/api/attendance/stats/${encodeURIComponent(user.messName || 'Partner Mess')}/${menuDate}`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) setStats(await response.json());
     } catch (e) { console.error(e); }
   };
@@ -62,7 +108,7 @@ const OwnerDashboard = () => {
   const fetchHistory = async () => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`${API_URL}/api/attendance/history/${encodeURIComponent(user.messName)}`, { headers: { 'Authorization': `Bearer ${token}` }});
+      const response = await fetch(`${API_URL}/api/attendance/history/${encodeURIComponent(user.messName || 'Partner Mess')}`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) setHistoryData(await response.json());
     } catch (e) { console.error(e); }
   };
@@ -71,16 +117,34 @@ const OwnerDashboard = () => {
     e.preventDefault();
     setIsPublishing(true);
     const token = localStorage.getItem('token');
+
     try {
       const itemsArray = menuItems.split(',').map(item => item.trim()).filter(Boolean);
-      await fetch(`${API_URL}/api/menus`, {
+
+      const response = await fetch(`${API_URL}/api/menus`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ ownerId: user._id, messName: user.messName, date: menuDate, items: itemsArray, price: Number(price) })
+        body: JSON.stringify({
+          messName: user.messName || `${user.name || 'Owner'}'s Mess`, // Critical fallback fix
+          date: menuDate,
+          items: itemsArray,
+          price: Number(price)
+        })
       });
-      alert(`Menu published for ${displayDate}!`);
-    } catch (error) { alert('Failed to publish menu.'); } 
-    finally { setIsPublishing(false); }
+
+      // STRICT ERROR CHECKING: Stop the fake success message!
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Server rejected the menu (Status: ${response.status})`);
+      }
+
+      alert(`Menu published successfully for ${displayDate.split(',')[0]}!`);
+    } catch (error) {
+      console.error("Publish Error:", error);
+      alert(`Failed to publish menu: ${error.message}`);
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const handleLogout = () => {
@@ -103,14 +167,14 @@ const OwnerDashboard = () => {
 
   return (
     <div className="min-h-screen font-sans bg-slate-50 dark:bg-slate-950 transition-colors duration-500 pb-12 selection:bg-orange-500 selection:text-white">
-      
+
       <nav className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 transition-colors duration-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="bg-gradient-to-br from-orange-500 to-rose-500 p-2 rounded-lg text-white shadow-md">
               <ChefHat size={20} />
             </div>
-            <h1 className="font-black text-slate-900 dark:text-white text-lg tracking-tight hidden sm:block">{user.messName} <span className="text-orange-500">Partner</span></h1>
+            <h1 className="font-black text-slate-900 dark:text-white text-lg tracking-tight hidden sm:block">{user.messName || 'Partner Mess'} <span className="text-orange-500">Partner</span></h1>
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
@@ -122,13 +186,13 @@ const OwnerDashboard = () => {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-8">
-        
+
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
           <div>
             <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">Dashboard Overview <span className="relative flex h-2 w-2 mb-4"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span></span></h2>
             <div className="flex items-center gap-2 mt-3 bg-white dark:bg-slate-800 p-1 w-fit rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-               <button onClick={() => setMenuDate(getLocalDateString(0))} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${menuDate === getLocalDateString(0) ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>Today's Data</button>
-               <button onClick={() => setMenuDate(getLocalDateString(1))} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${menuDate === getLocalDateString(1) ? 'bg-orange-500 text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>Tomorrow's Pre-Bookings</button>
+              <button onClick={() => setMenuDate(getLocalDateString(0))} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${menuDate === getLocalDateString(0) ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>Today's Data</button>
+              <button onClick={() => setMenuDate(getLocalDateString(1))} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${menuDate === getLocalDateString(1) ? 'bg-orange-500 text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>Tomorrow's Pre-Bookings</button>
             </div>
           </div>
           <button onClick={() => { fetchStats(); fetchHistory(); }} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm text-sm flex items-center gap-2"><LineChart size={16} /> Refresh Metrics</button>
@@ -146,33 +210,33 @@ const OwnerDashboard = () => {
             <h3 className="text-4xl font-black text-rose-500">{stats.notComing}</h3>
             <div className="mt-4 inline-flex text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-md">Saved raw materials</div>
           </div>
-          
+
           <div className="bg-amber-50 dark:bg-amber-900/20 rounded-[2rem] p-6 border border-amber-200 dark:border-amber-700/50 relative">
-             <div className="flex items-center gap-2 mb-3 text-amber-900 dark:text-amber-500 font-black"><Calculator size={20}/> Quick Waste Optimizer</div>
-             <label className="text-xs font-bold text-amber-700 dark:text-amber-600 block mb-1">How many thalis did you prepare?</label>
-             <input type="number" value={estThalis} onChange={e=>setEstThalis(e.target.value)} placeholder={`e.g. ${stats.coming + 15}`} className="w-full bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700/50 p-2 rounded-xl text-sm font-bold focus:outline-none mb-3 dark:text-white"/>
-             {estThalis && Number(estThalis) > stats.coming ? (
-                <div className="text-sm font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-800 p-2 rounded-lg border border-rose-100 dark:border-rose-900/50">
-                  ⚠️ Overproduced by {Number(estThalis) - stats.coming} thalis.
-                </div>
-             ) : estThalis && Number(estThalis) < stats.coming ? (
-                <div className="text-sm font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-800 p-2 rounded-lg">
-                  🚨 Shortfall of {stats.coming - Number(estThalis)} thalis! Cook more.
-                </div>
-             ) : null}
+            <div className="flex items-center gap-2 mb-3 text-amber-900 dark:text-amber-500 font-black"><Calculator size={20} /> Quick Waste Optimizer</div>
+            <label className="text-xs font-bold text-amber-700 dark:text-amber-600 block mb-1">How many thalis did you prepare?</label>
+            <input type="number" value={estThalis} onChange={e => setEstThalis(e.target.value)} placeholder={`e.g. ${stats.coming + 15}`} className="w-full bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700/50 p-2 rounded-xl text-sm font-bold focus:outline-none mb-3 dark:text-white" />
+            {estThalis && Number(estThalis) > stats.coming ? (
+              <div className="text-sm font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-800 p-2 rounded-lg border border-rose-100 dark:border-rose-900/50">
+                ⚠️ Overproduced by {Number(estThalis) - stats.coming} thalis.
+              </div>
+            ) : estThalis && Number(estThalis) < stats.coming ? (
+              <div className="text-sm font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-800 p-2 rounded-lg">
+                🚨 Shortfall of {stats.coming - Number(estThalis)} thalis! Cook more.
+              </div>
+            ) : null}
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white mb-8"><TrendingUp className="text-orange-500"/> Historical Headcount Trends</h2>
+            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white mb-8"><TrendingUp className="text-orange-500" /> Historical Headcount Trends</h2>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={historyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
                   <XAxis dataKey="date" tickFormatter={(tick) => tick.substring(5)} stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} dy={10} />
                   <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} dx={-10} />
-                  <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(148, 163, 184, 0.1)'}} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} />
                   <Bar dataKey="coming" name="Coming" fill="#10b981" radius={[6, 6, 0, 0]} barSize={24}>
                     {historyData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={index === historyData.length - 1 ? '#10b981' : '#34d399'} />
@@ -189,7 +253,7 @@ const OwnerDashboard = () => {
           </div>
 
           <div className="lg:col-span-1 bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors flex flex-col h-full">
-            <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-slate-900 dark:text-white"><PlusCircle className="text-orange-500"/> Menu Setup: {displayDate.split(',')[0]}</h2>
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-slate-900 dark:text-white"><PlusCircle className="text-orange-500" /> Menu Setup: {displayDate.split(',')[0]}</h2>
             <form onSubmit={handlePublishMenu} className="space-y-4 flex-grow flex flex-col justify-between">
               <div className="space-y-4">
                 <div>
@@ -206,6 +270,55 @@ const OwnerDashboard = () => {
               </button>
             </form>
           </div>
+        </div>
+
+        {/* Location Setter Section */}
+        <div className="mt-8 bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white"><MapPin className="text-indigo-500" /> Set Mess Location</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Set your mess location so students can find you on the map and get directions.</p>
+
+          {/* Display Persisted Location if available */}
+          {savedLocation && (
+            <div className="mb-4 inline-flex items-center gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-bold text-sm rounded-lg border border-indigo-100 dark:border-indigo-500/20">
+              <CheckCircle2 size={16} /> Location currently saved at: {savedLocation.lat.toFixed(5)}, {savedLocation.lng.toFixed(5)}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={async () => {
+                setIsSettingLocation(true); setLocationMsg('');
+                if (!('geolocation' in navigator)) { setLocationMsg('❌ Geolocation not supported.'); setIsSettingLocation(false); return; }
+                navigator.geolocation.getCurrentPosition(
+                  async (pos) => {
+                    const token = localStorage.getItem('token');
+                    try {
+                      const res = await fetch(`${API_URL}/api/owner/location`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
+                      });
+                      if (res.ok) {
+                        setLocationMsg(`✅ Location saved! (${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)})`);
+                        setSavedLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                      } else {
+                        setLocationMsg('❌ Failed to save location.');
+                      }
+                    } catch { setLocationMsg('❌ Connection failed.'); }
+                    setIsSettingLocation(false);
+                  },
+                  () => { setLocationMsg('❌ Location access denied. Please enable GPS.'); setIsSettingLocation(false); },
+                  { enableHighAccuracy: true, timeout: 15000 }
+                );
+              }}
+              disabled={isSettingLocation}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-3 rounded-xl flex items-center gap-2 transition-colors shadow-md disabled:opacity-50"
+            >
+              {isSettingLocation ? <Loader2 className="animate-spin" size={18} /> : <Navigation size={18} />}
+              {isSettingLocation ? 'Detecting...' : savedLocation ? '📍 Update Current Location' : '📍 Use My Current Location'}
+            </button>
+          </div>
+          {locationMsg && <p className="mt-4 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl">{locationMsg}</p>}
         </div>
       </main>
     </div>
