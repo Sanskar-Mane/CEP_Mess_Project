@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ShieldCheck, UserPlus, ChevronRight, ChevronLeft, 
-  User, Phone, Lock, BookOpen, ChefHat, 
-  MapPin, FileText, CheckCircle2, AlertCircle, LogIn 
+import {
+  ShieldCheck, UserPlus, ChevronRight, ChevronLeft,
+  User, Phone, Lock, BookOpen, ChefHat,
+  MapPin, FileText, CheckCircle2, AlertCircle, LogIn
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -33,6 +33,14 @@ const AuthPage = () => {
     setIsLoading(true);
     setError('');
 
+    // STRICT PHONE VALIDATION (10 digits, starts with 6,7,8,9)
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      setError("Please enter a valid 10-digit Indian mobile number.");
+      setIsLoading(false);
+      return; // Stop the request
+    }
+
     const endpoint = isLogin ? '/api/login' : '/api/register';
     const payload = isLogin ? { phone: formData.phone, password: formData.password } : { ...formData, role };
 
@@ -47,7 +55,7 @@ const AuthPage = () => {
       if (response.ok) {
         // Save JWT to localStorage
         localStorage.setItem('token', data.token);
-        
+
         if (data.user.role === 'admin') navigate('/admin', { state: { user: data.user } });
         else if (data.user.role === 'owner') navigate('/owner', { state: { user: data.user } });
         else navigate('/student', { state: { user: data.user } });
@@ -87,7 +95,17 @@ const AuthPage = () => {
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1">Phone Number</label>
                 <div className="relative">
                   <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input type="tel" name="phone" placeholder="9876543210" required className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-800 shadow-sm transition-all" onChange={handleInputChange} />
+                  <input
+                    type="tel"
+                    name="phone"
+                    placeholder="9876543210"
+                    maxLength="10"
+                    pattern="[6-9][0-9]{9}"
+                    title="Please enter a valid 10-digit mobile number starting with 6-9"
+                    required
+                    className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-800 shadow-sm transition-all"
+                    onChange={handleInputChange}
+                  />
                 </div>
               </div>
               <div>
@@ -116,7 +134,17 @@ const AuthPage = () => {
                   </div>
                   <div className="relative">
                     <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input type="tel" name="phone" placeholder="Mobile Number" required className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 font-bold text-slate-800 shadow-sm transition-all" onChange={handleInputChange} />
+                    <input
+                      type="tel"
+                      name="phone"
+                      placeholder="Mobile Number"
+                      maxLength="10"
+                      pattern="[6-9][0-9]{9}"
+                      title="Please enter a valid 10-digit mobile number starting with 6-9"
+                      required
+                      className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 font-bold text-slate-800 shadow-sm transition-all"
+                      onChange={handleInputChange}
+                    />
                   </div>
                   <div className="relative">
                     <BookOpen className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -150,7 +178,18 @@ const AuthPage = () => {
                       </div>
                       <div className="relative">
                         <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input type="tel" name="phone" placeholder="Mobile Number" required className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:border-orange-500 font-bold text-slate-800 shadow-sm" onChange={handleInputChange} value={formData.phone} />
+                        <input
+                          type="tel"
+                          name="phone"
+                          placeholder="Mobile Number"
+                          maxLength="10"
+                          pattern="[6-9][0-9]{9}"
+                          title="Please enter a valid 10-digit mobile number starting with 6-9"
+                          required
+                          className="w-full pl-11 pr-5 py-4 rounded-2xl bg-white/60 border border-slate-200 focus:outline-none focus:border-orange-500 font-bold text-slate-800 shadow-sm"
+                          onChange={handleInputChange}
+                          value={formData.phone}
+                        />
                       </div>
                       <div className="relative">
                         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />

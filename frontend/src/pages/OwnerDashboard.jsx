@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ChefHat, Users, CheckCircle2, XCircle, LogOut, Loader2, PlusCircle, TrendingUp, CalendarDays, LineChart, Calculator, MapPin, Navigation } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import ThemeToggle from '../components/ThemeToggle';
+import LanguageToggle from '../components/LanguageToggle';
+import { translations } from '../utils/translations';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -15,6 +17,10 @@ const OwnerDashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const user = location.state?.user;
+
+  // Language State
+  const [lang, setLang] = useState(() => localStorage.getItem('app_lang') || 'en');
+  const t = translations[lang];
 
   // Publish Form State
   const [menuDate, setMenuDate] = useState(getLocalDateString(0));
@@ -32,7 +38,7 @@ const OwnerDashboard = () => {
   // Location State
   const [isSettingLocation, setIsSettingLocation] = useState(false);
   const [locationMsg, setLocationMsg] = useState('');
-  const [savedLocation, setSavedLocation] = useState(null); // Persist map state
+  const [savedLocation, setSavedLocation] = useState(null);
 
   if (!user || user.role !== 'owner') {
     return (
@@ -42,7 +48,6 @@ const OwnerDashboard = () => {
 
   const displayDate = new Date(menuDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 
-  // FETCH PROFILE FOR EXISTING LOCATION
   useEffect(() => {
     const fetchProfile = async () => {
       const token = localStorage.getItem('token');
@@ -50,7 +55,6 @@ const OwnerDashboard = () => {
         const res = await fetch(`${API_URL}/api/me`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (res.ok) {
           const data = await res.json();
-          // Check if coordinates exist and are not the default [0,0]
           if (data.location && data.location.coordinates && data.location.coordinates[0] !== 0) {
             setSavedLocation({
               lng: data.location.coordinates[0],
@@ -63,13 +67,11 @@ const OwnerDashboard = () => {
     fetchProfile();
   }, []);
 
-  // REAL TIME POLLING LOGIC & MENU FETCHING
   useEffect(() => {
     fetchStats();
     fetchHistory();
-    fetchExistingMenu(); // Fetch menu for the selected date
+    fetchExistingMenu();
 
-    // Background silent fetch every 10 seconds for LIVE attendance
     const intervalId = setInterval(() => {
       fetchStats();
       fetchHistory();
@@ -84,7 +86,6 @@ const OwnerDashboard = () => {
       const response = await fetch(`${API_URL}/api/menus/${menuDate}`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) {
         const menus = await response.json();
-        // Find this specific owner's menu for the day
         const myMenu = menus.find(m => (m.ownerId._id === user._id || m.ownerId === user._id));
         if (myMenu) {
           setMenuItems(myMenu.items.join(', '));
@@ -125,14 +126,13 @@ const OwnerDashboard = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
-          messName: user.messName || `${user.name || 'Owner'}'s Mess`, // Critical fallback fix
+          messName: user.messName || `${user.name || 'Owner'}'s Mess`,
           date: menuDate,
           items: itemsArray,
           price: Number(price)
         })
       });
 
-      // STRICT ERROR CHECKING: Stop the fake success message!
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || `Server rejected the menu (Status: ${response.status})`);
@@ -157,8 +157,8 @@ const OwnerDashboard = () => {
       return (
         <div className="bg-slate-900 dark:bg-slate-800 text-white p-3 rounded-xl shadow-xl border border-slate-700 text-xs font-bold">
           <p className="mb-2 text-slate-400 border-b border-slate-700 pb-1">{label}</p>
-          <p className="text-emerald-400">Coming: {payload[0].value}</p>
-          <p className="text-rose-400">Skipped: {payload[1].value}</p>
+          <p className="text-emerald-400">{t.coming}: {payload[0].value}</p>
+          <p className="text-rose-400">{t.skip}: {payload[1].value}</p>
         </div>
       );
     }
@@ -174,12 +174,13 @@ const OwnerDashboard = () => {
             <div className="bg-gradient-to-br from-orange-500 to-rose-500 p-2 rounded-lg text-white shadow-md">
               <ChefHat size={20} />
             </div>
-            <h1 className="font-black text-slate-900 dark:text-white text-lg tracking-tight hidden sm:block">{user.messName || 'Partner Mess'} <span className="text-orange-500">Partner</span></h1>
+            <h1 className="font-black text-slate-900 dark:text-white text-lg tracking-tight hidden sm:block">{user.messName || 'Partner Mess'} <span className="text-orange-500">{t.partner}</span></h1>
           </div>
           <div className="flex items-center gap-3">
+            <LanguageToggle lang={lang} setLang={setLang} />
             <ThemeToggle />
             <button onClick={handleLogout} className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/10 px-4 py-2 rounded-xl transition-all">
-              <LogOut size={16} /> Logout
+              <LogOut size={16} /> {t.logout}
             </button>
           </div>
         </div>
@@ -189,39 +190,39 @@ const OwnerDashboard = () => {
 
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
           <div>
-            <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">Dashboard Overview <span className="relative flex h-2 w-2 mb-4"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span></span></h2>
+            <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">{t.dashboardOverview} <span className="relative flex h-2 w-2 mb-4"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span></span></h2>
             <div className="flex items-center gap-2 mt-3 bg-white dark:bg-slate-800 p-1 w-fit rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-              <button onClick={() => setMenuDate(getLocalDateString(0))} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${menuDate === getLocalDateString(0) ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>Today's Data</button>
-              <button onClick={() => setMenuDate(getLocalDateString(1))} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${menuDate === getLocalDateString(1) ? 'bg-orange-500 text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>Tomorrow's Pre-Bookings</button>
+              <button onClick={() => setMenuDate(getLocalDateString(0))} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${menuDate === getLocalDateString(0) ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>{t.todaysData}</button>
+              <button onClick={() => setMenuDate(getLocalDateString(1))} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${menuDate === getLocalDateString(1) ? 'bg-orange-500 text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>{t.tomorrowsPreBookings}</button>
             </div>
           </div>
-          <button onClick={() => { fetchStats(); fetchHistory(); }} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm text-sm flex items-center gap-2"><LineChart size={16} /> Refresh Metrics</button>
+          <button onClick={() => { fetchStats(); fetchHistory(); }} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm text-sm flex items-center gap-2"><LineChart size={16} /> {t.refreshMetrics}</button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-gradient-to-br from-emerald-500 to-teal-500 rounded-[2rem] p-6 shadow-xl shadow-emerald-500/20 text-white relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-6 opacity-20 transition-transform group-hover:scale-110"><CheckCircle2 size={80} /></div>
-            <p className="text-sm font-bold text-emerald-50 mb-1">Confirmed Coming</p>
+            <p className="text-sm font-bold text-emerald-50 mb-1">{t.confirmedComing}</p>
             <h3 className="text-4xl font-black">{stats.coming}</h3>
-            <div className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-emerald-900 bg-emerald-400/40 px-2.5 py-1 rounded-md backdrop-blur-sm">Prepare exactly {stats.coming} thalis</div>
+            <div className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-emerald-900 bg-emerald-400/40 px-2.5 py-1 rounded-md backdrop-blur-sm">{t.prepareExactly} {stats.coming} {t.thali}</div>
           </div>
           <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 border border-slate-100 dark:border-slate-700 relative overflow-hidden transition-colors">
-            <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Skipped Attendance</p>
+            <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">{t.skippedAttendance}</p>
             <h3 className="text-4xl font-black text-rose-500">{stats.notComing}</h3>
-            <div className="mt-4 inline-flex text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-md">Saved raw materials</div>
+            <div className="mt-4 inline-flex text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-md">{t.savedRawMaterials}</div>
           </div>
 
           <div className="bg-amber-50 dark:bg-amber-900/20 rounded-[2rem] p-6 border border-amber-200 dark:border-amber-700/50 relative">
-            <div className="flex items-center gap-2 mb-3 text-amber-900 dark:text-amber-500 font-black"><Calculator size={20} /> Quick Waste Optimizer</div>
-            <label className="text-xs font-bold text-amber-700 dark:text-amber-600 block mb-1">How many thalis did you prepare?</label>
+            <div className="flex items-center gap-2 mb-3 text-amber-900 dark:text-amber-500 font-black"><Calculator size={20} /> {t.quickWasteOptimizer}</div>
+            <label className="text-xs font-bold text-amber-700 dark:text-amber-600 block mb-1">{t.howManyPrepared}</label>
             <input type="number" value={estThalis} onChange={e => setEstThalis(e.target.value)} placeholder={`e.g. ${stats.coming + 15}`} className="w-full bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700/50 p-2 rounded-xl text-sm font-bold focus:outline-none mb-3 dark:text-white" />
             {estThalis && Number(estThalis) > stats.coming ? (
               <div className="text-sm font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-800 p-2 rounded-lg border border-rose-100 dark:border-rose-900/50">
-                ⚠️ Overproduced by {Number(estThalis) - stats.coming} thalis.
+                ⚠️ {t.overproducedBy} {Number(estThalis) - stats.coming} {t.thali}.
               </div>
             ) : estThalis && Number(estThalis) < stats.coming ? (
               <div className="text-sm font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-800 p-2 rounded-lg">
-                🚨 Shortfall of {stats.coming - Number(estThalis)} thalis! Cook more.
+                🚨 {t.shortfallOf} {stats.coming - Number(estThalis)} {t.cookMore}
               </div>
             ) : null}
           </div>
@@ -229,7 +230,7 @@ const OwnerDashboard = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white mb-8"><TrendingUp className="text-orange-500" /> Historical Headcount Trends</h2>
+            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white mb-8"><TrendingUp className="text-orange-500" /> {t.historicalTrends}</h2>
             <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={historyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -253,20 +254,20 @@ const OwnerDashboard = () => {
           </div>
 
           <div className="lg:col-span-1 bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors flex flex-col h-full">
-            <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-slate-900 dark:text-white"><PlusCircle className="text-orange-500" /> Menu Setup: {displayDate.split(',')[0]}</h2>
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-slate-900 dark:text-white"><PlusCircle className="text-orange-500" /> {t.menuSetup}: {displayDate.split(',')[0]}</h2>
             <form onSubmit={handlePublishMenu} className="space-y-4 flex-grow flex flex-col justify-between">
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Menu Items</label>
-                  <textarea required rows="5" className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-4 focus:ring-orange-500/10 outline-none resize-none" placeholder="Dal, Rice, Paneer (Comma separated)" value={menuItems} onChange={(e) => setMenuItems(e.target.value)} />
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.menuItems}</label>
+                  <textarea required rows="5" className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-4 focus:ring-orange-500/10 outline-none resize-none" placeholder={t.menuPlaceholder} value={menuItems} onChange={(e) => setMenuItems(e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Thali Price (₹)</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.thaliPrice}</label>
                   <input type="number" required className="w-full px-4 py-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-4 font-bold outline-none" placeholder="60" value={price} onChange={(e) => setPrice(e.target.value)} />
                 </div>
               </div>
               <button disabled={isPublishing} type="submit" className="mt-6 w-full bg-slate-900 hover:bg-slate-800 dark:bg-orange-500 dark:hover:bg-orange-600 text-white font-bold py-4 rounded-2xl transition-all shadow-lg active:scale-95 flex justify-center gap-2">
-                {isPublishing ? <Loader2 className="animate-spin" size={20} /> : `Publish for ${displayDate.split(',')[0]}`}
+                {isPublishing ? <Loader2 className="animate-spin" size={20} /> : `${t.publishFor} ${displayDate.split(',')[0]}`}
               </button>
             </form>
           </div>
@@ -274,13 +275,12 @@ const OwnerDashboard = () => {
 
         {/* Location Setter Section */}
         <div className="mt-8 bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white"><MapPin className="text-indigo-500" /> Set Mess Location</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Set your mess location so students can find you on the map and get directions.</p>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white"><MapPin className="text-indigo-500" /> {t.setMessLocation}</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t.locationDesc}</p>
 
-          {/* Display Persisted Location if available */}
           {savedLocation && (
             <div className="mb-4 inline-flex items-center gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-bold text-sm rounded-lg border border-indigo-100 dark:border-indigo-500/20">
-              <CheckCircle2 size={16} /> Location currently saved at: {savedLocation.lat.toFixed(5)}, {savedLocation.lng.toFixed(5)}
+              <CheckCircle2 size={16} /> {t.locationSavedAt} {savedLocation.lat.toFixed(5)}, {savedLocation.lng.toFixed(5)}
             </div>
           )}
 
@@ -315,7 +315,7 @@ const OwnerDashboard = () => {
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-3 rounded-xl flex items-center gap-2 transition-colors shadow-md disabled:opacity-50"
             >
               {isSettingLocation ? <Loader2 className="animate-spin" size={18} /> : <Navigation size={18} />}
-              {isSettingLocation ? 'Detecting...' : savedLocation ? '📍 Update Current Location' : '📍 Use My Current Location'}
+              {isSettingLocation ? t.detecting : savedLocation ? `📍 ${t.updateCurrentLocation}` : `📍 ${t.useCurrentLocation}`}
             </button>
           </div>
           {locationMsg && <p className="mt-4 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl">{locationMsg}</p>}
