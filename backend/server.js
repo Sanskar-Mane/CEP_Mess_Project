@@ -44,22 +44,42 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
+// UPDATED: Added shift to separate Morning and Night Menus
 const MenuSchema = new mongoose.Schema({
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   messName: { type: String, required: true },
   date: { type: String, required: true }, // Target Date YYYY-MM-DD
+  shift: { type: String, enum: ['morning', 'night'], required: true }, // <-- NEW
   items: [{ type: String }],
   price: { type: Number }
 });
 const Menu = mongoose.model('Menu', MenuSchema);
 
-// FIXED: Using mongoose.Schema.Types.ObjectId for relational integrity
+// UPDATED: Added skip tracking system
+const SubscriptionSchema = new mongoose.Schema({
+  studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  studentName: String,
+  studentPhone: String,
+  messId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  messName: String,
+  shift: { type: String, enum: ['morning', 'night', 'both'], default: 'both' },
+  startDate: { type: Date, default: Date.now },
+  endDate: { type: Date },
+  status: { type: String, enum: ['pending', 'paid'], default: 'pending' },
+  monthlyFee: { type: Number, default: 0 },
+  allowedSkips: { type: Number, default: 5 }, // <-- NEW: Max allowed skips
+  usedSkips: { type: Number, default: 0 }     // <-- NEW: Skips used so far
+});
+const Subscription = mongoose.model('Subscription', SubscriptionSchema);
+
+// UPDATED: Added shift to Attendance tracking
 const AttendanceSchema = new mongoose.Schema({
   messId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   messName: String,
+  shift: { type: String, enum: ['morning', 'night'], required: true }, // <-- NEW
   status: { type: String, enum: ['coming', 'not_coming'] },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  targetDate: { type: String, required: true }, // The date the meal is for
+  targetDate: { type: String, required: true },
   timestamp: { type: Date, default: Date.now }
 });
 const Attendance = mongoose.model('Attendance', AttendanceSchema);
@@ -95,7 +115,6 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// ADDED: Admin verification middleware
 const authenticateAdmin = (req, res, next) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin access required.' });
@@ -110,42 +129,26 @@ const authenticateAdmin = (req, res, next) => {
 // --- AUTH ROUTES ---
 app.post('/api/register', async (req, res) => {
   try {
-    // 1. Extract latitude and longitude from req.body
     const { role, name, phone, password, messName, messAddress, fssaiNumber, yearBranch, latitude, longitude } = req.body;
-
     const phoneRegex = /^[6-9]\d{9}$/;
-    if (!phoneRegex.test(phone)) {
-      return res.status(400).json({ error: 'Invalid mobile number. Must be 10 digits and start with 6, 7, 8, or 9.' });
-    }
-
-
+    if (!phoneRegex.test(phone)) return res.status(400).json({ error: 'Invalid mobile number.' });
     if (await User.findOne({ phone })) return res.status(400).json({ error: 'Phone number already registered' });
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-
-    // 2. Base user data
     const userData = { role, name, phone, password: hashedPassword, messName, messAddress, fssaiNumber, yearBranch };
 
-    // 3. If location is provided during auth, format it for MongoDB GeoJSON
     if (latitude && longitude) {
-      userData.location = {
-        type: 'Point',
-        coordinates: [longitude, latitude] // GeoJSON strictly requires [longitude, latitude]
-      };
+      userData.location = { type: 'Point', coordinates: [longitude, latitude] };
     }
 
     const newUser = new User(userData);
     await newUser.save();
-
     const token = jwt.sign({ id: newUser._id, role: newUser.role }, JWT_SECRET, { expiresIn: '7d' });
     const userResponse = { ...newUser._doc }; delete userResponse.password;
 
     res.status(201).json({ message: 'Registration successful', user: userResponse, token });
-  } catch (error) {
-    console.error("Registration Error:", error);
-    res.status(500).json({ error: 'Server error' });
-  }
+  } catch (error) { res.status(500).json({ error: 'Server error' }); }
 });
 
 app.post('/api/login', async (req, res) => {
@@ -168,27 +171,20 @@ app.get('/api/me', authenticateToken, async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Failed to fetch user profile' }); }
 });
 
-// --- ADMIN ROUTES (NEWLY ADDED) ---
+// --- ADMIN ROUTES ---
 app.get('/api/admin/users', authenticateToken, authenticateAdmin, async (req, res) => {
-  try {
-    const users = await User.find().select('-password').sort({ createdAt: -1 });
-    res.status(200).json(users);
-  } catch (error) { res.status(500).json({ error: 'Failed to fetch users' }); }
+  try { res.status(200).json(await User.find().select('-password').sort({ createdAt: -1 })); } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 app.put('/api/admin/verify/:id', authenticateToken, authenticateAdmin, async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(req.params.id, { isVerified: true }, { new: true });
-    if (!user) return res.status(404).json({ error: 'User not found' });
     res.status(200).json({ message: 'Owner verified successfully', user });
-  } catch (error) { res.status(500).json({ error: 'Failed to verify owner' }); }
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 app.delete('/api/admin/users/:id', authenticateToken, authenticateAdmin, async (req, res) => {
-  try {
-    await User.findByIdAndDelete(req.params.id);
-    res.status(200).json({ message: 'User deleted' });
-  } catch (error) { res.status(500).json({ error: 'Failed to delete user' }); }
+  try { await User.findByIdAndDelete(req.params.id); res.status(200).json({ message: 'User deleted' }); } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 app.post('/api/admin/directory', authenticateToken, authenticateAdmin, async (req, res) => {
@@ -196,35 +192,32 @@ app.post('/api/admin/directory', authenticateToken, authenticateAdmin, async (re
     const newDir = new Directory(req.body);
     await newDir.save();
     res.status(201).json({ message: 'Directory item added', item: newDir });
-  } catch (error) { res.status(500).json({ error: 'Failed to add directory item' }); }
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 app.delete('/api/admin/directory/:id', authenticateToken, authenticateAdmin, async (req, res) => {
-  try {
-    await Directory.findByIdAndDelete(req.params.id);
-    res.status(200).json({ message: 'Directory item deleted' });
-  } catch (error) { res.status(500).json({ error: 'Failed to delete directory item' }); }
+  try { await Directory.findByIdAndDelete(req.params.id); res.status(200).json({ message: 'Directory item deleted' }); } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
-
 
 // --- MENU ROUTES ---
 app.post('/api/menus', authenticateToken, async (req, res) => {
   if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized.' });
   try {
-    // FIXED BOLA: Pull ownerId from token, not body
     const ownerId = req.user.id;
-    const { messName, date, items, price } = req.body;
+    // UPDATED: Accept shift
+    const { messName, date, shift, items, price } = req.body;
+    if (!shift) return res.status(400).json({ error: 'Shift (morning or night) is required.' });
 
-    const existingMenu = await Menu.findOne({ ownerId, date });
+    const existingMenu = await Menu.findOne({ ownerId, date, shift });
     if (existingMenu) {
       existingMenu.items = items;
       existingMenu.price = price;
       await existingMenu.save();
-      return res.status(200).json({ message: 'Menu updated!' });
+      return res.status(200).json({ message: `${shift} menu updated!` });
     }
-    const newMenu = new Menu({ ownerId, messName, date, items, price });
+    const newMenu = new Menu({ ownerId, messName, date, shift, items, price });
     await newMenu.save();
-    res.status(201).json({ message: 'Menu published!' });
+    res.status(201).json({ message: `${shift} menu published!` });
   } catch (error) { res.status(500).json({ error: 'Failed to publish' }); }
 });
 
@@ -238,12 +231,36 @@ app.get('/api/menus/:date', authenticateToken, async (req, res) => {
 // --- ATTENDANCE ROUTES ---
 app.post('/api/attendance', authenticateToken, async (req, res) => {
   try {
-    const { messId, messName, status, targetDate } = req.body;
+    // UPDATED: Accept shift from the UI
+    const { messId, messName, shift, status, targetDate } = req.body;
+    if (!shift) return res.status(400).json({ error: 'Shift is required.' });
     const userId = req.user.id;
 
-    // FIXED DUPLICATES: Upsert attendance records to ensure max 1 per user per day
+    // Check if the user is a monthly member
+    const sub = await Subscription.findOne({ studentId: userId, messId });
+    const existingAtt = await Attendance.findOne({ userId, targetDate, shift });
+
+    if (sub) {
+      // If they are trying to SKIP
+      if (status === 'not_coming' && (!existingAtt || existingAtt.status !== 'not_coming')) {
+        if (sub.usedSkips >= sub.allowedSkips) {
+          return res.status(400).json({ error: `Skip limit reached (${sub.allowedSkips} max). Please contact the owner for more skips.` });
+        }
+        sub.usedSkips += 1;
+        await sub.save();
+      }
+      // If they change mind and revert back to COMING, refund their skip
+      else if (status === 'coming' && existingAtt && existingAtt.status === 'not_coming') {
+        if (sub.usedSkips > 0) {
+          sub.usedSkips -= 1;
+          await sub.save();
+        }
+      }
+    }
+
+    // Upsert attendance record for the specific shift
     await Attendance.findOneAndUpdate(
-      { userId, targetDate },
+      { userId, targetDate, shift },
       { messId, messName, status, timestamp: new Date() },
       { upsert: true, new: true }
     );
@@ -259,19 +276,25 @@ app.get('/api/attendance/me/:date', authenticateToken, async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Failed to fetch your attendance' }); }
 });
 
+// UPDATED: Returns separate stats for Morning vs Night
 app.get('/api/attendance/stats/:messName/:date', authenticateToken, async (req, res) => {
   try {
     const records = await Attendance.find({ messName: decodeURIComponent(req.params.messName), targetDate: req.params.date });
-    const coming = records.filter(r => r.status === 'coming').length;
-    const notComing = records.filter(r => r.status === 'not_coming').length;
-    res.status(200).json({ coming, notComing, total: coming + notComing });
+
+    // Separate by shift
+    const morningRecords = records.filter(r => r.shift === 'morning');
+    const nightRecords = records.filter(r => r.shift === 'night');
+
+    res.status(200).json({
+      morning: { coming: morningRecords.filter(r => r.status === 'coming').length, notComing: morningRecords.filter(r => r.status === 'not_coming').length },
+      night: { coming: nightRecords.filter(r => r.status === 'coming').length, notComing: nightRecords.filter(r => r.status === 'not_coming').length }
+    });
   } catch (error) { res.status(500).json({ error: 'Failed to fetch stats' }); }
 });
 
 app.get('/api/attendance/history/:messName', authenticateToken, async (req, res) => {
   try {
     const { messName } = req.params;
-    // Build the last 7 days date strings
     const history = {};
     const dateStrings = [];
     for (let i = 6; i >= 0; i--) {
@@ -311,55 +334,113 @@ app.post('/api/messes/:ownerId/rate', authenticateToken, async (req, res) => {
     const { rating, comment } = req.body;
     const owner = await User.findById(req.params.ownerId);
     const student = await User.findById(req.user.id);
-    if (!owner || owner.role !== 'owner') return res.status(404).json({ error: 'Owner not found' });
+    if (!owner || owner.role !== 'owner') return res.status(404).json({ error: 'Owner not found.' });
+    if (!student) return res.status(401).json({ error: 'Student profile not found. Please log out and log back in.' });
 
     owner.ratingTotal = (owner.ratingTotal || 0) + rating;
     owner.ratingCount += 1;
     owner.rating = owner.ratingTotal / owner.ratingCount;
     await owner.save();
 
+    const safeStudentName = student.name || 'Anonymous Student';
     if (comment) {
-      const review = new Review({ messId: owner._id, studentName: student.name, rating, comment });
+      const review = new Review({ messId: owner._id, studentName: safeStudentName, rating, comment });
       await review.save();
     }
-    res.status(200).json({ message: 'Rating submitted' });
-  } catch (error) { res.status(500).json({ error: 'Failed to submit rating' }); }
+    res.status(200).json({ message: 'Rating submitted successfully!' });
+  } catch (error) { res.status(500).json({ error: 'Server crashed' }); }
 });
 
 app.get('/api/messes/:ownerId/reviews', authenticateToken, async (req, res) => {
-  try {
-    const reviews = await Review.find({ messId: req.params.ownerId }).sort({ date: -1 }).limit(5);
-    res.status(200).json(reviews);
-  } catch (error) { res.status(500).json({ error: 'Failed to fetch reviews' }); }
+  try { res.status(200).json(await Review.find({ messId: req.params.ownerId }).sort({ date: -1 }).limit(5)); } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 // --- DIRECTORY ROUTES ---
 app.get('/api/directory', authenticateToken, async (req, res) => {
-  try { res.json(await Directory.find()); } catch (error) { res.status(500).json({ error: 'Failed to fetch' }); }
+  try { res.json(await Directory.find()); } catch (error) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// --- SUBSCRIPTION ROUTES ---
+app.post('/api/subscriptions', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'student') return res.status(403).json({ error: 'Only students can subscribe.' });
+    const { messId, messName, shift } = req.body;
+    const student = await User.findById(req.user.id);
+
+    const existing = await Subscription.findOne({ studentId: student._id, messId });
+    if (existing) return res.status(400).json({ error: 'You are already a member of this mess.' });
+
+    const startDate = new Date();
+    const endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const newSub = new Subscription({
+      studentId: student._id,
+      studentName: student.name || 'Student',
+      studentPhone: student.phone,
+      messId,
+      messName,
+      shift: shift || 'both',
+      startDate,
+      endDate,
+      monthlyFee: 0,
+      allowedSkips: 5, // Default skips
+      usedSkips: 0
+    });
+
+    await newSub.save();
+    res.status(201).json({ message: 'Subscribed successfully! Awaiting owner confirmation.', sub: newSub });
+  } catch (error) { res.status(500).json({ error: 'Failed to subscribe' }); }
+});
+
+app.get('/api/subscriptions/me', authenticateToken, async (req, res) => {
+  try { res.status(200).json(await Subscription.find({ studentId: req.user.id })); } catch (error) { res.status(500).json({ error: 'Failed' }); }
+});
+
+app.get('/api/subscriptions/mess', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized' });
+    res.status(200).json(await Subscription.find({ messId: req.user.id }));
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
+});
+
+// UPDATED: Added allowedSkips handling for the owner
+app.put('/api/subscriptions/:subId', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized' });
+    const { status, monthlyFee, extendDays, allowedSkips } = req.body;
+
+    const sub = await Subscription.findOne({ _id: req.params.subId, messId: req.user.id });
+    if (!sub) return res.status(404).json({ error: 'Subscription not found' });
+
+    if (status) sub.status = status;
+    if (monthlyFee !== undefined) sub.monthlyFee = monthlyFee;
+    if (allowedSkips !== undefined) sub.allowedSkips = allowedSkips;
+
+    if (extendDays) {
+      const currentEnd = sub.endDate ? new Date(sub.endDate) : new Date();
+      sub.endDate = new Date(currentEnd.getTime() + (extendDays * 24 * 60 * 60 * 1000));
+    }
+
+    await sub.save();
+    res.status(200).json({ message: 'Subscription successfully updated', sub });
+  } catch (error) { res.status(500).json({ error: 'Failed to update subscription' }); }
 });
 
 // --- LOCATION/MAP ROUTES ---
 app.get('/api/messes/nearby', authenticateToken, async (req, res) => {
   try {
-    const messes = await User.find({
-      role: 'owner',
-      isVerified: true, // <--- IMPORTANT
-      'location.coordinates': { $ne: [0, 0] }
-    }).select('messName messAddress location rating ratingCount');
-    res.status(200).json(messes);
-  } catch (error) { res.status(500).json({ error: 'Failed to fetch nearby messes' }); }
+    res.status(200).json(await User.find({ role: 'owner', isVerified: true, 'location.coordinates': { $ne: [0, 0] } }).select('messName messAddress location rating ratingCount'));
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 app.put('/api/owner/location', authenticateToken, async (req, res) => {
   if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized.' });
   try {
     const { latitude, longitude } = req.body;
-    if (!latitude || !longitude) return res.status(400).json({ error: 'Latitude and longitude are required.' });
-    await User.findByIdAndUpdate(req.user.id, {
-      location: { type: 'Point', coordinates: [longitude, latitude] }
-    });
+    if (!latitude || !longitude) return res.status(400).json({ error: 'Coords required.' });
+    await User.findByIdAndUpdate(req.user.id, { location: { type: 'Point', coordinates: [longitude, latitude] } });
     res.status(200).json({ message: 'Location updated successfully!' });
-  } catch (error) { res.status(500).json({ error: 'Failed to update location' }); }
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 const PORT = process.env.PORT || 3000;

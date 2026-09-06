@@ -115,6 +115,21 @@ const MenuSchema = new mongoose.Schema({
 });
 const Menu = mongoose.model('Menu', MenuSchema);
 
+// UPDATED: Added shift type and end date for absenteeism extensions
+const SubscriptionSchema = new mongoose.Schema({
+  studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  studentName: String,
+  studentPhone: String,
+  messId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  messName: String,
+  shift: { type: String, enum: ['morning', 'night', 'both'], default: 'both' }, // <-- NEW
+  startDate: { type: Date, default: Date.now },
+  endDate: { type: Date }, // <-- NEW
+  status: { type: String, enum: ['pending', 'paid'], default: 'pending' },
+  monthlyFee: { type: Number, default: 0 } // Owner sets this now
+});
+const Subscription = mongoose.model('Subscription', SubscriptionSchema);
+
 // FIXED: Using mongoose.Schema.Types.ObjectId for relational integrity
 const AttendanceSchema = new mongoose.Schema({
   messId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -172,7 +187,6 @@ const authenticateAdmin = (req, res, next) => {
 // --- AUTH ROUTES ---
 app.post('/api/register', async (req, res) => {
   try {
-    // 1. Extract latitude and longitude from req.body
     const { role, name, phone, password, messName, messAddress, fssaiNumber, yearBranch, latitude, longitude } = req.body;
 
     const phoneRegex = /^[6-9]\d{9}$/;
@@ -180,20 +194,17 @@ app.post('/api/register', async (req, res) => {
       return res.status(400).json({ error: 'Invalid mobile number. Must be 10 digits and start with 6, 7, 8, or 9.' });
     }
 
-
     if (await User.findOne({ phone })) return res.status(400).json({ error: 'Phone number already registered' });
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 2. Base user data
     const userData = { role, name, phone, password: hashedPassword, messName, messAddress, fssaiNumber, yearBranch };
 
-    // 3. If location is provided during auth, format it for MongoDB GeoJSON
     if (latitude && longitude) {
       userData.location = {
         type: 'Point',
-        coordinates: [longitude, latitude] // GeoJSON strictly requires [longitude, latitude]
+        coordinates: [longitude, latitude]
       };
     }
 
@@ -230,7 +241,7 @@ app.get('/api/me', authenticateToken, async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Failed to fetch user profile' }); }
 });
 
-// --- ADMIN ROUTES (NEWLY ADDED) ---
+// --- ADMIN ROUTES ---
 app.get('/api/admin/users', authenticateToken, authenticateAdmin, async (req, res) => {
   try {
     const users = await User.find().select('-password').sort({ createdAt: -1 });
@@ -268,12 +279,10 @@ app.delete('/api/admin/directory/:id', authenticateToken, authenticateAdmin, asy
   } catch (error) { res.status(500).json({ error: 'Failed to delete directory item' }); }
 });
 
-
 // --- MENU ROUTES ---
 app.post('/api/menus', authenticateToken, async (req, res) => {
   if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized.' });
   try {
-    // FIXED BOLA: Pull ownerId from token, not body
     const ownerId = req.user.id;
     const { messName, date, items, price } = req.body;
 
@@ -303,7 +312,6 @@ app.post('/api/attendance', authenticateToken, async (req, res) => {
     const { messId, messName, status, targetDate } = req.body;
     const userId = req.user.id;
 
-    // FIXED DUPLICATES: Upsert attendance records to ensure max 1 per user per day
     await Attendance.findOneAndUpdate(
       { userId, targetDate },
       { messId, messName, status, timestamp: new Date() },
@@ -333,7 +341,6 @@ app.get('/api/attendance/stats/:messName/:date', authenticateToken, async (req, 
 app.get('/api/attendance/history/:messName', authenticateToken, async (req, res) => {
   try {
     const { messName } = req.params;
-    // Build the last 7 days date strings
     const history = {};
     const dateStrings = [];
     for (let i = 6; i >= 0; i--) {
@@ -373,19 +380,36 @@ app.post('/api/messes/:ownerId/rate', authenticateToken, async (req, res) => {
     const { rating, comment } = req.body;
     const owner = await User.findById(req.params.ownerId);
     const student = await User.findById(req.user.id);
-    if (!owner || owner.role !== 'owner') return res.status(404).json({ error: 'Owner not found' });
+
+    if (!owner || owner.role !== 'owner') {
+      return res.status(404).json({ error: 'Owner not found.' });
+    }
+    if (!student) {
+      return res.status(401).json({ error: 'Student profile not found. Please log out and log back in.' });
+    }
 
     owner.ratingTotal = (owner.ratingTotal || 0) + rating;
     owner.ratingCount += 1;
     owner.rating = owner.ratingTotal / owner.ratingCount;
     await owner.save();
 
+    const safeStudentName = student.name || 'Anonymous Student';
+
     if (comment) {
-      const review = new Review({ messId: owner._id, studentName: student.name, rating, comment });
+      const review = new Review({
+        messId: owner._id,
+        studentName: safeStudentName,
+        rating,
+        comment
+      });
       await review.save();
     }
-    res.status(200).json({ message: 'Rating submitted' });
-  } catch (error) { res.status(500).json({ error: 'Failed to submit rating' }); }
+
+    res.status(200).json({ message: 'Rating submitted successfully!' });
+  } catch (error) {
+    console.error("Backend Review Error:", error);
+    res.status(500).json({ error: error.message || 'Server crashed while submitting rating.' });
+  }
 });
 
 app.get('/api/messes/:ownerId/reviews', authenticateToken, async (req, res) => {
@@ -400,12 +424,91 @@ app.get('/api/directory', authenticateToken, async (req, res) => {
   try { res.json(await Directory.find()); } catch (error) { res.status(500).json({ error: 'Failed to fetch' }); }
 });
 
+// --- SUBSCRIPTION ROUTES ---
+
+// 1. Student subscribes to a mess
+app.post('/api/subscriptions', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'student') return res.status(403).json({ error: 'Only students can subscribe.' });
+
+    // ADDED: Accept 'shift' from frontend (morning, night, both)
+    const { messId, messName, shift } = req.body;
+    const student = await User.findById(req.user.id);
+
+    // Prevent duplicate subscriptions
+    const existing = await Subscription.findOne({ studentId: student._id, messId });
+    if (existing) return res.status(400).json({ error: 'You are already a member of this mess.' });
+
+    const startDate = new Date();
+    // Default duration is 30 days
+    const endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const newSub = new Subscription({
+      studentId: student._id,
+      studentName: student.name || 'Student',
+      studentPhone: student.phone,
+      messId,
+      messName,
+      shift: shift || 'both', // Save the specific shift
+      startDate,
+      endDate,
+      monthlyFee: 0 // Owner will set the exact price later from their dashboard
+    });
+
+    await newSub.save();
+    res.status(201).json({ message: 'Subscribed successfully! Awaiting owner confirmation.', sub: newSub });
+  } catch (error) { res.status(500).json({ error: 'Failed to subscribe' }); }
+});
+
+// 2. Student fetches their own subscriptions
+app.get('/api/subscriptions/me', authenticateToken, async (req, res) => {
+  try {
+    const subs = await Subscription.find({ studentId: req.user.id });
+    res.status(200).json(subs);
+  } catch (error) { res.status(500).json({ error: 'Failed to fetch your subscriptions' }); }
+});
+
+// 3. Owner fetches all their monthly members
+app.get('/api/subscriptions/mess', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized' });
+    const subs = await Subscription.find({ messId: req.user.id });
+    res.status(200).json(subs);
+  } catch (error) { res.status(500).json({ error: 'Failed to fetch members' }); }
+});
+
+// 4. UPDATED: Owner updates payment status, sets fee, or extends absentee dates
+app.put('/api/subscriptions/:subId', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized' });
+
+    // We can accept status, fee, or days to extend
+    const { status, monthlyFee, extendDays } = req.body;
+
+    const sub = await Subscription.findOne({ _id: req.params.subId, messId: req.user.id });
+    if (!sub) return res.status(404).json({ error: 'Subscription not found' });
+
+    // Update fields if provided
+    if (status) sub.status = status;
+    if (monthlyFee !== undefined) sub.monthlyFee = monthlyFee;
+
+    // Extend end date by X days if absent
+    if (extendDays) {
+      const currentEnd = sub.endDate ? new Date(sub.endDate) : new Date();
+      sub.endDate = new Date(currentEnd.getTime() + (extendDays * 24 * 60 * 60 * 1000));
+    }
+
+    await sub.save();
+    res.status(200).json({ message: 'Subscription successfully updated', sub });
+  } catch (error) { res.status(500).json({ error: 'Failed to update subscription' }); }
+});
+
 // --- LOCATION/MAP ROUTES ---
 app.get('/api/messes/nearby', authenticateToken, async (req, res) => {
   try {
     const messes = await User.find({
       role: 'owner',
-      isVerified: true, // <--- IMPORTANT
+      isVerified: true,
       'location.coordinates': { $ne: [0, 0] }
     }).select('messName messAddress location rating ratingCount');
     res.status(200).json(messes);
@@ -936,7 +1039,7 @@ Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8d in posi
 ================================================
 FILE: frontend/src/pages/OwnerDashboard.jsx
 ================================================
-Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8f in position 11910: character maps to <undefined>
+Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8f in position 13538: character maps to <undefined>
 
 
 ================================================
@@ -944,7 +1047,7 @@ FILE: frontend/src/pages/StudentDashboard.jsx
 ================================================
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Utensils, MapPin, Navigation, Home, Phone, CheckCircle2, XCircle, LogOut, Loader2, IndianRupee, Star, AlertTriangle, Sparkles, CalendarDays, Trophy, MessageSquareQuote, Map } from 'lucide-react';
+import { Utensils, MapPin, Navigation, Home, Phone, CheckCircle2, XCircle, LogOut, Loader2, IndianRupee, Star, AlertTriangle, Sparkles, CalendarDays, Trophy, MessageSquareQuote, Map, Award } from 'lucide-react';
 import MessMap from '../components/MessMap';
 import ThemeToggle from '../components/ThemeToggle';
 import LanguageToggle from '../components/LanguageToggle';
@@ -958,7 +1061,7 @@ const getLocalDateString = (offsetDays = 0) => {
   return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 };
 
-const MessCard = ({ mess, initialAttendance, targetDate, globalHasCommitted, onAttendanceUpdate, t }) => {
+const MessCard = ({ mess, user, initialAttendance, targetDate, globalHasCommitted, onAttendanceUpdate, mySub, onSubscribe, t }) => {
   const [attendance, setAttendance] = useState(initialAttendance || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rating, setRating] = useState(0);
@@ -968,9 +1071,18 @@ const MessCard = ({ mess, initialAttendance, targetDate, globalHasCommitted, onA
   const [showReviews, setShowReviews] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // NEW STATE: For handling subscription shift selection
+  const [showSubForm, setShowSubForm] = useState(false);
+  const [selectedShift, setSelectedShift] = useState('both');
+
+  // Auto-set attendance to 'coming' if they are a monthly member and haven't chosen yet
   useEffect(() => {
-    setAttendance(initialAttendance || null);
-  }, [initialAttendance]);
+    if (mySub && initialAttendance === undefined) {
+      setAttendance('coming');
+    } else {
+      setAttendance(initialAttendance || null);
+    }
+  }, [initialAttendance, mySub]);
 
   const fetchReviews = async () => {
     const token = localStorage.getItem('token');
@@ -999,16 +1111,36 @@ const MessCard = ({ mess, initialAttendance, targetDate, globalHasCommitted, onA
 
   const handleRating = async (e) => {
     e.preventDefault();
-    if (rating === 0) return;
+    if (rating === 0) { alert("Please select a star rating before submitting your review!"); return; }
     const token = localStorage.getItem('token');
     try {
       const response = await fetch(`${API_URL}/api/messes/${mess.ownerId._id}/rate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ rating, comment })
+        body: JSON.stringify({ rating, comment, studentName: user?.name || 'Student' })
       });
-      if (response.ok) setHasRated(true);
-    } catch (error) { console.error("Failed to submit rating"); }
+      const data = await response.json();
+      if (response.ok) { setHasRated(true); fetchReviews(); }
+      else { alert(`Server Error: ${data.error}`); }
+    } catch (error) { alert("Network error: Failed to connect to server."); }
+  };
+
+  const handleSubscribe = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/subscriptions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        // UPDATED: Send specific shift, removed monthlyFee so owner can set it
+        body: JSON.stringify({ messId: mess.ownerId._id, messName: mess.messName, shift: selectedShift })
+      });
+      if (res.ok) {
+        alert("Subscribed successfully! The owner will set your exact monthly fee.");
+        setShowSubForm(false);
+        onSubscribe();
+      }
+      else { const d = await res.json(); alert(d.error); }
+    } catch (e) { alert("Failed to subscribe"); }
   };
 
   const currentRating = mess.ownerId?.rating ? Number(mess.ownerId.rating).toFixed(1) : 'New';
@@ -1029,6 +1161,31 @@ const MessCard = ({ mess, initialAttendance, targetDate, globalHasCommitted, onA
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <span className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-1 shadow-sm"><Star size={10} className="fill-amber-400 text-amber-400" /> {currentRating}</span>
               <span className="bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400 text-[10px] font-bold px-3 py-1 rounded-full uppercase flex items-center gap-1"><IndianRupee size={12} /> {mess.price || '60'} {t.thali}</span>
+
+              {/* UPDATED: MEMBERSHIP BADGE OR SHIFT SELECTION FORM */}
+              {mySub ? (
+                <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-1 shadow-sm ${mySub.status === 'paid' ? 'bg-indigo-500 text-white' : 'bg-rose-100 text-rose-600 border border-rose-200'}`}>
+                  <Award size={12} /> Member: {mySub.status} ({mySub.shift})
+                </span>
+              ) : showSubForm ? (
+                <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-1 rounded-full border border-slate-200 dark:border-slate-700">
+                  <select
+                    value={selectedShift}
+                    onChange={(e) => setSelectedShift(e.target.value)}
+                    className="text-[10px] font-bold px-2 py-1 rounded-full bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-none outline-none cursor-pointer"
+                  >
+                    <option value="morning">Morning Only</option>
+                    <option value="night">Night Only</option>
+                    <option value="both">Both Shifts</option>
+                  </select>
+                  <button onClick={handleSubscribe} className="bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-colors">Confirm</button>
+                  <button onClick={() => setShowSubForm(false)} className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-colors">Cancel</button>
+                </div>
+              ) : (
+                <button onClick={() => setShowSubForm(true)} className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100 text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-colors">
+                  Join Monthly
+                </button>
+              )}
             </div>
             <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">{mess.messName}</h3>
           </div>
@@ -1064,7 +1221,7 @@ const MessCard = ({ mess, initialAttendance, targetDate, globalHasCommitted, onA
                   ))}
                 </div>
                 <textarea rows="2" placeholder="How was the food?" value={comment} onChange={e => setComment(e.target.value)} className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none mb-3 dark:text-white" />
-                <button type="submit" disabled={rating === 0} className="w-full bg-slate-900 dark:bg-orange-500 text-white font-bold py-2.5 rounded-xl disabled:opacity-50">Submit Review</button>
+                <button type="submit" className="w-full bg-slate-900 dark:bg-orange-500 hover:bg-slate-800 dark:hover:bg-orange-600 transition-colors text-white font-bold py-2.5 rounded-xl">Submit Review</button>
               </form>
             ) : (
               <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl border border-emerald-100 dark:border-emerald-500/20 text-center text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center gap-2"><CheckCircle2 size={18} /> Review Submitted</div>
@@ -1121,7 +1278,6 @@ const StudentDashboard = () => {
   const navigate = useNavigate();
   const user = location.state?.user;
 
-  // Language State
   const [lang, setLang] = useState(() => localStorage.getItem('app_lang') || 'en');
   const t = translations[lang];
 
@@ -1130,6 +1286,7 @@ const StudentDashboard = () => {
 
   const [menus, setMenus] = useState([]);
   const [myAttendance, setMyAttendance] = useState([]);
+  const [mySubscriptions, setMySubscriptions] = useState([]); // NEW STATE
   const [globalHasCommitted, setGlobalHasCommitted] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
   const [directory, setDirectory] = useState({ rickshaws: [], rooms: [], emergency: [] });
@@ -1169,6 +1326,10 @@ const StudentDashboard = () => {
         setGlobalHasCommitted(myAtt.some(a => a.status === 'coming'));
       }
 
+      // FETCH SUBSCRIPTIONS
+      const subRes = await fetch(`${API_URL}/api/subscriptions/me`, { headers });
+      if (subRes.ok) setMySubscriptions(await subRes.json());
+
       const dirRes = await fetch(`${API_URL}/api/directory`, { headers });
       if (dirRes.ok) {
         const rawDir = await dirRes.json();
@@ -1196,7 +1357,7 @@ const StudentDashboard = () => {
 
   const getAttendanceStatus = (messName) => {
     const record = myAttendance.find(a => a.messName === messName);
-    return record ? record.status : null;
+    return record ? record.status : undefined;
   };
 
   const studentName = (user.name || user.fullName || 'Student').split(' ')[0];
@@ -1254,7 +1415,18 @@ const StudentDashboard = () => {
               ) : (
                 <div className="space-y-8">
                   {menus.map(mess => (
-                    <MessCard key={mess._id} mess={mess} targetDate={targetDate} initialAttendance={getAttendanceStatus(mess.messName)} globalHasCommitted={globalHasCommitted} onAttendanceUpdate={(silent = true) => fetchData(silent)} t={t} />
+                    <MessCard
+                      key={mess._id}
+                      mess={mess}
+                      user={user}
+                      targetDate={targetDate}
+                      initialAttendance={getAttendanceStatus(mess.messName)}
+                      globalHasCommitted={globalHasCommitted}
+                      mySub={mySubscriptions.find(s => s.messId === mess.ownerId._id)} // Pass sub data
+                      onSubscribe={() => fetchData(false)} // Refresh on sub
+                      onAttendanceUpdate={(silent = true) => fetchData(silent)}
+                      t={t}
+                    />
                   ))}
                 </div>
               )}
