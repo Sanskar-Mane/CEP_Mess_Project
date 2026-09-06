@@ -31,6 +31,7 @@ const OwnerDashboard = () => {
   const [menuItems, setMenuItems] = useState('');
   const [price, setPrice] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isMenuExisting, setIsMenuExisting] = useState(false); // <-- NEW STATE FOR EDIT VS PUBLISH
 
   // Analytics & Members State
   const [analyticsShift, setAnalyticsShift] = useState('morning');
@@ -95,9 +96,11 @@ const OwnerDashboard = () => {
           if (myMenu) {
             setMenuItems(myMenu.items.join(', '));
             setPrice(myMenu.price.toString());
+            setIsMenuExisting(true); // Menu exists -> Edit mode
           } else {
             setMenuItems('');
             setPrice('');
+            setIsMenuExisting(false); // Menu doesn't exist -> Publish mode
           }
         }
       } catch (e) { console.error("Failed to fetch menus", e); }
@@ -171,7 +174,10 @@ const OwnerDashboard = () => {
     } catch (e) { console.error("Failed to update subscription", e); }
   };
 
-  const togglePaymentStatus = (subId, currentStatus) => updateSubscription(subId, { status: currentStatus === 'paid' ? 'pending' : 'paid' });
+  const togglePaymentStatus = (subId, currentStatus) => {
+    if (currentStatus === 'paid') return; // Do nothing if it's already paid!
+    updateSubscription(subId, { status: 'paid' });
+  };
 
   const handleSetFee = (subId, currentFee) => {
     const fee = window.prompt("Enter the custom monthly fee (₹) for this student:", currentFee || 0);
@@ -222,9 +228,12 @@ const OwnerDashboard = () => {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || `Server rejected the menu`);
       }
-      alert(`Menu published successfully for ${displayDate.split(',')[0]} (${menuShift})!`);
+
+      const data = await response.json();
+      alert(data.message || `Menu saved successfully for ${displayDate.split(',')[0]} (${menuShift})!`);
+      setIsMenuExisting(true); // Automatically switch to Edit Mode now
     } catch (error) {
-      alert(`Failed to publish menu: ${error.message}`);
+      alert(`Failed to save menu: ${error.message}`);
     } finally {
       setIsPublishing(false);
     }
@@ -306,12 +315,24 @@ const OwnerDashboard = () => {
           <div className="bg-amber-50 dark:bg-amber-900/20 rounded-[2rem] p-6 border border-amber-200 dark:border-amber-700/50 relative">
             <div className="flex items-center gap-2 mb-3 text-amber-900 dark:text-amber-500 font-black"><Calculator size={20} /> {t.quickWasteOptimizer}</div>
             <label className="text-xs font-bold text-amber-700 dark:text-amber-600 block mb-1">{t.howManyPrepared}</label>
-            <input type="number" value={estThalis} onChange={e => setEstThalis(e.target.value)} placeholder={`e.g. ${currentStats.coming + 15}`} className="w-full bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700/50 p-2 rounded-xl text-sm font-bold focus:outline-none mb-3 dark:text-white" />
-            {estThalis && Number(estThalis) > currentStats.coming ? (
+            <input
+              type="number"
+              min="0"
+              value={estThalis}
+              onChange={e => {
+                const val = e.target.value;
+                if (val === '' || Number(val) >= 0) {
+                  setEstThalis(val);
+                }
+              }}
+              placeholder={`e.g. ${currentStats.coming + 15}`}
+              className="w-full bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700/50 p-2 rounded-xl text-sm font-bold focus:outline-none mb-3 dark:text-white"
+            />
+            {estThalis !== '' && Number(estThalis) >= 0 && Number(estThalis) > currentStats.coming ? (
               <div className="text-sm font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-800 p-2 rounded-lg border border-rose-100 dark:border-rose-900/50">
                 ⚠️ {t.overproducedBy} {Number(estThalis) - currentStats.coming} {t.thali}.
               </div>
-            ) : estThalis && Number(estThalis) < currentStats.coming ? (
+            ) : estThalis !== '' && Number(estThalis) >= 0 && Number(estThalis) < currentStats.coming ? (
               <div className="text-sm font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-800 p-2 rounded-lg">
                 🚨 {t.shortfallOf} {currentStats.coming - Number(estThalis)} {t.cookMore}
               </div>
@@ -361,11 +382,11 @@ const OwnerDashboard = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.thaliPrice}</label>
-                  <input type="number" required className="w-full px-4 py-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-4 font-bold outline-none" placeholder="60" value={price} onChange={(e) => setPrice(e.target.value)} />
+                  <input type="number" required min="0" className="w-full px-4 py-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-4 font-bold outline-none" placeholder="60" value={price} onChange={(e) => setPrice(e.target.value)} />
                 </div>
               </div>
               <button disabled={isPublishing} type="submit" className="mt-6 w-full bg-slate-900 hover:bg-slate-800 dark:bg-orange-500 dark:hover:bg-orange-600 text-white font-bold py-4 rounded-2xl transition-all shadow-lg active:scale-95 flex justify-center gap-2">
-                {isPublishing ? <Loader2 className="animate-spin" size={20} /> : `Publish ${menuShift} Menu`}
+                {isPublishing ? <Loader2 className="animate-spin" size={20} /> : `${isMenuExisting ? 'Update' : 'Publish'} ${menuShift} Menu`}
               </button>
             </form>
           </div>
@@ -436,17 +457,21 @@ const OwnerDashboard = () => {
                       <td className="py-4 px-5">
                         <div className="flex items-center gap-2 text-sm font-bold text-orange-500 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 w-fit rounded-lg border border-orange-100 dark:border-orange-500/20">
                           <IndianRupee size={14} />{member.monthlyFee || 0}
-                          <button onClick={() => handleSetFee(member._id, member.monthlyFee)} className="text-slate-400 hover:text-orange-500 ml-1 transition-colors">
-                            <Edit3 size={14} />
-                          </button>
+                          {/* FIX: Hide edit button if payment is locked */}
+                          {member.status !== 'paid' && (
+                            <button onClick={() => handleSetFee(member._id, member.monthlyFee)} className="text-slate-400 hover:text-orange-500 ml-1 transition-colors">
+                              <Edit3 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td className="py-4 px-5 text-right">
                         <button
                           onClick={() => togglePaymentStatus(member._id, member.status)}
+                          disabled={member.status === 'paid'}
                           className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 ${member.status === 'paid'
-                            ? 'bg-emerald-500 text-white shadow-emerald-500/20'
-                            : 'bg-rose-100 text-rose-600 border border-rose-200 hover:bg-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30 dark:hover:bg-rose-500/20'
+                              ? 'bg-emerald-500 text-white shadow-emerald-500/20 cursor-not-allowed opacity-80'
+                              : 'bg-rose-100 text-rose-600 border border-rose-200 hover:bg-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30 dark:hover:bg-rose-500/20'
                             }`}
                         >
                           {member.status === 'paid' ? 'Paid ✓' : 'Mark as Paid'}

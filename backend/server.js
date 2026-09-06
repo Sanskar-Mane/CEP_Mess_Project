@@ -44,18 +44,16 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
-// UPDATED: Added shift to separate Morning and Night Menus
 const MenuSchema = new mongoose.Schema({
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   messName: { type: String, required: true },
   date: { type: String, required: true }, // Target Date YYYY-MM-DD
-  shift: { type: String, enum: ['morning', 'night'], required: true }, // <-- NEW
+  shift: { type: String, enum: ['morning', 'night'], required: true },
   items: [{ type: String }],
   price: { type: Number }
 });
 const Menu = mongoose.model('Menu', MenuSchema);
 
-// UPDATED: Added skip tracking system
 const SubscriptionSchema = new mongoose.Schema({
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   studentName: String,
@@ -67,16 +65,15 @@ const SubscriptionSchema = new mongoose.Schema({
   endDate: { type: Date },
   status: { type: String, enum: ['pending', 'paid'], default: 'pending' },
   monthlyFee: { type: Number, default: 0 },
-  allowedSkips: { type: Number, default: 5 }, // <-- NEW: Max allowed skips
-  usedSkips: { type: Number, default: 0 }     // <-- NEW: Skips used so far
+  allowedSkips: { type: Number, default: 5 },
+  usedSkips: { type: Number, default: 0 }
 });
 const Subscription = mongoose.model('Subscription', SubscriptionSchema);
 
-// UPDATED: Added shift to Attendance tracking
 const AttendanceSchema = new mongoose.Schema({
   messId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   messName: String,
-  shift: { type: String, enum: ['morning', 'night'], required: true }, // <-- NEW
+  shift: { type: String, enum: ['morning', 'night'], required: true },
   status: { type: String, enum: ['coming', 'not_coming'] },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   targetDate: { type: String, required: true },
@@ -130,6 +127,7 @@ const authenticateAdmin = (req, res, next) => {
 app.post('/api/register', async (req, res) => {
   try {
     const { role, name, phone, password, messName, messAddress, fssaiNumber, yearBranch, latitude, longitude } = req.body;
+
     const phoneRegex = /^[6-9]\d{9}$/;
     if (!phoneRegex.test(phone)) return res.status(400).json({ error: 'Invalid mobile number.' });
     if (await User.findOne({ phone })) return res.status(400).json({ error: 'Phone number already registered' });
@@ -204,9 +202,9 @@ app.post('/api/menus', authenticateToken, async (req, res) => {
   if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized.' });
   try {
     const ownerId = req.user.id;
-    // UPDATED: Accept shift
     const { messName, date, shift, items, price } = req.body;
     if (!shift) return res.status(400).json({ error: 'Shift (morning or night) is required.' });
+    if (price < 0) return res.status(400).json({ error: 'Price cannot be negative.' });
 
     const existingMenu = await Menu.findOne({ ownerId, date, shift });
     if (existingMenu) {
@@ -231,17 +229,14 @@ app.get('/api/menus/:date', authenticateToken, async (req, res) => {
 // --- ATTENDANCE ROUTES ---
 app.post('/api/attendance', authenticateToken, async (req, res) => {
   try {
-    // UPDATED: Accept shift from the UI
     const { messId, messName, shift, status, targetDate } = req.body;
     if (!shift) return res.status(400).json({ error: 'Shift is required.' });
     const userId = req.user.id;
 
-    // Check if the user is a monthly member
     const sub = await Subscription.findOne({ studentId: userId, messId });
     const existingAtt = await Attendance.findOne({ userId, targetDate, shift });
 
     if (sub) {
-      // If they are trying to SKIP
       if (status === 'not_coming' && (!existingAtt || existingAtt.status !== 'not_coming')) {
         if (sub.usedSkips >= sub.allowedSkips) {
           return res.status(400).json({ error: `Skip limit reached (${sub.allowedSkips} max). Please contact the owner for more skips.` });
@@ -249,7 +244,6 @@ app.post('/api/attendance', authenticateToken, async (req, res) => {
         sub.usedSkips += 1;
         await sub.save();
       }
-      // If they change mind and revert back to COMING, refund their skip
       else if (status === 'coming' && existingAtt && existingAtt.status === 'not_coming') {
         if (sub.usedSkips > 0) {
           sub.usedSkips -= 1;
@@ -258,7 +252,6 @@ app.post('/api/attendance', authenticateToken, async (req, res) => {
       }
     }
 
-    // Upsert attendance record for the specific shift
     await Attendance.findOneAndUpdate(
       { userId, targetDate, shift },
       { messId, messName, status, timestamp: new Date() },
@@ -276,25 +269,74 @@ app.get('/api/attendance/me/:date', authenticateToken, async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Failed to fetch your attendance' }); }
 });
 
-// UPDATED: Returns separate stats for Morning vs Night
+// FIX: Auto-Count Monthly Members in Owner Stats
 app.get('/api/attendance/stats/:messName/:date', authenticateToken, async (req, res) => {
   try {
-    const records = await Attendance.find({ messName: decodeURIComponent(req.params.messName), targetDate: req.params.date });
+    const messName = decodeURIComponent(req.params.messName);
+    const targetDate = req.params.date;
+    const targetDateObj = new Date(targetDate);
 
-    // Separate by shift
-    const morningRecords = records.filter(r => r.shift === 'morning');
-    const nightRecords = records.filter(r => r.shift === 'night');
+    const records = await Attendance.find({ messName, targetDate });
+    const allSubs = await Subscription.find({ messName });
+
+    // Filter to currently active subscriptions
+    const activeSubs = allSubs.filter(sub => {
+      const start = new Date(sub.startDate);
+      const end = sub.endDate ? new Date(sub.endDate) : new Date(8640000000000000);
+      return targetDateObj >= start && targetDateObj <= end;
+    });
+
+    const morningAtt = records.filter(r => r.shift === 'morning');
+    const nightAtt = records.filter(r => r.shift === 'night');
+
+    const morningSubs = activeSubs.filter(s => s.shift === 'morning' || s.shift === 'both');
+    const nightSubs = activeSubs.filter(s => s.shift === 'night' || s.shift === 'both');
+
+    // Morning Stats Calculation
+    let morningComing = 0;
+    let morningNotComing = 0;
+    const morningSubIds = new Set(morningSubs.map(s => s.studentId.toString()));
+
+    morningSubs.forEach(sub => {
+      const att = morningAtt.find(r => r.userId.toString() === sub.studentId.toString());
+      if (att && att.status === 'not_coming') morningNotComing++;
+      else morningComing++; // Auto-counted as coming!
+    });
+    morningAtt.forEach(r => {
+      if (!morningSubIds.has(r.userId.toString())) {
+        if (r.status === 'coming') morningComing++;
+        if (r.status === 'not_coming') morningNotComing++;
+      }
+    });
+
+    // Night Stats Calculation
+    let nightComing = 0;
+    let nightNotComing = 0;
+    const nightSubIds = new Set(nightSubs.map(s => s.studentId.toString()));
+
+    nightSubs.forEach(sub => {
+      const att = nightAtt.find(r => r.userId.toString() === sub.studentId.toString());
+      if (att && att.status === 'not_coming') nightNotComing++;
+      else nightComing++; // Auto-counted as coming!
+    });
+    nightAtt.forEach(r => {
+      if (!nightSubIds.has(r.userId.toString())) {
+        if (r.status === 'coming') nightComing++;
+        if (r.status === 'not_coming') nightNotComing++;
+      }
+    });
 
     res.status(200).json({
-      morning: { coming: morningRecords.filter(r => r.status === 'coming').length, notComing: morningRecords.filter(r => r.status === 'not_coming').length },
-      night: { coming: nightRecords.filter(r => r.status === 'coming').length, notComing: nightRecords.filter(r => r.status === 'not_coming').length }
+      morning: { coming: morningComing, notComing: morningNotComing },
+      night: { coming: nightComing, notComing: nightNotComing }
     });
   } catch (error) { res.status(500).json({ error: 'Failed to fetch stats' }); }
 });
 
+// FIX: Auto-Count Monthly Members in Owner History Chart
 app.get('/api/attendance/history/:messName', authenticateToken, async (req, res) => {
   try {
-    const { messName } = req.params;
+    const messName = decodeURIComponent(req.params.messName);
     const history = {};
     const dateStrings = [];
     for (let i = 6; i >= 0; i--) {
@@ -305,16 +347,40 @@ app.get('/api/attendance/history/:messName', authenticateToken, async (req, res)
       dateStrings.push(dateStr);
     }
 
-    const records = await Attendance.find({
-      messName: decodeURIComponent(messName),
-      targetDate: { $in: dateStrings }
-    });
+    const records = await Attendance.find({ messName, targetDate: { $in: dateStrings } });
+    const allSubs = await Subscription.find({ messName });
 
-    records.forEach(r => {
-      if (history[r.targetDate]) {
-        if (r.status === 'coming') history[r.targetDate].coming++;
-        if (r.status === 'not_coming') history[r.targetDate].notComing++;
-      }
+    dateStrings.forEach(dateStr => {
+      const dateObj = new Date(dateStr);
+      const activeSubs = allSubs.filter(sub => {
+        const start = new Date(sub.startDate);
+        const end = sub.endDate ? new Date(sub.endDate) : new Date(8640000000000000);
+        return dateObj >= start && dateObj <= end;
+      });
+
+      const dayRecords = records.filter(r => r.targetDate === dateStr);
+      let coming = 0;
+      let notComing = 0;
+      const subIds = new Set(activeSubs.map(s => s.studentId.toString()));
+
+      activeSubs.forEach(sub => {
+        let shifts = sub.shift === 'both' ? ['morning', 'night'] : [sub.shift];
+        shifts.forEach(shift => {
+          const att = dayRecords.find(r => r.userId.toString() === sub.studentId.toString() && r.shift === shift);
+          if (att && att.status === 'not_coming') notComing++;
+          else coming++; // Auto-counted
+        });
+      });
+
+      dayRecords.forEach(r => {
+        if (!subIds.has(r.userId.toString())) {
+          if (r.status === 'coming') coming++;
+          if (r.status === 'not_coming') notComing++;
+        }
+      });
+
+      history[dateStr].coming = coming;
+      history[dateStr].notComing = notComing;
     });
 
     res.status(200).json(Object.values(history));
@@ -334,6 +400,7 @@ app.post('/api/messes/:ownerId/rate', authenticateToken, async (req, res) => {
     const { rating, comment } = req.body;
     const owner = await User.findById(req.params.ownerId);
     const student = await User.findById(req.user.id);
+
     if (!owner || owner.role !== 'owner') return res.status(404).json({ error: 'Owner not found.' });
     if (!student) return res.status(401).json({ error: 'Student profile not found. Please log out and log back in.' });
 
@@ -383,7 +450,7 @@ app.post('/api/subscriptions', authenticateToken, async (req, res) => {
       startDate,
       endDate,
       monthlyFee: 0,
-      allowedSkips: 5, // Default skips
+      allowedSkips: 5,
       usedSkips: 0
     });
 
@@ -403,7 +470,6 @@ app.get('/api/subscriptions/mess', authenticateToken, async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// UPDATED: Added allowedSkips handling for the owner
 app.put('/api/subscriptions/:subId', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized' });
@@ -412,11 +478,25 @@ app.put('/api/subscriptions/:subId', authenticateToken, async (req, res) => {
     const sub = await Subscription.findOne({ _id: req.params.subId, messId: req.user.id });
     if (!sub) return res.status(404).json({ error: 'Subscription not found' });
 
-    if (status) sub.status = status;
-    if (monthlyFee !== undefined) sub.monthlyFee = monthlyFee;
-    if (allowedSkips !== undefined) sub.allowedSkips = allowedSkips;
+    if (status) {
+      if (sub.status === 'paid' && status === 'pending') {
+        return res.status(400).json({ error: 'Cannot mark as pending. This subscription is already permanently marked as paid.' });
+      }
+      sub.status = status;
+    }
+
+    if (monthlyFee !== undefined) {
+      if (monthlyFee < 0) return res.status(400).json({ error: 'Fee cannot be negative.' });
+      sub.monthlyFee = monthlyFee;
+    }
+
+    if (allowedSkips !== undefined) {
+      if (allowedSkips < 0) return res.status(400).json({ error: 'Allowed skips cannot be negative.' });
+      sub.allowedSkips = allowedSkips;
+    }
 
     if (extendDays) {
+      if (extendDays < 0) return res.status(400).json({ error: 'Extended days cannot be negative.' });
       const currentEnd = sub.endDate ? new Date(sub.endDate) : new Date();
       sub.endDate = new Date(currentEnd.getTime() + (extendDays * 24 * 60 * 60 * 1000));
     }

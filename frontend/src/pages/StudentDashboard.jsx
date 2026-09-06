@@ -14,53 +14,45 @@ const getLocalDateString = (offsetDays = 0) => {
   return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 };
 
-const MessCard = ({ mess, user, initialAttendance, targetDate, globalHasCommitted, onAttendanceUpdate, mySub, onSubscribe, t }) => {
-  const [attendance, setAttendance] = useState(initialAttendance || null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+const MessCard = ({ messData, user, targetDate, globalCommitted, onAttendanceUpdate, mySub, onSubscribe, attendanceStatus, t }) => {
+  const [attMorning, setAttMorning] = useState(null);
+  const [attNight, setAttNight] = useState(null);
+  const [isSubmittingMorning, setIsSubmittingMorning] = useState(false);
+  const [isSubmittingNight, setIsSubmittingNight] = useState(false);
+  const [errorMsg, setErrorMsg] = useState({ morning: '', night: '' });
+
+  const [showSubForm, setShowSubForm] = useState(false);
+  const [selectedShift, setSelectedShift] = useState('both');
+
+  // --- REVIEW STATE ---
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [hasRated, setHasRated] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [showReviews, setShowReviews] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
 
-  const [showSubForm, setShowSubForm] = useState(false);
-  const [selectedShift, setSelectedShift] = useState('both');
+  const ownerId = messData.ownerId?._id || messData.ownerId;
 
   useEffect(() => {
-    if (mySub && initialAttendance === undefined) {
-      setAttendance('coming');
-    } else {
-      setAttendance(initialAttendance || null);
-    }
-  }, [initialAttendance, mySub]);
+    let m = attendanceStatus?.morning;
+    let n = attendanceStatus?.night;
 
+    if (mySub) {
+      if ((mySub.shift === 'morning' || mySub.shift === 'both') && m === undefined) m = 'coming';
+      if ((mySub.shift === 'night' || mySub.shift === 'both') && n === undefined) n = 'coming';
+    }
+    setAttMorning(m || null);
+    setAttNight(n || null);
+  }, [attendanceStatus, mySub]);
+
+  // --- REVIEW FUNCTIONS ---
   const fetchReviews = async () => {
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`${API_URL}/api/messes/${mess.ownerId._id}/reviews`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const res = await fetch(`${API_URL}/api/messes/${ownerId}/reviews`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) setReviews(await res.json());
       setShowReviews(!showReviews);
     } catch (e) { console.error(e); }
-  };
-
-  const handleAttendance = async (status) => {
-    setIsSubmitting(true); setErrorMsg('');
-    const token = localStorage.getItem('token');
-    try {
-      const response = await fetch(`${API_URL}/api/attendance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ messId: mess.ownerId._id, messName: mess.messName, shift: mess.shift, status, targetDate, timestamp: new Date().toISOString() })
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setAttendance(status);
-        onAttendanceUpdate(true);
-      }
-      else { setErrorMsg(data.error || "Action not allowed."); }
-    } catch (error) { setErrorMsg("Connection failed."); }
-    finally { setIsSubmitting(false); }
   };
 
   const handleRating = async (e) => {
@@ -68,7 +60,7 @@ const MessCard = ({ mess, user, initialAttendance, targetDate, globalHasCommitte
     if (rating === 0) { alert("Please select a star rating before submitting your review!"); return; }
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`${API_URL}/api/messes/${mess.ownerId._id}/rate`, {
+      const response = await fetch(`${API_URL}/api/messes/${ownerId}/rate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ rating, comment, studentName: user?.name || 'Student' })
@@ -79,13 +71,50 @@ const MessCard = ({ mess, user, initialAttendance, targetDate, globalHasCommitte
     } catch (error) { alert("Network error: Failed to connect to server."); }
   };
 
+  // --- ATTENDANCE & SUBSCRIPTION FUNCTIONS ---
+  const handleAttendance = async (shift, status) => {
+    shift === 'morning' ? setIsSubmittingMorning(true) : setIsSubmittingNight(true);
+    setErrorMsg(prev => ({ ...prev, [shift]: '' }));
+
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_URL}/api/attendance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          messId: ownerId,
+          messName: messData.messName,
+          shift: shift,
+          status,
+          targetDate,
+          timestamp: new Date().toISOString()
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        shift === 'morning' ? setAttMorning(status) : setAttNight(status);
+        onAttendanceUpdate(true);
+      } else {
+        setErrorMsg(prev => ({ ...prev, [shift]: data.error || "Action not allowed." }));
+      }
+    } catch (error) {
+      setErrorMsg(prev => ({ ...prev, [shift]: "Connection failed." }));
+    } finally {
+      shift === 'morning' ? setIsSubmittingMorning(false) : setIsSubmittingNight(false);
+    }
+  };
+
   const handleSubscribe = async () => {
     const token = localStorage.getItem('token');
     try {
       const res = await fetch(`${API_URL}/api/subscriptions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ messId: mess.ownerId._id, messName: mess.messName, shift: selectedShift })
+        body: JSON.stringify({
+          messId: ownerId,
+          messName: messData.messName,
+          shift: selectedShift
+        })
       });
       if (res.ok) {
         alert("Subscribed successfully! The owner will set your exact monthly fee.");
@@ -96,98 +125,114 @@ const MessCard = ({ mess, user, initialAttendance, targetDate, globalHasCommitte
     } catch (e) { alert("Failed to subscribe"); }
   };
 
-  const currentRating = mess.ownerId?.rating ? Number(mess.ownerId.rating).toFixed(1) : 'New';
+  const currentRating = messData.ownerId?.rating ? Number(messData.ownerId.rating).toFixed(1) : 'New';
 
-  const isCurrentSelectionComing = attendance === 'coming';
-  const isCurrentSelectionSkip = attendance === 'not_coming';
-  const disableComing = isSubmitting || isCurrentSelectionComing || (globalHasCommitted && !isCurrentSelectionComing);
-  const disableSkip = isSubmitting || isCurrentSelectionSkip;
+  const renderShiftBlock = (shiftLabel, shiftKey, menuData, currentAtt, isSubmitting) => {
+    const isCommittedToOther = globalCommitted[shiftKey] && currentAtt !== 'coming';
+
+    // FIX: Removed the rigid `isLocked` variable. Now you can toggle back and forth!
+    const disableComing = isSubmitting || currentAtt === 'coming' || isCommittedToOther;
+    const disableSkip = isSubmitting || currentAtt === 'not_coming';
+
+    return (
+      <div className={`p-5 rounded-3xl border transition-all duration-300 shadow-sm flex flex-col justify-between ${currentAtt === 'coming' ? 'bg-emerald-50/50 border-emerald-200 dark:bg-emerald-900/10 dark:border-emerald-800/50' : currentAtt === 'not_coming' ? 'bg-rose-50/50 border-rose-200 dark:bg-rose-900/10 dark:border-rose-800/50 opacity-80' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50'}`}>
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="font-black text-slate-800 dark:text-slate-200 tracking-tight">{shiftLabel}</h4>
+            {menuData && <span className="bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400 text-xs font-bold px-2 py-1 rounded-lg uppercase flex items-center gap-1"><IndianRupee size={12} /> {menuData.price || '60'}</span>}
+          </div>
+
+          {!menuData ? (
+            <div className="text-center py-6 border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl mb-4">
+              <p className="text-sm font-bold text-slate-400 dark:text-slate-500">Menu not published yet</p>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2 mb-6">
+              {menuData.items.map((item, idx) => (
+                <span key={idx} className="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 shadow-sm border border-slate-200/60 dark:border-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold">{item}</span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div className="flex gap-2 mt-auto">
+            <button onClick={() => handleAttendance(shiftKey, 'coming')} disabled={disableComing} className={`flex-1 flex justify-center items-center gap-1 py-2.5 rounded-xl font-bold transition-all text-sm ${currentAtt === 'coming' ? 'bg-emerald-500 text-white shadow-md' : disableComing ? 'bg-slate-200 dark:bg-slate-700/50 text-slate-400 cursor-not-allowed' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 border border-slate-200 dark:border-slate-600 hover:border-emerald-500 hover:text-emerald-500 shadow-sm'}`}><CheckCircle2 size={16} /> Coming</button>
+            <button onClick={() => handleAttendance(shiftKey, 'not_coming')} disabled={disableSkip} className={`flex-1 flex justify-center items-center gap-1 py-2.5 rounded-xl font-bold transition-all text-sm ${currentAtt === 'not_coming' ? 'bg-rose-500 text-white shadow-md' : disableSkip ? 'bg-slate-200 dark:bg-slate-700/50 text-slate-400 cursor-not-allowed' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 border border-slate-200 dark:border-slate-600 hover:border-rose-500 hover:text-rose-500 shadow-sm'}`}><XCircle size={16} /> Skip</button>
+          </div>
+          {errorMsg[shiftKey] && <div className="mt-2 text-xs font-bold text-rose-500 bg-rose-50 dark:bg-rose-500/10 p-2 rounded-lg text-center">{errorMsg[shiftKey]}</div>}
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className={`relative bg-white/60 dark:bg-slate-800/60 backdrop-blur-2xl rounded-[2rem] border transition-all duration-300 hover:shadow-2xl group mb-8 overflow-hidden
-      ${attendance === 'coming' ? 'border-emerald-400 dark:border-emerald-500 shadow-[0_0_40px_rgba(16,185,129,0.15)]' :
-        attendance === 'not_coming' ? 'border-rose-200 dark:border-rose-900/50 opacity-80' : 'border-white/80 dark:border-slate-700 shadow-xl'}`}>
+    <div className="relative bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl rounded-[2.5rem] border border-white/80 dark:border-slate-700/50 shadow-xl mb-8 overflow-hidden group">
 
-      <div className={`h-2 w-full transition-colors duration-500 ${attendance === 'coming' ? 'bg-emerald-500' : attendance === 'not_coming' ? 'bg-rose-500' : 'bg-gradient-to-r from-orange-500 to-rose-500'}`}></div>
+      <div className="h-2 w-full bg-gradient-to-r from-orange-400 to-rose-400"></div>
 
-      <div className="p-6 sm:p-8 pb-2">
-        <div className="flex justify-between items-start mb-4">
+      <div className="p-6 sm:p-8">
+
+        {/* MESS HEADER & SUBSCRIPTION */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
           <div>
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <span className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-1 shadow-sm"><Star size={10} className="fill-amber-400 text-amber-400" /> {currentRating}</span>
-              <span className="bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400 text-[10px] font-bold px-3 py-1 rounded-full uppercase flex items-center gap-1"><IndianRupee size={12} /> {mess.price || '60'} {t.thali}</span>
-
-              {mess.shift && (
-                <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-1 shadow-sm ${mess.shift === 'morning' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400'}`}>
-                  {mess.shift === 'morning' ? '☀️ Morning' : '🌙 Night'}
-                </span>
-              )}
-
-              {mySub ? (
-                <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-1 shadow-sm ${mySub.status === 'paid' ? 'bg-emerald-500 text-white' : 'bg-rose-100 text-rose-600 border border-rose-200'}`}>
-                  <Award size={12} /> Member: {mySub.status} ({mySub.shift})
-                </span>
-              ) : showSubForm ? (
-                <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-1 rounded-full border border-slate-200 dark:border-slate-700">
-                  <select
-                    value={selectedShift}
-                    onChange={(e) => setSelectedShift(e.target.value)}
-                    className="text-[10px] font-bold px-2 py-1 rounded-full bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-none outline-none cursor-pointer"
-                  >
-                    <option value="morning">Morning Only</option>
-                    <option value="night">Night Only</option>
-                    <option value="both">Both Shifts</option>
-                  </select>
-                  <button onClick={handleSubscribe} className="bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-colors">Confirm</button>
-                  <button onClick={() => setShowSubForm(false)} className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-colors">Cancel</button>
-                </div>
-              ) : (
-                <button onClick={() => setShowSubForm(true)} className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100 text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-colors">
-                  Join Monthly
-                </button>
-              )}
-            </div>
-            <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">{mess.messName}</h3>
+            <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">{messData.messName}</h3>
+            <span className="inline-flex bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] font-black px-3 py-1 rounded-full uppercase items-center gap-1 shadow-sm"><Star size={10} className="fill-amber-400 text-amber-400" /> {currentRating} Rating</span>
           </div>
-        </div>
 
-        <div className="bg-slate-50/80 dark:bg-slate-900/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-700/50 relative overflow-hidden mb-6">
-          <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl"></div>
-          <h4 className="font-bold text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-2 text-xs uppercase tracking-widest"><Sparkles size={14} className="text-orange-400" /> {t.feastMenu}</h4>
-          <div className="flex flex-wrap gap-2 relative z-10">
-            {mess.items.map((item, idx) => (
-              <span key={idx} className="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm border border-slate-200 dark:border-slate-600 px-3.5 py-1.5 rounded-xl text-sm font-semibold">{item}</span>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          <button onClick={() => handleAttendance('coming')} disabled={disableComing} className={`flex-1 flex justify-center items-center gap-2 py-3.5 rounded-xl font-bold transition-all duration-300 ${attendance === 'coming' ? 'bg-emerald-500 text-white shadow-lg ring-4 ring-emerald-500/20' : disableComing ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-300 dark:text-slate-600 cursor-not-allowed border border-transparent' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-500/20 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-600 active:scale-95 shadow-sm hover:shadow'}`}><CheckCircle2 size={20} /> {t.coming}</button>
-          <button onClick={() => handleAttendance('not_coming')} disabled={disableSkip} className={`flex-1 flex justify-center items-center gap-2 py-3.5 rounded-xl font-bold transition-all duration-300 ${attendance === 'not_coming' ? 'bg-rose-500 text-white shadow-lg ring-4 ring-rose-500/20' : disableSkip ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-300 dark:text-slate-600 cursor-not-allowed border border-transparent' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 hover:bg-rose-50 dark:hover:bg-rose-500/20 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-600 active:scale-95 shadow-sm hover:shadow'}`}><XCircle size={20} /> {t.skip}</button>
-        </div>
-
-        {errorMsg && <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-400 text-sm font-bold text-center mt-4 p-3 rounded-xl flex items-center justify-center gap-2"><AlertTriangle size={16} /> {errorMsg}</div>}
-
-        {attendance === 'coming' && (
-          <div className="mt-6 border-t border-slate-100 dark:border-slate-700 pt-6 animate-in slide-in-from-bottom-2">
-            {!hasRated ? (
-              <form onSubmit={handleRating} className="bg-slate-50 dark:bg-slate-900/50 p-5 rounded-2xl border border-slate-200 dark:border-slate-700">
-                <p className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">Leave a review!</p>
-                <div className="flex gap-1 mb-3">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button key={star} type="button" onClick={() => setRating(star)} className="focus:outline-none transition-transform hover:scale-110">
-                      <Star size={24} className={star <= rating ? "text-amber-400 fill-amber-400 drop-shadow-md" : "text-slate-300 dark:text-slate-600"} />
-                    </button>
-                  ))}
+          <div>
+            {mySub ? (
+              <div className="text-right">
+                <span className={`inline-flex text-xs font-black px-3 py-1.5 rounded-lg uppercase items-center gap-1 shadow-sm ${mySub.status === 'paid' ? 'bg-emerald-500 text-white' : 'bg-rose-100 text-rose-600 border border-rose-200'}`}>
+                  <Award size={14} /> Member: {mySub.status}
+                </span>
+                <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase text-right w-full">Shift: {mySub.shift} • Skips: {mySub.usedSkips}/{mySub.allowedSkips}</p>
+              </div>
+            ) : showSubForm ? (
+              <div className="flex flex-col items-end gap-2 bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
+                <select value={selectedShift} onChange={(e) => setSelectedShift(e.target.value)} className="text-xs font-bold px-3 py-2 rounded-xl bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 outline-none cursor-pointer w-full">
+                  <option value="morning">Morning Only</option>
+                  <option value="night">Night Only</option>
+                  <option value="both">Both Shifts</option>
+                </select>
+                <div className="flex gap-2 w-full">
+                  <button onClick={() => setShowSubForm(false)} className="flex-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs font-bold py-2 rounded-xl uppercase transition-colors">Cancel</button>
+                  <button onClick={handleSubscribe} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2 rounded-xl uppercase transition-colors shadow-md">Confirm</button>
                 </div>
-                <textarea rows="2" placeholder="How was the food?" value={comment} onChange={e => setComment(e.target.value)} className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none mb-3 dark:text-white" />
-                <button type="submit" className="w-full bg-slate-900 dark:bg-orange-500 hover:bg-slate-800 dark:hover:bg-orange-600 transition-colors text-white font-bold py-2.5 rounded-xl">Submit Review</button>
-              </form>
+              </div>
             ) : (
-              <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl border border-emerald-100 dark:border-emerald-500/20 text-center text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center gap-2"><CheckCircle2 size={18} /> Review Submitted</div>
+              <button onClick={() => setShowSubForm(true)} className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100 text-xs font-black px-5 py-2.5 rounded-xl uppercase transition-colors flex items-center gap-2 shadow-sm">
+                <Award size={16} /> Join Monthly
+              </button>
             )}
           </div>
-        )}
+        </div>
+
+        {/* COMBINED SHIFTS GRID */}
+        <div className="grid md:grid-cols-2 gap-4">
+          {renderShiftBlock('☀️ Morning Shift', 'morning', messData.morning, attMorning, isSubmittingMorning)}
+          {renderShiftBlock('🌙 Night Shift', 'night', messData.night, attNight, isSubmittingNight)}
+        </div>
+
+        {/* --- REVIEW SECTION RESTORED --- */}
+        <div className="mt-8 border-t border-slate-100 dark:border-slate-700 pt-6 animate-in slide-in-from-bottom-2">
+          {!hasRated ? (
+            <form onSubmit={handleRating} className="bg-slate-50 dark:bg-slate-900/50 p-5 rounded-2xl border border-slate-200 dark:border-slate-700">
+              <p className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">Leave a review!</p>
+              <div className="flex gap-1 mb-3">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button key={star} type="button" onClick={() => setRating(star)} className="focus:outline-none transition-transform hover:scale-110">
+                    <Star size={24} className={star <= rating ? "text-amber-400 fill-amber-400 drop-shadow-md" : "text-slate-300 dark:text-slate-600"} />
+                  </button>
+                ))}
+              </div>
+              <textarea rows="2" placeholder="How was the food?" value={comment} onChange={e => setComment(e.target.value)} className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none mb-3 dark:text-white" />
+              <button type="submit" className="w-full bg-slate-900 dark:bg-orange-500 hover:bg-slate-800 dark:hover:bg-orange-600 transition-colors text-white font-bold py-2.5 rounded-xl">Submit Review</button>
+            </form>
+          ) : (
+            <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl border border-emerald-100 dark:border-emerald-500/20 text-center text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center gap-2"><CheckCircle2 size={18} /> Review Submitted</div>
+          )}
+        </div>
 
         <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-center">
           <button onClick={fetchReviews} className="text-xs font-bold text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 flex items-center gap-1"><MessageSquareQuote size={14} /> {showReviews ? t.hideReviews : t.readReviews}</button>
@@ -206,6 +251,7 @@ const MessCard = ({ mess, user, initialAttendance, targetDate, globalHasCommitte
             ))}
           </div>
         )}
+
       </div>
     </div>
   );
@@ -237,11 +283,9 @@ const StudentDashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // --- NEW AUTHENTICATION LOGIC ---
   const [user, setUser] = useState(location.state?.user || null);
   const [isAuthLoading, setIsAuthLoading] = useState(!user);
 
-  // ALL other hooks must be called unconditionally below
   const [lang, setLang] = useState(() => localStorage.getItem('app_lang') || 'en');
   const t = translations[lang];
 
@@ -251,13 +295,14 @@ const StudentDashboard = () => {
   const [menus, setMenus] = useState([]);
   const [myAttendance, setMyAttendance] = useState([]);
   const [mySubscriptions, setMySubscriptions] = useState([]);
-  const [globalHasCommitted, setGlobalHasCommitted] = useState(false);
+
+  const [globalHasCommitted, setGlobalHasCommitted] = useState({ morning: false, night: false });
+
   const [leaderboard, setLeaderboard] = useState([]);
   const [directory, setDirectory] = useState({ rickshaws: [], rooms: [], emergency: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [nearbyMesses, setNearbyMesses] = useState([]);
 
-  // 1. Verify User Session
   useEffect(() => {
     const verifyToken = async () => {
       const token = localStorage.getItem('token');
@@ -280,9 +325,8 @@ const StudentDashboard = () => {
     else setIsAuthLoading(false);
   }, [navigate, user]);
 
-  // 2. Fetch Dashboard Data
   useEffect(() => {
-    if (!user) return; // Wait until authenticated
+    if (!user) return;
 
     const fetchData = async (isSilent = false) => {
       if (!isSilent) setIsLoading(true);
@@ -296,7 +340,10 @@ const StudentDashboard = () => {
         if (attRes.ok) {
           const myAtt = await attRes.json();
           setMyAttendance(myAtt);
-          setGlobalHasCommitted(myAtt.some(a => a.status === 'coming'));
+          setGlobalHasCommitted({
+            morning: myAtt.some(a => a.status === 'coming' && a.shift === 'morning'),
+            night: myAtt.some(a => a.status === 'coming' && a.shift === 'night')
+          });
         }
 
         const subRes = await fetch(`${API_URL}/api/subscriptions/me`, { headers });
@@ -330,7 +377,6 @@ const StudentDashboard = () => {
     return () => clearInterval(intervalId);
   }, [targetDate, user]);
 
-  // --- RENDER GUARDS ---
   if (isAuthLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-900"><Loader2 className="animate-spin text-indigo-500" size={48} /></div>;
   }
@@ -339,7 +385,6 @@ const StudentDashboard = () => {
     return <div className="min-h-screen flex flex-col gap-4 items-center justify-center bg-slate-900"><p className="text-white">Session Expired</p><button onClick={() => navigate('/')} className="text-indigo-400 font-bold underline">Return to Login</button></div>;
   }
 
-  // --- HELPER FUNCTIONS ---
   const fetchNearbyMesses = async () => {
     const token = localStorage.getItem('token');
     try {
@@ -348,9 +393,21 @@ const StudentDashboard = () => {
     } catch (e) { console.error(e); }
   };
 
-  const getAttendanceStatus = (messName, shift) => {
-    const record = myAttendance.find(a => a.messName === messName && a.shift === shift);
-    return record ? record.status : undefined;
+  // Group menus so there is only ONE card per Mess (combining Morning & Night)
+  const groupedMesses = Object.values(menus.reduce((acc, menu) => {
+    const id = menu.ownerId._id || menu.ownerId;
+    if (!acc[id]) {
+      acc[id] = { ownerId: menu.ownerId, messName: menu.messName, morning: null, night: null };
+    }
+    acc[id][menu.shift] = menu;
+    return acc;
+  }, {}));
+
+  const getAttendanceStatus = (messName) => {
+    return {
+      morning: myAttendance.find(a => a.messName === messName && a.shift === 'morning')?.status,
+      night: myAttendance.find(a => a.messName === messName && a.shift === 'night')?.status,
+    };
   };
 
   const forceDataRefresh = async () => {
@@ -364,7 +421,10 @@ const StudentDashboard = () => {
     if (attRes.ok) {
       const myAtt = await attRes.json();
       setMyAttendance(myAtt);
-      setGlobalHasCommitted(myAtt.some(a => a.status === 'coming'));
+      setGlobalHasCommitted({
+        morning: myAtt.some(a => a.status === 'coming' && a.shift === 'morning'),
+        night: myAtt.some(a => a.status === 'coming' && a.shift === 'night')
+      });
     }
     const subRes = await fetch(`${API_URL}/api/subscriptions/me`, { headers });
     if (subRes.ok) setMySubscriptions(await subRes.json());
@@ -414,43 +474,9 @@ const StudentDashboard = () => {
                 </div>
               </div>
 
-              {/* --- MY SUBSCRIPTIONS BANNER WITH SKIPS DISPLAY --- */}
-              {mySubscriptions.length > 0 && !isLoading && (
-                <div className="mb-8 space-y-4">
-                  {mySubscriptions.map(sub => {
-                    const isMenuPublished = menus.some(m => m.ownerId._id === sub.messId || m.messName === sub.messName);
-                    return (
-                      <div key={sub._id} className="bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
-                        <div>
-                          <h3 className="text-lg font-black text-indigo-900 dark:text-indigo-400 flex items-center gap-2">
-                            <Award size={20} className="text-indigo-500" />
-                            Monthly Member at {sub.messName}
-                          </h3>
-                          <p className="text-sm font-bold mt-2">
-                            {isMenuPublished ? (
-                              <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5"><CheckCircle2 size={16} /> Menu is published for {targetDate === getLocalDateString(0) ? 'Today' : 'Tomorrow'} (See below)</span>
-                            ) : (
-                              <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1.5"><AlertTriangle size={16} /> Menu not published yet</span>
-                            )}
-                          </p>
-                        </div>
-                        <div className="flex flex-row sm:flex-col gap-2 sm:gap-1 text-right flex-wrap">
-                          <span className="text-xs font-black px-2 py-1 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 rounded-md uppercase border border-indigo-100 dark:border-indigo-800">Shift: {sub.shift}</span>
-                          <span className={`text-xs font-black px-2 py-1 bg-white dark:bg-slate-800 rounded-md uppercase border ${sub.status === 'paid' ? 'text-emerald-600 border-emerald-100 dark:border-emerald-800' : 'text-rose-600 border-rose-100 dark:border-rose-800'}`}>Status: {sub.status}</span>
-                          {/* SKIPS UI */}
-                          <span className="text-xs font-black px-2 py-1 bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-500 rounded-md uppercase border border-amber-100 dark:border-amber-800">
-                            Skips: {sub.usedSkips || 0} / {sub.allowedSkips || 5}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-24 text-indigo-600 dark:text-indigo-400"><Loader2 className="animate-spin mb-4" size={48} /><p className="font-bold text-slate-500 dark:text-slate-400">Loading menus...</p></div>
-              ) : menus.length === 0 ? (
+              ) : groupedMesses.length === 0 ? (
                 <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl p-16 rounded-[2.5rem] text-center border border-white dark:border-slate-700 shadow-xl">
                   <div className="bg-slate-100 dark:bg-slate-700 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"><CalendarDays className="text-slate-400 dark:text-slate-500" size={40} /></div>
                   <h3 className="font-black text-slate-900 dark:text-white text-2xl mb-2">{t.noMenus}</h3>
@@ -458,18 +484,18 @@ const StudentDashboard = () => {
                 </div>
               ) : (
                 <div className="space-y-8">
-                  {/* Now rendering dynamically per shift published by owner */}
-                  {menus.map(mess => (
+                  {groupedMesses.map(messData => (
                     <MessCard
-                      key={mess._id}
-                      mess={mess}
+                      key={messData.ownerId._id || messData.ownerId}
+                      messData={messData}
                       user={user}
                       targetDate={targetDate}
-                      initialAttendance={getAttendanceStatus(mess.messName, mess.shift)}
-                      globalHasCommitted={globalHasCommitted}
-                      mySub={mySubscriptions.find(s => s.messId === mess.ownerId._id)}
+                      initialAttendance={getAttendanceStatus(messData.messName)}
+                      globalCommitted={globalHasCommitted}
+                      mySub={mySubscriptions.find(s => s.messId === (messData.ownerId._id || messData.ownerId))}
                       onSubscribe={() => forceDataRefresh()}
                       onAttendanceUpdate={() => forceDataRefresh()}
+                      attendanceStatus={getAttendanceStatus(messData.messName)}
                       t={t}
                     />
                   ))}
