@@ -1,5 +1,50 @@
 Directory structure:
 └── CEP_Mess_Project/
+    ├── avasari-mobile/
+    │   ├── README.md
+    │   ├── AGENTS.md
+    │   ├── app.json
+    │   ├── CLAUDE.md
+    │   ├── LICENSE
+    │   ├── package.json
+    │   ├── tsconfig.json
+    │   ├── assets/
+    │   │   └── expo.icon/
+    │   │       └── icon.json
+    │   ├── scripts/
+    │   │   └── reset-project.js
+    │   ├── src/
+    │   │   ├── global.css
+    │   │   ├── app/
+    │   │   │   ├── _layout.tsx
+    │   │   │   ├── explore.tsx
+    │   │   │   ├── index.tsx
+    │   │   │   ├── owner/
+    │   │   │   │   └── index.tsx
+    │   │   │   └── student/
+    │   │   │       └── index.tsx
+    │   │   ├── components/
+    │   │   │   ├── animated-icon.module.css
+    │   │   │   ├── animated-icon.tsx
+    │   │   │   ├── animated-icon.web.tsx
+    │   │   │   ├── app-tabs.tsx
+    │   │   │   ├── app-tabs.web.tsx
+    │   │   │   ├── external-link.tsx
+    │   │   │   ├── hint-row.tsx
+    │   │   │   ├── MessMap.tsx
+    │   │   │   ├── themed-text.tsx
+    │   │   │   ├── themed-view.tsx
+    │   │   │   ├── web-badge.tsx
+    │   │   │   └── ui/
+    │   │   │       └── collapsible.tsx
+    │   │   ├── constants/
+    │   │   │   └── theme.ts
+    │   │   └── hooks/
+    │   │       ├── use-color-scheme.ts
+    │   │       ├── use-color-scheme.web.ts
+    │   │       └── use-theme.ts
+    │   └── .claude/
+    │       └── settings.json
     ├── backend/
     │   ├── package.json
     │   └── server.js
@@ -24,6 +69,2767 @@ Directory structure:
             │   └── StudentDashboard.jsx
             └── utils/
                 └── translations.js
+
+================================================
+FILE: avasari-mobile/README.md
+================================================
+# Welcome to your Expo app ðŸ‘‹
+
+This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+
+## Get started
+
+1. Install dependencies
+
+   ```bash
+   npm install
+   ```
+
+2. Start the app
+
+   ```bash
+   npx expo start
+   ```
+
+In the output, you'll find options to open the app in a
+
+- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
+- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
+- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
+- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+
+You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+
+## Get a fresh project
+
+When you're ready, run:
+
+```bash
+npm run reset-project
+```
+
+This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+
+### Other setup steps
+
+- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
+- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
+- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+
+## Learn more
+
+To learn more about developing your project with Expo, look at the following resources:
+
+- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
+- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+
+## Join the community
+
+Join our community of developers creating universal apps.
+
+- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
+- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+
+
+================================================
+FILE: avasari-mobile/AGENTS.md
+================================================
+# Expo HAS CHANGED
+
+Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
+
+
+
+================================================
+FILE: avasari-mobile/app.json
+================================================
+{
+  "expo": {
+    "name": "avasari-mobile",
+    "slug": "avasari-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "avasarimobile",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/expo.icon"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#208AEF",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
+
+
+
+================================================
+FILE: avasari-mobile/CLAUDE.md
+================================================
+@AGENTS.md
+
+
+
+================================================
+FILE: avasari-mobile/LICENSE
+================================================
+The MIT License (MIT)
+
+Copyright (c) 2015-present 650 Industries, Inc. (aka Expo)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+
+================================================
+FILE: avasari-mobile/package.json
+================================================
+{
+  "name": "avasari-mobile",
+  "main": "expo-router/entry",
+  "version": "1.0.0",
+  "dependencies": {
+    "@expo/ui": "~57.0.16",
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~57.0.20",
+    "expo-constants": "~57.0.17",
+    "expo-device": "~57.0.1",
+    "expo-font": "~57.0.3",
+    "expo-glass-effect": "~57.0.1",
+    "expo-image": "~57.0.4",
+    "expo-linking": "~57.0.9",
+    "expo-location": "~57.0.16",
+    "expo-router": "~57.0.19",
+    "expo-splash-screen": "~57.0.8",
+    "expo-status-bar": "~57.0.1",
+    "expo-symbols": "~57.0.2",
+    "expo-system-ui": "~57.0.3",
+    "expo-web-browser": "~57.0.2",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-maps": "1.27.2",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-web": "~0.21.0",
+    "react-native-webview": "13.16.1",
+    "react-native-worklets": "0.10.1"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "reset-project": "node ./scripts/reset-project.js",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "expo lint"
+  },
+  "private": true
+}
+
+
+
+================================================
+FILE: avasari-mobile/tsconfig.json
+================================================
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@/assets/*": [
+        "./assets/*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
+}
+
+
+
+================================================
+FILE: avasari-mobile/assets/expo.icon/icon.json
+================================================
+{
+  "fill" : {
+    "automatic-gradient" : "extended-srgb:0.00000,0.47843,1.00000,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "expo-symbol 2.svg",
+          "name" : "expo-symbol 2",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              1.1008400065293245e-05,
+              -16.046875
+            ]
+          }
+        },
+        {
+          "image-name" : "grid.png",
+          "name" : "grid"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
+
+
+================================================
+FILE: avasari-mobile/scripts/reset-project.js
+================================================
+Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x81 in position 1447: character maps to <undefined>
+
+
+================================================
+FILE: avasari-mobile/src/global.css
+================================================
+:root {
+  --font-display:
+    Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
+    Segoe UI Symbol, Noto Color Emoji;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
+  --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
+  --font-serif: Georgia, 'Times New Roman', serif;
+}
+
+
+
+================================================
+FILE: avasari-mobile/src/app/_layout.tsx
+================================================
+import { Stack } from "expo-router";
+
+export default function RootLayout() {
+  return (
+    <Stack screenOptions={{ headerShown: false }} />
+  );
+}
+
+
+================================================
+FILE: avasari-mobile/src/app/explore.tsx
+================================================
+import { Image } from 'expo-image';
+import { SymbolView } from 'expo-symbols';
+import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { ExternalLink } from '@/components/external-link';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Collapsible } from '@/components/ui/collapsible';
+import { WebBadge } from '@/components/web-badge';
+import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+
+export default function TabTwoScreen() {
+  const safeAreaInsets = useSafeAreaInsets();
+  const insets = {
+    ...safeAreaInsets,
+    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
+  };
+  const theme = useTheme();
+
+  const contentPlatformStyle = Platform.select({
+    android: {
+      paddingTop: insets.top,
+      paddingLeft: insets.left,
+      paddingRight: insets.right,
+      paddingBottom: insets.bottom,
+    },
+    web: {
+      paddingTop: Spacing.six,
+      paddingBottom: Spacing.four,
+    },
+  });
+
+  return (
+    <ScrollView
+      style={[styles.scrollView, { backgroundColor: theme.background }]}
+      contentInset={insets}
+      contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
+      <ThemedView style={styles.container}>
+        <ThemedView style={styles.titleContainer}>
+          <ThemedText type="subtitle">Explore</ThemedText>
+          <ThemedText style={styles.centerText} themeColor="textSecondary">
+            This starter app includes example{'\n'}code to help you get started.
+          </ThemedText>
+
+          <ExternalLink href="https://docs.expo.dev" asChild>
+            <Pressable style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedView type="backgroundElement" style={styles.linkButton}>
+                <ThemedText type="link">Expo documentation</ThemedText>
+                <SymbolView
+                  tintColor={theme.text}
+                  name={{ ios: 'arrow.up.right.square', android: 'link', web: 'link' }}
+                  size={12}
+                />
+              </ThemedView>
+            </Pressable>
+          </ExternalLink>
+        </ThemedView>
+
+        <ThemedView style={styles.sectionsWrapper}>
+          <Collapsible title="File-based routing">
+            <ThemedText type="small">
+              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
+              <ThemedText type="code">src/app/explore.tsx</ThemedText>
+            </ThemedText>
+            <ThemedText type="small">
+              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
+              the tab navigator.
+            </ThemedText>
+            <ExternalLink href="https://docs.expo.dev/router/introduction">
+              <ThemedText type="linkPrimary">Learn more</ThemedText>
+            </ExternalLink>
+          </Collapsible>
+
+          <Collapsible title="Android, iOS, and web support">
+            <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
+              <ThemedText type="small">
+                You can open this project on Android, iOS, and the web. To open the web version,
+                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
+                project.
+              </ThemedText>
+              <Image
+                source={require('@/assets/images/tutorial-web.png')}
+                style={styles.imageTutorial}
+              />
+            </ThemedView>
+          </Collapsible>
+
+          <Collapsible title="Images">
+            <ThemedText type="small">
+              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
+              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
+              screen densities.
+            </ThemedText>
+            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
+            <ExternalLink href="https://reactnative.dev/docs/images">
+              <ThemedText type="linkPrimary">Learn more</ThemedText>
+            </ExternalLink>
+          </Collapsible>
+
+          <Collapsible title="Light and dark mode components">
+            <ThemedText type="small">
+              This template has light and dark mode support. The{' '}
+              <ThemedText type="code">useColorScheme()</ThemedText> hook lets you inspect what the
+              user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
+            </ThemedText>
+            <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
+              <ThemedText type="linkPrimary">Learn more</ThemedText>
+            </ExternalLink>
+          </Collapsible>
+
+          <Collapsible title="Animations">
+            <ThemedText type="small">
+              This template includes an example of an animated component. The{' '}
+              <ThemedText type="code">src/components/ui/collapsible.tsx</ThemedText> component uses
+              the powerful <ThemedText type="code">react-native-reanimated</ThemedText> library to
+              animate opening this hint.
+            </ThemedText>
+          </Collapsible>
+        </ThemedView>
+        {Platform.OS === 'web' && <WebBadge />}
+      </ThemedView>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  container: {
+    maxWidth: MaxContentWidth,
+    flexGrow: 1,
+  },
+  titleContainer: {
+    gap: Spacing.three,
+    alignItems: 'center',
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.six,
+  },
+  centerText: {
+    textAlign: 'center',
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  linkButton: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.five,
+    justifyContent: 'center',
+    gap: Spacing.one,
+    alignItems: 'center',
+  },
+  sectionsWrapper: {
+    gap: Spacing.five,
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.three,
+  },
+  collapsibleContent: {
+    alignItems: 'center',
+  },
+  imageTutorial: {
+    width: '100%',
+    aspectRatio: 296 / 171,
+    borderRadius: Spacing.three,
+    marginTop: Spacing.two,
+  },
+  imageReact: {
+    width: 100,
+    height: 100,
+    alignSelf: 'center',
+  },
+});
+
+
+
+================================================
+FILE: avasari-mobile/src/app/index.tsx
+================================================
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, SafeAreaView, Platform, StatusBar, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+
+const API_URL = 'http://192.168.0.101:3000'; // ⚠️ IP CONFIGURED
+
+export default function AuthScreen() {
+  const router = useRouter();
+  const [isLogin, setIsLogin] = useState(true);
+  const [role, setRole] = useState('student');
+  const [step, setStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const [formData, setFormData] = useState({
+    name: '', phone: '', password: '', yearBranch: '', messName: '', messAddress: '', fssaiNumber: '', latitude: null, longitude: null,
+  });
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+
+  const handleInputChange = (name, value) => {
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const nextStep = () => setStep(step + 1);
+  const prevStep = () => setStep(step - 1);
+
+  const handleLocationCapture = async () => {
+    setIsGettingLocation(true);
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required to detect coordinates.');
+        setIsGettingLocation(false);
+        return;
+      }
+      let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setFormData(prev => ({ ...prev, latitude: location.coords.latitude, longitude: location.coords.longitude }));
+      Alert.alert('Success', 'GPS coordinates captured successfully!');
+    } catch (err) {
+      Alert.alert('Error', 'Could not fetch current location.');
+    } finally {
+      setIsGettingLocation(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    setError('');
+
+    // STRICT PHONE VALIDATION (10 digits, starts with 6,7,8,9)
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      setError("Please enter a valid 10-digit Indian mobile number.");
+      setIsLoading(false);
+      return;
+    }
+
+    const endpoint = isLogin ? '/api/login' : '/api/register';
+    const payload = isLogin ? { phone: formData.phone, password: formData.password } : { ...formData, role };
+
+    try {
+      const response = await fetch(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        // Save JWT to AsyncStorage for Mobile
+        await AsyncStorage.setItem('token', data.token);
+
+        if (data.user.role === 'admin') router.replace('/admin');
+        else if (data.user.role === 'owner') router.replace('/owner');
+        else router.replace('/student');
+      } else {
+        setError(data.error || 'Authentication failed');
+      }
+    } catch (err) {
+      setError('Cannot connect to server. Ensure backend is running.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+
+        <View style={styles.card}>
+          <View style={styles.header}>
+            <View style={styles.iconCircle}>
+              <Feather name={isLogin ? "log-in" : "user-plus"} size={28} color="#4f46e5" />
+            </View>
+            <Text style={styles.title}>{isLogin ? 'Welcome Back' : 'Join AvasariConnect'}</Text>
+            <Text style={styles.subtitle}>Your campus dining and living network</Text>
+          </View>
+
+          {error ? (
+            <View style={styles.errorBox}>
+              <Feather name="alert-circle" size={16} color="#dc2626" />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          {isLogin ? (
+            <View style={styles.formGroup}>
+              <View style={styles.inputWrapper}>
+                <Feather name="phone" size={18} color="#94a3b8" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Phone Number (e.g. 9876543210)"
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="phone-pad"
+                  maxLength={10}
+                  value={formData.phone}
+                  onChangeText={(val) => handleInputChange('phone', val)}
+                />
+              </View>
+
+              <View style={styles.inputWrapper}>
+                <Feather name="lock" size={18} color="#94a3b8" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Password"
+                  placeholderTextColor="#94a3b8"
+                  secureTextEntry
+                  value={formData.password}
+                  onChangeText={(val) => handleInputChange('password', val)}
+                />
+              </View>
+
+              <TouchableOpacity style={styles.primaryBtn} onPress={handleSubmit} disabled={isLoading}>
+                {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Sign In</Text>}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.formGroup}>
+              {/* ROLE SELECTOR */}
+              <View style={styles.roleToggleRow}>
+                <TouchableOpacity style={[styles.roleBtn, role === 'student' && styles.roleBtnActive]} onPress={() => setRole('student')}>
+                  <Text style={[styles.roleBtnText, role === 'student' && styles.roleBtnTextActive]}>Student</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.roleBtn, role === 'owner' && styles.roleBtnActive]} onPress={() => setRole('owner')}>
+                  <Text style={[styles.roleBtnText, role === 'owner' && styles.roleBtnTextActive]}>Mess Owner</Text>
+                </TouchableOpacity>
+              </View>
+
+              {role === 'student' ? (
+                <View style={styles.formGroup}>
+                  <View style={styles.inputWrapper}>
+                    <Feather name="user" size={18} color="#94a3b8" style={styles.inputIcon} />
+                    <TextInput style={styles.input} placeholder="Full Name" placeholderTextColor="#94a3b8" value={formData.name} onChangeText={(val) => handleInputChange('name', val)} />
+                  </View>
+
+                  <View style={styles.inputWrapper}>
+                    <Feather name="phone" size={18} color="#94a3b8" style={styles.inputIcon} />
+                    <TextInput style={styles.input} placeholder="Mobile Number" placeholderTextColor="#94a3b8" keyboardType="phone-pad" maxLength={10} value={formData.phone} onChangeText={(val) => handleInputChange('phone', val)} />
+                  </View>
+
+                  <View style={styles.inputWrapper}>
+                    <Feather name="book" size={18} color="#94a3b8" style={styles.inputIcon} />
+                    <TextInput style={styles.input} placeholder="Year & Branch (e.g. 2nd Yr Computer)" placeholderTextColor="#94a3b8" value={formData.yearBranch} onChangeText={(val) => handleInputChange('yearBranch', val)} />
+                  </View>
+
+                  <View style={styles.inputWrapper}>
+                    <Feather name="lock" size={18} color="#94a3b8" style={styles.inputIcon} />
+                    <TextInput style={styles.input} placeholder="Create Password" placeholderTextColor="#94a3b8" secureTextEntry value={formData.password} onChangeText={(val) => handleInputChange('password', val)} />
+                  </View>
+
+                  <TouchableOpacity style={styles.primaryBtn} onPress={handleSubmit} disabled={isLoading}>
+                    {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Register Student</Text>}
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View>
+                  {/* STEPPER INDICATOR */}
+                  <View style={styles.stepperRow}>
+                    {[1, 2, 3].map((num) => (
+                      <View key={num} style={[styles.stepCircle, step >= num && styles.stepCircleActive]}>
+                        <Text style={[styles.stepText, step >= num && styles.stepTextActive]}>{num}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {step === 1 && (
+                    <View style={styles.formGroup}>
+                      <View style={styles.inputWrapper}>
+                        <Feather name="user" size={18} color="#94a3b8" style={styles.inputIcon} />
+                        <TextInput style={styles.input} placeholder="Owner Full Name" placeholderTextColor="#94a3b8" value={formData.name} onChangeText={(val) => handleInputChange('name', val)} />
+                      </View>
+                      <View style={styles.inputWrapper}>
+                        <Feather name="phone" size={18} color="#94a3b8" style={styles.inputIcon} />
+                        <TextInput style={styles.input} placeholder="Mobile Number" placeholderTextColor="#94a3b8" keyboardType="phone-pad" maxLength={10} value={formData.phone} onChangeText={(val) => handleInputChange('phone', val)} />
+                      </View>
+                      <View style={styles.inputWrapper}>
+                        <Feather name="lock" size={18} color="#94a3b8" style={styles.inputIcon} />
+                        <TextInput style={styles.input} placeholder="Create Password" placeholderTextColor="#94a3b8" secureTextEntry value={formData.password} onChangeText={(val) => handleInputChange('password', val)} />
+                      </View>
+                      <TouchableOpacity style={styles.blackBtn} onPress={nextStep}>
+                        <Text style={styles.blackBtnText}>Next Step</Text>
+                        <Feather name="chevron-right" size={18} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {step === 2 && (
+                    <View style={styles.formGroup}>
+                      <View style={styles.inputWrapper}>
+                        <Feather name="coffee" size={18} color="#94a3b8" style={styles.inputIcon} />
+                        <TextInput style={styles.input} placeholder="Mess Name" placeholderTextColor="#94a3b8" value={formData.messName} onChangeText={(val) => handleInputChange('messName', val)} />
+                      </View>
+                      <View style={styles.inputWrapper}>
+                        <Feather name="map-pin" size={18} color="#94a3b8" style={styles.inputIcon} />
+                        <TextInput style={styles.input} placeholder="Full Address / Landmark" placeholderTextColor="#94a3b8" value={formData.messAddress} onChangeText={(val) => handleInputChange('messAddress', val)} />
+                      </View>
+
+                      <TouchableOpacity style={styles.locationBtn} onPress={handleLocationCapture} disabled={isGettingLocation}>
+                        <Feather name="map-pin" size={16} color="#4f46e5" />
+                        <Text style={styles.locationBtnText}>
+                          {formData.latitude ? `✅ Location captured` : isGettingLocation ? 'Detecting...' : '📍 Use Current Location'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <View style={styles.stepBtnRow}>
+                        <TouchableOpacity style={styles.secondaryBtn} onPress={prevStep}><Feather name="chevron-left" size={18} color="#334155" /></TouchableOpacity>
+                        <TouchableOpacity style={[styles.blackBtn, { flex: 1 }]} onPress={nextStep}><Text style={styles.blackBtnText}>Next Step</Text></TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  {step === 3 && (
+                    <View style={styles.formGroup}>
+                      <View style={styles.inputWrapper}>
+                        <Feather name="file-text" size={18} color="#94a3b8" style={styles.inputIcon} />
+                        <TextInput style={styles.input} placeholder="FSSAI License (Optional)" placeholderTextColor="#94a3b8" value={formData.fssaiNumber} onChangeText={(val) => handleInputChange('fssaiNumber', val)} />
+                      </View>
+
+                      <View style={styles.stepBtnRow}>
+                        <TouchableOpacity style={styles.secondaryBtn} onPress={prevStep}><Feather name="chevron-left" size={18} color="#334155" /></TouchableOpacity>
+                        <TouchableOpacity style={[styles.primaryBtn, { flex: 1, backgroundColor: '#f97316' }]} onPress={handleSubmit} disabled={isLoading}>
+                          {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Complete Registration</Text>}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+
+          <View style={styles.footer}>
+            <TouchableOpacity onPress={() => { setIsLogin(!isLogin); setError(''); setStep(1); }}>
+              <Text style={styles.footerText}>
+                {isLogin ? "Don't have an account? Sign up here" : "Already have an account? Sign in"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#f8fafc', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+  container: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  card: { backgroundColor: '#ffffff', width: '100%', maxWidth: 400, borderRadius: 32, padding: 24, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 20, elevation: 6 },
+  header: { alignItems: 'center', marginBottom: 24 },
+  iconCircle: { backgroundColor: '#e0e7ff', padding: 16, borderRadius: 20, marginBottom: 12 },
+  title: { fontSize: 24, fontWeight: '900', color: '#0f172a', textAlign: 'center' },
+  subtitle: { fontSize: 13, color: '#64748b', marginTop: 4, textAlign: 'center' },
+
+  errorBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', padding: 12, borderRadius: 12, marginBottom: 16, gap: 8 },
+  errorText: { color: '#dc2626', fontSize: 13, fontWeight: 'bold', flex: 1 },
+
+  formGroup: { gap: 16 },
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, paddingHorizontal: 16 },
+  inputIcon: { marginRight: 12 },
+  input: { flex: 1, paddingVertical: 14, fontSize: 15, fontWeight: 'bold', color: '#0f172a' },
+
+  primaryBtn: { backgroundColor: '#4f46e5', paddingVertical: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#4f46e5', shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  primaryBtnText: { color: '#ffffff', fontSize: 16, fontWeight: '900' },
+
+  roleToggleRow: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 14, padding: 4, marginBottom: 8 },
+  roleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
+  roleBtnActive: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  roleBtnText: { fontSize: 13, fontWeight: 'bold', color: '#64748b' },
+  roleBtnTextActive: { color: '#4f46e5' },
+
+  stepperRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginBottom: 20 },
+  stepCircle: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: '#cbd5e1', justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
+  stepCircleActive: { backgroundColor: '#f97316', borderColor: '#f97316' },
+  stepText: { fontSize: 13, fontWeight: 'bold', color: '#94a3b8' },
+  stepTextActive: { color: '#fff' },
+
+  blackBtn: { backgroundColor: '#0f172a', paddingVertical: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  blackBtnText: { color: '#ffffff', fontSize: 15, fontWeight: 'bold' },
+  secondaryBtn: { width: 60, backgroundColor: '#e2e8f0', borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  stepBtnRow: { flexDirection: 'row', gap: 12 },
+
+  locationBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e0e7ff', paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: '#c7d2fe', gap: 8 },
+  locationBtnText: { color: '#4338ca', fontWeight: 'bold', fontSize: 13 },
+
+  footer: { marginTop: 24, alignItems: 'center', borderTopWidth: 1, borderColor: '#f1f5f9', paddingTop: 16 },
+  footerText: { fontSize: 13, fontWeight: 'bold', color: '#4f46e5' }
+});
+
+
+================================================
+FILE: avasari-mobile/src/app/owner/index.tsx
+================================================
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, ScrollView, Alert, TextInput, Modal, SafeAreaView, Platform, StatusBar, RefreshControl } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+
+const API_URL = 'http://192.168.0.101:3000'; // ⚠️ IP CONFIGURED
+
+const getLocalDateString = (offsetDays = 0) => {
+    const d = new Date(); d.setDate(d.getDate() + offsetDays);
+    return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+};
+
+export default function OwnerDashboard() {
+    const router = useRouter();
+    const [user, setUser] = useState(null);
+    const [isAuthLoading, setIsAuthLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false); // <-- Pull-to-refresh state
+
+    // Publish Form State
+    const [menuDate, setMenuDate] = useState(getLocalDateString(0));
+    const [menuShift, setMenuShift] = useState('morning');
+    const [menuItems, setMenuItems] = useState('');
+    const [price, setPrice] = useState('');
+    const [isPublishing, setIsPublishing] = useState(false);
+
+    // Analytics & Members State
+    const [analyticsShift, setAnalyticsShift] = useState('morning');
+    const [stats, setStats] = useState({ morning: { coming: 0, notComing: 0 }, night: { coming: 0, notComing: 0 } });
+    const [historyData, setHistoryData] = useState([]);
+    const [members, setMembers] = useState([]);
+
+    // Location State
+    const [isSettingLocation, setIsSettingLocation] = useState(false);
+    const [savedLocation, setSavedLocation] = useState(null);
+
+    // Native Modal State
+    const [modalVisible, setModalVisible] = useState(false);
+    const [modalConfig, setModalConfig] = useState({ type: '', subId: '', title: '', placeholder: '' });
+    const [modalInput, setModalInput] = useState('');
+
+    const displayDate = new Date(menuDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+    // 1. Authenticate User
+    useEffect(() => {
+        const fetchUser = async () => {
+            const token = await AsyncStorage.getItem('token');
+            if (!token) { router.replace('/'); return; }
+            try {
+                const res = await fetch(`${API_URL}/api/me`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.role !== 'owner') router.replace('/');
+                    else {
+                        setUser(data);
+                        if (data.location && data.location.coordinates && data.location.coordinates[0] !== 0) {
+                            setSavedLocation({ lng: data.location.coordinates[0], lat: data.location.coordinates[1] });
+                        }
+                    }
+                } else {
+                    await AsyncStorage.removeItem('token'); router.replace('/');
+                }
+            } catch (e) { console.error(e); }
+            finally { setIsAuthLoading(false); }
+        };
+        fetchUser();
+    }, []);
+
+    // 2. Fetch All Data (Used for initial load and Pull-to-Refresh)
+    const fetchData = async () => {
+        if (!user) return;
+        const token = await AsyncStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        try {
+            const menuRes = await fetch(`${API_URL}/api/menus/${menuDate}`, { headers });
+            if (menuRes.ok) {
+                const menus = await menuRes.json();
+                const myMenu = menus.find(m => (m.ownerId._id === user._id || m.ownerId === user._id) && m.shift === menuShift);
+                if (myMenu) { setMenuItems(myMenu.items.join(', ')); setPrice(myMenu.price.toString()); }
+                else { setMenuItems(''); setPrice(''); }
+            }
+            await fetchLiveStats(headers);
+        } catch (e) { console.error(e); }
+    };
+
+    // 3. Fetch ONLY Live Stats (Used for background polling so we don't erase your typing)
+    const fetchLiveStats = async (headers) => {
+        try {
+            const statsRes = await fetch(`${API_URL}/api/attendance/stats/${encodeURIComponent(user.messName || 'Partner Mess')}/${menuDate}`, { headers });
+            if (statsRes.ok) setStats(await statsRes.json());
+
+            const memRes = await fetch(`${API_URL}/api/subscriptions/mess`, { headers });
+            if (memRes.ok) setMembers(await memRes.json());
+        } catch (e) { console.error(e); }
+    };
+
+    // --- REAL-TIME ENGINE ---
+    useEffect(() => {
+        fetchData(); // Load everything when tab/date changes
+
+        // Polling: Silently fetch live stats every 5 seconds
+        const interval = setInterval(async () => {
+            const token = await AsyncStorage.getItem('token');
+            if (token) fetchLiveStats({ 'Authorization': `Bearer ${token}` });
+        }, 5000);
+
+        return () => clearInterval(interval); // Clean up on unmount
+    }, [menuDate, menuShift, user]);
+
+    // Pull-to-Refresh Handler
+    const onRefresh = React.useCallback(async () => {
+        setRefreshing(true);
+        await fetchData();
+        setRefreshing(false);
+    }, [menuDate, menuShift, user]);
+
+    const handleLogout = async () => {
+        await AsyncStorage.removeItem('token');
+        router.replace('/');
+    };
+
+    const handlePublishMenu = async () => {
+        if (!menuItems || !price) { Alert.alert("Error", "Please fill all fields"); return; }
+        setIsPublishing(true);
+        const token = await AsyncStorage.getItem('token');
+        const itemsArray = menuItems.split(',').map(item => item.trim()).filter(Boolean);
+
+        try {
+            const response = await fetch(`${API_URL}/api/menus`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ messName: user.messName || 'Mess', date: menuDate, shift: menuShift, items: itemsArray, price: Number(price) })
+            });
+            if (response.ok) Alert.alert("Success", `Menu published for ${displayDate} (${menuShift})!`);
+            else Alert.alert("Error", "Failed to publish menu");
+        } catch (error) { Alert.alert("Error", "Network failed"); }
+        finally { setIsPublishing(false); fetchData(); }
+    };
+
+    const updateSubscription = async (subId, payload) => {
+        const token = await AsyncStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_URL}/api/subscriptions/${subId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) fetchLiveStats({ 'Authorization': `Bearer ${token}` });
+        } catch (e) { Alert.alert("Error", "Failed to update"); }
+    };
+
+    const togglePaymentStatus = (subId, currentStatus) => updateSubscription(subId, { status: currentStatus === 'paid' ? 'pending' : 'paid' });
+
+    const openModal = (type, subId, currentValue, title, placeholder) => {
+        setModalConfig({ type, subId, title, placeholder });
+        setModalInput(currentValue ? currentValue.toString() : '');
+        setModalVisible(true);
+    };
+
+    const handleModalSubmit = () => {
+        const val = Number(modalInput);
+        if (isNaN(val)) { Alert.alert("Error", "Please enter a valid number"); return; }
+        if (modalConfig.type === 'fee') updateSubscription(modalConfig.subId, { monthlyFee: val });
+        else if (modalConfig.type === 'days') updateSubscription(modalConfig.subId, { extendDays: val });
+        else if (modalConfig.type === 'skips') updateSubscription(modalConfig.subId, { allowedSkips: val });
+        setModalVisible(false); setModalInput('');
+    };
+
+    const handleSetLocation = async () => {
+        setIsSettingLocation(true);
+        try {
+            let { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'Please allow location access in your phone settings to set your mess location.');
+                setIsSettingLocation(false); return;
+            }
+            let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            const { latitude, longitude } = location.coords;
+            const token = await AsyncStorage.getItem('token');
+            const res = await fetch(`${API_URL}/api/owner/location`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ latitude, longitude })
+            });
+            if (res.ok) {
+                setSavedLocation({ lat: latitude, lng: longitude });
+                Alert.alert('Success', 'Your mess location has been updated on the map!');
+            } else { Alert.alert('Error', 'Failed to save location.'); }
+        } catch (error) { Alert.alert('Error', 'Could not fetch GPS location.'); }
+        finally { setIsSettingLocation(false); }
+    };
+
+    if (isAuthLoading || !user) return <View style={styles.center}><ActivityIndicator size="large" color="#f97316" /></View>;
+
+    const currentStats = stats[analyticsShift] || { coming: 0, notComing: 0 };
+
+    return (
+        <SafeAreaView style={styles.safeArea}>
+            <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.greeting}>Chef {user.name.split(' ')[0]} 👨‍🍳</Text>
+                    <Text style={styles.subtitle}>{user.messName || 'Owner Dashboard'}</Text>
+                </View>
+                <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+                    <Feather name="log-out" size={18} color="#ef4444" />
+                </TouchableOpacity>
+            </View>
+
+            <ScrollView
+                style={styles.content}
+                contentContainerStyle={{ paddingBottom: 60 }}
+                showsVerticalScrollIndicator={false}
+                // --- PULL TO REFRESH IMPLEMENTED HERE ---
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4f46e5']} tintColor="#4f46e5" />}
+            >
+
+                <View style={styles.dateSelector}>
+                    <TouchableOpacity style={[styles.dateBtn, menuDate === getLocalDateString(0) && styles.dateBtnActive]} onPress={() => setMenuDate(getLocalDateString(0))}>
+                        <Text style={[styles.dateBtnText, menuDate === getLocalDateString(0) && styles.dateBtnTextActive]}>Today</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.dateBtn, menuDate === getLocalDateString(1) && styles.dateBtnActive]} onPress={() => setMenuDate(getLocalDateString(1))}>
+                        <Text style={[styles.dateBtnText, menuDate === getLocalDateString(1) && styles.dateBtnTextActive]}>Tomorrow</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Attendance Stats</Text>
+                        <View style={styles.shiftToggleRow}>
+                            <TouchableOpacity onPress={() => setAnalyticsShift('morning')} style={[styles.shiftBtn, analyticsShift === 'morning' && styles.shiftBtnActive]}>
+                                <Text style={[styles.shiftBtnText, analyticsShift === 'morning' && styles.shiftBtnTextActive]}>Morning</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setAnalyticsShift('night')} style={[styles.shiftBtn, analyticsShift === 'night' && styles.shiftBtnActive]}>
+                                <Text style={[styles.shiftBtnText, analyticsShift === 'night' && styles.shiftBtnTextActive]}>Night</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    <View style={styles.statsRow}>
+                        <View style={[styles.statCard, { backgroundColor: '#10b981' }]}>
+                            <Feather name="users" size={24} color="rgba(255,255,255,0.3)" style={styles.statBgIcon} />
+                            <Text style={styles.statLabel}>Coming</Text>
+                            <Text style={styles.statValue}>{currentStats.coming}</Text>
+                        </View>
+                        <View style={[styles.statCard, { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0' }]}>
+                            <Feather name="user-x" size={24} color="rgba(244,63,94,0.1)" style={styles.statBgIcon} />
+                            <Text style={[styles.statLabel, { color: '#64748b' }]}>Skipped</Text>
+                            <Text style={[styles.statValue, { color: '#f43f5e' }]}>{currentStats.notComing}</Text>
+                        </View>
+                    </View>
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Publish Menu</Text>
+                    <View style={styles.premiumCard}>
+                        <View style={[styles.shiftToggleRow, { marginBottom: 20 }]}>
+                            <TouchableOpacity onPress={() => setMenuShift('morning')} style={[styles.shiftBtn, menuShift === 'morning' && styles.shiftBtnActive]}>
+                                <Feather name="sun" size={14} color={menuShift === 'morning' ? '#4f46e5' : '#64748b'} style={{ marginRight: 6 }} />
+                                <Text style={[styles.shiftBtnText, menuShift === 'morning' && styles.shiftBtnTextActive]}>Morning</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setMenuShift('night')} style={[styles.shiftBtn, menuShift === 'night' && styles.shiftBtnActive]}>
+                                <Feather name="moon" size={14} color={menuShift === 'night' ? '#4f46e5' : '#64748b'} style={{ marginRight: 6 }} />
+                                <Text style={[styles.shiftBtnText, menuShift === 'night' && styles.shiftBtnTextActive]}>Night</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <TextInput style={[styles.input, { height: 90, textAlignVertical: 'top' }]} placeholder="Items (e.g. Dal, Roti, Paneer)" multiline value={menuItems} onChangeText={setMenuItems} />
+                        <View style={styles.priceInputWrapper}>
+                            <Text style={styles.currencySymbol}>₹</Text>
+                            <TextInput style={styles.priceInput} placeholder="Thali Price" keyboardType="numeric" value={price} onChangeText={setPrice} />
+                        </View>
+
+                        <TouchableOpacity style={styles.publishBtn} onPress={handlePublishMenu} disabled={isPublishing}>
+                            {isPublishing ? <ActivityIndicator color="#fff" /> : (
+                                <>
+                                    <Feather name="send" size={16} color="#ffffff" style={{ marginRight: 8 }} />
+                                    <Text style={styles.publishBtnText}>Publish {menuShift} Menu</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Monthly Members ({members.length})</Text>
+                    {members.length === 0 ? (
+                        <View style={styles.emptyState}>
+                            <Feather name="users" size={32} color="#cbd5e1" />
+                            <Text style={styles.emptyText}>No monthly members yet.</Text>
+                        </View>
+                    ) : (
+                        members.map(member => (
+                            <View key={member._id} style={styles.memberCard}>
+                                <View style={styles.memberHeader}>
+                                    <View style={styles.memberAvatar}>
+                                        <Text style={styles.avatarText}>{member.studentName.charAt(0).toUpperCase()}</Text>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.memberName}>{member.studentName}</Text>
+                                        <Text style={styles.memberPhone}><Feather name="phone" size={10} /> {member.studentPhone || 'N/A'}</Text>
+                                    </View>
+                                    <View style={styles.memberShift}><Text style={styles.memberShiftText}>{member.shift} Shift</Text></View>
+                                </View>
+
+                                <View style={styles.memberMetrics}>
+                                    <TouchableOpacity style={styles.metricBtn} onPress={() => openModal('skips', member._id, member.allowedSkips, 'Max Skips', 'Enter total allowed skips')}>
+                                        <Text style={styles.metricLabel}>Skips</Text>
+                                        <Text style={styles.metricValue}>{member.usedSkips}/{member.allowedSkips} <Feather name="edit-2" size={10} color="#94a3b8" /></Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity style={styles.metricBtn} onPress={() => openModal('fee', member._id, member.monthlyFee, 'Monthly Fee (₹)', 'Enter fee amount')}>
+                                        <Text style={styles.metricLabel}>Fee</Text>
+                                        <Text style={[styles.metricValue, { color: '#f97316' }]}>₹{member.monthlyFee} <Feather name="edit-2" size={10} color="#94a3b8" /></Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity style={styles.metricBtn} onPress={() => openModal('days', member._id, '', 'Extend Days', 'Add days for absenteeism')}>
+                                        <Text style={styles.metricLabel}>Expires</Text>
+                                        <Text style={styles.metricValue}>{member.endDate ? new Date(member.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'N/A'} <Feather name="plus-circle" size={10} color="#94a3b8" /></Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={() => togglePaymentStatus(member._id, member.status)}
+                                    style={[styles.payBtn, member.status === 'paid' ? styles.payBtnPaid : styles.payBtnPending]}>
+                                    <Text style={[styles.payBtnText, member.status === 'paid' ? { color: '#059669' } : { color: '#dc2626' }]}>
+                                        {member.status === 'paid' ? 'STATUS: PAID ✓' : 'MARK AS PAID'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        ))
+                    )}
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Mess Location Map</Text>
+                    <View style={styles.premiumCard}>
+                        <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 16, lineHeight: 20 }}>Allow students to find your mess on the interactive map by saving your current GPS coordinates.</Text>
+
+                        {savedLocation && (
+                            <View style={styles.locationActiveBanner}>
+                                <Feather name="map-pin" size={16} color="#4338ca" />
+                                <Text style={styles.locationActiveText}>Location is active on map</Text>
+                            </View>
+                        )}
+
+                        <TouchableOpacity
+                            style={[styles.publishBtn, { backgroundColor: '#4f46e5' }]}
+                            onPress={handleSetLocation}
+                            disabled={isSettingLocation}
+                        >
+                            {isSettingLocation ? <ActivityIndicator color="#fff" /> : (
+                                <>
+                                    <Feather name="navigation" size={16} color="#fff" style={{ marginRight: 8 }} />
+                                    <Text style={styles.publishBtnText}>
+                                        {savedLocation ? 'Update Current Location' : 'Set Location via GPS'}
+                                    </Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+            </ScrollView>
+
+            <Modal visible={modalVisible} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+                        <Text style={styles.modalTitle}>{modalConfig.title}</Text>
+                        <TextInput
+                            style={styles.modalInput}
+                            keyboardType="numeric"
+                            placeholder={modalConfig.placeholder}
+                            value={modalInput}
+                            onChangeText={setModalInput}
+                            autoFocus
+                        />
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalBtnCancel}><Text style={{ color: '#64748b', fontWeight: '900' }}>Cancel</Text></TouchableOpacity>
+                            <TouchableOpacity onPress={handleModalSubmit} style={styles.modalBtnSave}><Text style={{ color: '#fff', fontWeight: '900' }}>Save</Text></TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+        </SafeAreaView>
+    );
+}
+
+const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: '#f8fafc', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' },
+
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#f8fafc' },
+    greeting: { fontSize: 26, fontWeight: '900', color: '#0f172a' },
+    subtitle: { fontSize: 14, color: '#64748b', marginTop: 4 },
+    logoutBtn: { backgroundColor: '#fee2e2', padding: 12, borderRadius: 12 },
+
+    content: { flex: 1, paddingHorizontal: 20, paddingTop: 8 },
+    sectionTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a', marginBottom: 16 },
+
+    dateSelector: { flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 16, padding: 4, marginBottom: 24, alignSelf: 'center' },
+    dateBtn: { paddingVertical: 10, paddingHorizontal: 24, borderRadius: 12 },
+    dateBtnActive: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+    dateBtnText: { fontWeight: 'bold', color: '#64748b', fontSize: 15 },
+    dateBtnTextActive: { color: '#0f172a' },
+
+    section: { marginBottom: 32 },
+
+    sectionHeader: { flexDirection: 'column', alignItems: 'flex-start', marginBottom: 16 },
+
+    shiftToggleRow: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, width: '100%' },
+    shiftBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10, flexDirection: 'row', justifyContent: 'center' },
+    shiftBtnActive: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+    shiftBtnText: { fontSize: 13, fontWeight: 'bold', color: '#64748b' },
+    shiftBtnTextActive: { color: '#4f46e5' },
+
+    statsRow: { flexDirection: 'row', gap: 16 },
+    statCard: { flex: 1, padding: 20, borderRadius: 24, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
+    statBgIcon: { position: 'absolute', right: -10, bottom: -10, transform: [{ scale: 3 }] },
+    statLabel: { color: '#ecfdf5', fontWeight: 'bold', fontSize: 14, marginBottom: 8 },
+    statValue: { color: '#ffffff', fontWeight: '900', fontSize: 40 },
+
+    premiumCard: { backgroundColor: '#ffffff', padding: 20, borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 15, shadowOffset: { width: 0, height: 8 }, elevation: 5 },
+    input: { backgroundColor: '#f1f5f9', padding: 16, borderRadius: 16, marginBottom: 16, fontSize: 15, color: '#0f172a' },
+    priceInputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 16, marginBottom: 20, paddingHorizontal: 16 },
+    currencySymbol: { fontSize: 16, fontWeight: 'bold', color: '#64748b', marginRight: 8 },
+    priceInput: { flex: 1, paddingVertical: 16, fontSize: 15, color: '#0f172a' },
+
+    publishBtn: { backgroundColor: '#0f172a', paddingVertical: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+    publishBtnText: { color: '#ffffff', fontWeight: '900', fontSize: 15 },
+
+    emptyState: { alignItems: 'center', padding: 40, backgroundColor: '#ffffff', borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 },
+    emptyText: { color: '#94a3b8', fontWeight: 'bold', marginTop: 12, fontSize: 15 },
+
+    memberCard: { backgroundColor: '#ffffff', padding: 16, borderRadius: 24, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
+    memberHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+    memberAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#e0e7ff', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    avatarText: { fontSize: 18, fontWeight: '900', color: '#4f46e5' },
+    memberName: { fontSize: 17, fontWeight: '900', color: '#0f172a' },
+    memberPhone: { fontSize: 12, color: '#64748b', marginTop: 4, fontWeight: '600' },
+    memberShift: { backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+    memberShiftText: { fontSize: 11, fontWeight: '900', color: '#475569', textTransform: 'uppercase' },
+
+    memberMetrics: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+    metricBtn: { flex: 1, backgroundColor: '#f8fafc', paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#f1f5f9', alignItems: 'center' },
+    metricLabel: { fontSize: 10, color: '#64748b', marginBottom: 6, textTransform: 'uppercase', fontWeight: '900' },
+    metricValue: { fontSize: 13, fontWeight: '900', color: '#0f172a' },
+
+    payBtn: { paddingVertical: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+    payBtnPaid: { backgroundColor: '#ecfdf5' },
+    payBtnPending: { backgroundColor: '#fef2f2' },
+    payBtnText: { fontWeight: '900', fontSize: 13, letterSpacing: 0.5 },
+
+    locationActiveBanner: { backgroundColor: '#e0e7ff', padding: 12, borderRadius: 12, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
+    locationActiveText: { color: '#4338ca', fontWeight: 'bold', fontSize: 13 },
+
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalBox: { width: '100%', backgroundColor: '#fff', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
+    modalTitle: { fontSize: 18, fontWeight: '900', marginBottom: 20, color: '#0f172a', textAlign: 'center' },
+    modalInput: { backgroundColor: '#f8fafc', padding: 16, borderRadius: 16, marginBottom: 24, fontSize: 20, textAlign: 'center', fontWeight: '900', color: '#4f46e5' },
+    modalActions: { flexDirection: 'row', gap: 12 },
+    modalBtnCancel: { flex: 1, padding: 16, alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 16 },
+    modalBtnSave: { flex: 1, padding: 16, alignItems: 'center', backgroundColor: '#4f46e5', borderRadius: 16 },
+});
+
+
+================================================
+FILE: avasari-mobile/src/app/student/index.tsx
+================================================
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, ScrollView, Alert, Linking, SafeAreaView, Platform, StatusBar, Modal, TextInput, RefreshControl } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import MessMap from '../../components/MessMap';
+
+const API_URL = 'http://192.168.0.101:3000'; // ⚠️ IP CONFIGURED
+
+const getLocalDateString = (offsetDays = 0) => {
+    const d = new Date(); d.setDate(d.getDate() + offsetDays);
+    return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+};
+
+// --- PREMIUM MESS CARD ---
+const MessCard = ({ mess, initialAttendance, targetDate, mySub, onRefresh }) => {
+    const [attendance, setAttendance] = useState(initialAttendance || null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showSubForm, setShowSubForm] = useState(false);
+
+    // Rate Modal State
+    const [reviewModalVisible, setReviewModalVisible] = useState(false);
+    const [rating, setRating] = useState(0);
+    const [comment, setComment] = useState('');
+
+    // View Reviews State
+    const [readReviewsModalVisible, setReadReviewsModalVisible] = useState(false);
+    const [messReviews, setMessReviews] = useState([]);
+    const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+
+    useEffect(() => {
+        if (mySub && initialAttendance === undefined) setAttendance('coming');
+        else setAttendance(initialAttendance || null);
+    }, [initialAttendance, mySub]);
+
+    const handleAttendance = async (status) => {
+        setIsSubmitting(true);
+        const token = await AsyncStorage.getItem('token');
+        try {
+            const response = await fetch(`${API_URL}/api/attendance`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ messId: mess.ownerId._id, messName: mess.messName, shift: mess.shift, status, targetDate, timestamp: new Date().toISOString() })
+            });
+            const data = await response.json();
+            if (response.ok) { setAttendance(status); onRefresh(); }
+            else { Alert.alert("Notice", data.error || "Action not allowed."); }
+        } catch (error) { Alert.alert("Error", "Connection failed."); }
+        finally { setIsSubmitting(false); }
+    };
+
+    const handleSubscribe = async (shiftType) => {
+        const token = await AsyncStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_URL}/api/subscriptions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ messId: mess.ownerId._id, messName: mess.messName, shift: shiftType })
+            });
+            if (res.ok) { Alert.alert("Success", "Subscribed successfully!"); setShowSubForm(false); onRefresh(); }
+            else { const d = await res.json(); Alert.alert("Failed", d.error); }
+        } catch (e) { Alert.alert("Error", "Failed to subscribe"); }
+    };
+
+    // Submit Review
+    const submitReview = async () => {
+        if (rating === 0) { Alert.alert("Notice", "Please select a star rating first."); return; }
+        setIsSubmitting(true);
+        const token = await AsyncStorage.getItem('token');
+        const messId = mess.ownerId?._id || mess.ownerId;
+
+        try {
+            const response = await fetch(`${API_URL}/api/messes/${messId}/rate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ rating, comment })
+            });
+
+            if (response.ok) {
+                Alert.alert("Success", "Thank you for your feedback!");
+                setReviewModalVisible(false);
+                setRating(0);
+                setComment('');
+                onRefresh(); // Refresh dashboard to update average stars
+            } else {
+                const text = await response.text();
+                try {
+                    const data = JSON.parse(text);
+                    Alert.alert("Error", data.error || "Failed to submit review.");
+                } catch { Alert.alert("Server Error", "Endpoint not found."); }
+            }
+        } catch (e) { Alert.alert("Network Error", `Details: ${e.message}`); }
+        finally { setIsSubmitting(false); }
+    };
+
+    // 🛠️ NEW: Fetch Reviews to display them
+    const fetchReviews = async () => {
+        setIsLoadingReviews(true);
+        setReadReviewsModalVisible(true);
+        const token = await AsyncStorage.getItem('token');
+        const messId = mess.ownerId?._id || mess.ownerId;
+
+        try {
+            const response = await fetch(`${API_URL}/api/messes/${messId}/reviews`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setMessReviews(data);
+            }
+        } catch (e) { console.error("Failed to fetch reviews", e); }
+        finally { setIsLoadingReviews(false); }
+    };
+
+    const disableComing = isSubmitting || attendance === 'coming';
+    const disableSkip = isSubmitting || attendance === 'not_coming';
+
+    return (
+        <View style={[styles.card, attendance === 'coming' ? styles.cardComing : attendance === 'not_coming' ? styles.cardSkip : null]}>
+            <View style={styles.cardHeader}>
+                <View style={{ flex: 1 }}>
+                    <View style={styles.badgeRow}>
+                        <View style={styles.priceBadge}><Text style={styles.priceText}>₹{mess.price || 60} Thali</Text></View>
+                        <View style={[styles.shiftBadge, mess.shift === 'morning' ? styles.shiftMorning : styles.shiftNight]}>
+                            <Feather name={mess.shift === 'morning' ? "sun" : "moon"} size={12} color={mess.shift === 'morning' ? "#d97706" : "#4338ca"} style={{ marginRight: 4 }} />
+                            <Text style={[styles.shiftText, mess.shift === 'morning' ? styles.shiftTextMorning : styles.shiftTextNight]}>
+                                {mess.shift === 'morning' ? 'Morning' : 'Night'}
+                            </Text>
+                        </View>
+                        <View style={[styles.shiftBadge, { backgroundColor: '#fef3c7' }]}>
+                            <Text style={[styles.shiftText, { color: '#d97706' }]}>⭐ {mess.rating ? mess.rating.toFixed(1) : 'New'}</Text>
+                        </View>
+                    </View>
+                    <Text style={styles.messName}>{mess.messName}</Text>
+                </View>
+            </View>
+
+            {!mySub && !showSubForm && (
+                <TouchableOpacity style={styles.joinBtn} onPress={() => setShowSubForm(true)}>
+                    <Feather name="plus" size={14} color="#ffffff" style={{ marginRight: 6 }} />
+                    <Text style={styles.joinBtnText}>Join Monthly</Text>
+                </TouchableOpacity>
+            )}
+
+            {showSubForm && (
+                <View style={styles.subForm}>
+                    <Text style={styles.subFormLabel}>Select your shift:</Text>
+                    <View style={styles.subFormButtons}>
+                        <TouchableOpacity style={styles.shiftSelectBtn} onPress={() => handleSubscribe('morning')}><Text style={styles.shiftSelectText}>Morning</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.shiftSelectBtn} onPress={() => handleSubscribe('night')}><Text style={styles.shiftSelectText}>Night</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.shiftSelectBtnBoth} onPress={() => handleSubscribe('both')}><Text style={styles.shiftSelectTextBoth}>Both</Text></TouchableOpacity>
+                    </View>
+                    <TouchableOpacity onPress={() => setShowSubForm(false)} style={{ marginTop: 8 }}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+                </View>
+            )}
+
+            <View style={styles.menuContainer}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Feather name="star" size={16} color="#f59e0b" />
+                        <Text style={styles.menuTitle}> Today's Feast</Text>
+                    </View>
+
+                    {/* BUTTON ROW FOR REVIEWS */}
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <TouchableOpacity onPress={fetchReviews} style={[styles.rateBtn, { backgroundColor: '#f1f5f9' }]}>
+                            <Text style={[styles.rateBtnText, { color: '#64748b' }]}>Reviews</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setReviewModalVisible(true)} style={styles.rateBtn}>
+                            <Text style={styles.rateBtnText}>Rate ⭐</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                <View style={styles.itemsRow}>
+                    {mess.items.map((item, idx) => (
+                        <View key={idx} style={styles.itemBadge}><Text style={styles.itemText}>{item}</Text></View>
+                    ))}
+                </View>
+            </View>
+
+            <View style={styles.actionsRow}>
+                <TouchableOpacity style={[styles.actionBtn, attendance === 'coming' ? styles.btnComingActive : disableComing ? styles.btnDisabled : styles.btnComing]} onPress={() => handleAttendance('coming')} disabled={disableComing}>
+                    <Feather name="check" size={20} color={attendance === 'coming' ? '#fff' : disableComing ? '#94a3b8' : '#10b981'} />
+                    <Text style={[styles.actionBtnText, attendance === 'coming' ? { color: '#fff' } : disableComing ? { color: '#94a3b8' } : { color: '#10b981' }]}>Coming</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.actionBtn, attendance === 'not_coming' ? styles.btnSkipActive : disableSkip ? styles.btnDisabled : styles.btnSkip]} onPress={() => handleAttendance('not_coming')} disabled={disableSkip}>
+                    <Feather name="x" size={20} color={attendance === 'not_coming' ? '#fff' : disableSkip ? '#94a3b8' : '#f43f5e'} />
+                    <Text style={[styles.actionBtnText, attendance === 'not_coming' ? { color: '#fff' } : disableSkip ? { color: '#94a3b8' } : { color: '#f43f5e' }]}>Skip</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* WRITE REVIEW MODAL */}
+            <Modal visible={reviewModalVisible} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+                        <Text style={styles.modalTitle}>Rate {mess.messName}</Text>
+
+                        <View style={styles.starRow}>
+                            {[1, 2, 3, 4, 5].map(star => (
+                                <TouchableOpacity key={star} onPress={() => setRating(star)}>
+                                    <Feather
+                                        name="star"
+                                        size={36}
+                                        color={rating >= star ? '#f59e0b' : '#e2e8f0'}
+                                        style={rating >= star && { transform: [{ scale: 1.1 }] }}
+                                    />
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        <TextInput
+                            style={[styles.input, { height: 90, textAlignVertical: 'top' }]}
+                            placeholder="Write a review (optional)..."
+                            multiline
+                            value={comment}
+                            onChangeText={setComment}
+                        />
+
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity onPress={() => setReviewModalVisible(false)} style={styles.modalBtnCancel}>
+                                <Text style={{ color: '#64748b', fontWeight: '900' }}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={submitReview} style={styles.modalBtnSave} disabled={isSubmitting}>
+                                {isSubmitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: '#fff', fontWeight: '900' }}>Submit</Text>}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* READ REVIEWS MODAL */}
+            <Modal visible={readReviewsModalVisible} transparent animationType="slide">
+                <View style={[styles.modalOverlay, { justifyContent: 'flex-end' }]}>
+                    <View style={[styles.modalBox, { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, maxHeight: '80%' }]}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                            <Text style={styles.modalTitle}>Reviews</Text>
+                            <TouchableOpacity onPress={() => setReadReviewsModalVisible(false)}>
+                                <Feather name="x-circle" size={28} color="#cbd5e1" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {isLoadingReviews ? (
+                            <ActivityIndicator size="large" color="#4f46e5" style={{ marginVertical: 40 }} />
+                        ) : messReviews.length === 0 ? (
+                            <View style={{ alignItems: 'center', padding: 20 }}>
+                                <Feather name="message-square" size={32} color="#cbd5e1" style={{ marginBottom: 12 }} />
+                                <Text style={{ color: '#64748b', fontSize: 16 }}>No reviews yet. Be the first to rate!</Text>
+                            </View>
+                        ) : (
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                {messReviews.map((rev, index) => (
+                                    <View key={index} style={styles.reviewCard}>
+                                        <View style={styles.reviewHeader}>
+                                            <Text style={styles.reviewAuthor}>{rev.studentName || 'Student'}</Text>
+                                            <Text style={styles.reviewRating}>
+                                                {Array(rev.rating).fill('⭐').join('')}
+                                            </Text>
+                                        </View>
+                                        {rev.comment ? <Text style={styles.reviewComment}>{rev.comment}</Text> : null}
+                                    </View>
+                                ))}
+                                <View style={{ height: 40 }} />
+                            </ScrollView>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+        </View>
+    );
+};
+
+// --- DIRECTORY CARD ---
+const DirectoryCard = ({ item }) => {
+    const handleCall = () => {
+        Linking.openURL(`tel:${item.phone}`).catch(() => Alert.alert('Error', 'Could not open the phone dialer.'));
+    };
+
+    return (
+        <View style={styles.dirCard}>
+            <View style={styles.dirInfo}>
+                <Text style={styles.dirType}>{item.type || 'Contact'}</Text>
+                <Text style={styles.dirName}>{item.name}</Text>
+                {item.description && <Text style={styles.dirDesc}>{item.description}</Text>}
+            </View>
+            <TouchableOpacity style={styles.callBtn} onPress={handleCall}>
+                <Feather name="phone-call" size={20} color="#ffffff" />
+            </TouchableOpacity>
+        </View>
+    );
+};
+
+
+// --- MAIN DASHBOARD SCREEN ---
+export default function StudentDashboard() {
+    const router = useRouter();
+    const [user, setUser] = useState(null);
+    const [activeTab, setActiveTab] = useState('menus');
+    const [targetDate, setTargetDate] = useState(getLocalDateString(0));
+
+    // UI State
+    const [refreshing, setRefreshing] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const [menus, setMenus] = useState([]);
+    const [myAttendance, setMyAttendance] = useState([]);
+    const [mySubscriptions, setMySubscriptions] = useState([]);
+    const [nearbyMesses, setNearbyMesses] = useState([]);
+    const [directoryData, setDirectoryData] = useState([]);
+
+    useEffect(() => {
+        const fetchUser = async () => {
+            const token = await AsyncStorage.getItem('token');
+            if (!token) { router.replace('/'); return; }
+            try {
+                const res = await fetch(`${API_URL}/api/me`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) setUser(await res.json());
+                else { await AsyncStorage.removeItem('token'); router.replace('/'); }
+            } catch (e) { console.error(e); }
+        };
+        fetchUser();
+    }, []);
+
+    const fetchData = async () => {
+        const token = await AsyncStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}` };
+        try {
+            if (activeTab === 'menus') {
+                const [menuRes, attRes, subRes] = await Promise.all([
+                    fetch(`${API_URL}/api/menus/${targetDate}`, { headers }),
+                    fetch(`${API_URL}/api/attendance/me/${targetDate}`, { headers }),
+                    fetch(`${API_URL}/api/subscriptions/me`, { headers })
+                ]);
+                if (menuRes.ok) setMenus(await menuRes.json());
+                if (attRes.ok) setMyAttendance(await attRes.json());
+                if (subRes.ok) setMySubscriptions(await subRes.json());
+            } else if (activeTab === 'map') {
+                const res = await fetch(`${API_URL}/api/messes/nearby`, { headers });
+                if (res.ok) setNearbyMesses(await res.json());
+            } else if (activeTab === 'directory') {
+                const res = await fetch(`${API_URL}/api/directory`, { headers });
+                if (res.ok) setDirectoryData(await res.json());
+            }
+        } catch (error) { console.error(error); }
+    };
+
+    useEffect(() => {
+        if (user) {
+            setIsLoading(true);
+            fetchData().finally(() => setIsLoading(false));
+
+            const interval = setInterval(() => fetchData(), 5000);
+            return () => clearInterval(interval);
+        }
+    }, [targetDate, activeTab, user]);
+
+    const onRefresh = React.useCallback(async () => {
+        setRefreshing(true);
+        await fetchData();
+        setRefreshing(false);
+    }, [targetDate, activeTab, user]);
+
+    const handleLogout = async () => {
+        await AsyncStorage.removeItem('token');
+        router.replace('/');
+    };
+
+    const getAttendanceStatus = (messName, shift) => {
+        const record = myAttendance.find(a => a.messName === messName && a.shift === shift);
+        return record ? record.status : undefined;
+    };
+
+    if (!user) return <View style={styles.center}><ActivityIndicator size="large" color="#4f46e5" /></View>;
+
+    return (
+        <SafeAreaView style={styles.safeArea}>
+            <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.greeting}>Hi, {user.name.split(' ')[0]} 👋</Text>
+                    <Text style={styles.subtitle}>What are you craving today?</Text>
+                </View>
+                <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+                    <Feather name="log-out" size={18} color="#ef4444" />
+                </TouchableOpacity>
+            </View>
+
+            <ScrollView
+                style={styles.content}
+                contentContainerStyle={{ paddingBottom: 100 }}
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4f46e5']} tintColor="#4f46e5" />}
+            >
+
+                {activeTab === 'menus' && (
+                    <>
+                        <View style={styles.dateSelector}>
+                            <TouchableOpacity style={[styles.dateBtn, targetDate === getLocalDateString(0) && styles.dateBtnActive]} onPress={() => setTargetDate(getLocalDateString(0))}>
+                                <Text style={[styles.dateBtnText, targetDate === getLocalDateString(0) && styles.dateBtnTextActive]}>Today</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.dateBtn, targetDate === getLocalDateString(1) && styles.dateBtnActive]} onPress={() => setTargetDate(getLocalDateString(1))}>
+                                <Text style={[styles.dateBtnText, targetDate === getLocalDateString(1) && styles.dateBtnTextActive]}>Tomorrow</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {mySubscriptions.length > 0 && !isLoading && (
+                            <View style={{ marginBottom: 20 }}>
+                                {mySubscriptions.map(sub => (
+                                    <View key={sub._id} style={styles.subBanner}>
+                                        <View style={styles.subBannerTop}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <View style={styles.iconCircle}><Feather name="award" size={16} color="#4f46e5" /></View>
+                                                <Text style={styles.subBannerTitle}>{sub.messName}</Text>
+                                            </View>
+                                            <Text style={[styles.subStatusText, sub.status === 'paid' ? { color: '#10b981' } : { color: '#f43f5e' }]}>{sub.status.toUpperCase()}</Text>
+                                        </View>
+                                        <View style={styles.subBadgeRow}>
+                                            <View style={styles.subBadge}><Text style={styles.subBadgeText}>{sub.shift} Shift</Text></View>
+                                            <View style={[styles.subBadge, { backgroundColor: '#fffbeb' }]}><Text style={[styles.subBadgeText, { color: '#d97706' }]}>Skips: {sub.usedSkips}/{sub.allowedSkips}</Text></View>
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
+                        {isLoading && menus.length === 0 ? (
+                            <ActivityIndicator size="large" color="#4f46e5" style={{ marginTop: 40 }} />
+                        ) : menus.length === 0 ? (
+                            <View style={styles.emptyState}>
+                                <View style={styles.emptyIconCircle}><Feather name="coffee" size={32} color="#94a3b8" /></View>
+                                <Text style={styles.emptyStateTitle}>No menus yet</Text>
+                                <Text style={styles.emptyStateSub}>Chefs are still preparing the menu!</Text>
+                            </View>
+                        ) : (
+                            menus.map(mess => (
+                                <MessCard key={mess._id} mess={mess} initialAttendance={getAttendanceStatus(mess.messName, mess.shift)} targetDate={targetDate} mySub={mySubscriptions.find(s => s.messId === mess.ownerId._id)} onRefresh={fetchData} />
+                            ))
+                        )}
+                    </>
+                )}
+
+                {activeTab === 'map' && (
+                    <View>
+                        <Text style={styles.sectionTitle}>Messes Near You</Text>
+                        <MessMap messes={nearbyMesses} />
+                    </View>
+                )}
+
+                {activeTab === 'directory' && (
+                    <View>
+                        <Text style={styles.sectionTitle}>Campus Directory</Text>
+                        {isLoading && directoryData.length === 0 ? (
+                            <ActivityIndicator size="large" color="#4f46e5" style={{ marginTop: 40 }} />
+                        ) : directoryData.length === 0 ? (
+                            <View style={styles.emptyState}>
+                                <View style={styles.emptyIconCircle}><Feather name="book-open" size={32} color="#94a3b8" /></View>
+                                <Text style={styles.emptyStateTitle}>Directory Empty</Text>
+                            </View>
+                        ) : (
+                            directoryData.map((item, idx) => (
+                                <DirectoryCard key={item._id || idx} item={item} />
+                            ))
+                        )}
+                    </View>
+                )}
+
+            </ScrollView>
+
+            <View style={styles.floatingTabBar}>
+                <TouchableOpacity style={styles.bottomTabBtn} onPress={() => setActiveTab('menus')}>
+                    <Feather name="home" size={22} color={activeTab === 'menus' ? '#4f46e5' : '#94a3b8'} />
+                    <Text style={[styles.bottomTabText, activeTab === 'menus' && styles.bottomTabTextActive]}>Home</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.bottomTabBtn} onPress={() => setActiveTab('map')}>
+                    <Feather name="map-pin" size={22} color={activeTab === 'map' ? '#4f46e5' : '#94a3b8'} />
+                    <Text style={[styles.bottomTabText, activeTab === 'map' && styles.bottomTabTextActive]}>Map</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.bottomTabBtn} onPress={() => setActiveTab('directory')}>
+                    <Feather name="phone" size={22} color={activeTab === 'directory' ? '#4f46e5' : '#94a3b8'} />
+                    <Text style={[styles.bottomTabText, activeTab === 'directory' && styles.bottomTabTextActive]}>Directory</Text>
+                </TouchableOpacity>
+            </View>
+
+        </SafeAreaView>
+    );
+}
+
+const styles = StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: '#f8fafc', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' },
+
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#f8fafc' },
+    greeting: { fontSize: 26, fontWeight: '900', color: '#0f172a' },
+    subtitle: { fontSize: 14, color: '#64748b', marginTop: 4 },
+    logoutBtn: { backgroundColor: '#fee2e2', padding: 12, borderRadius: 12 },
+
+    content: { flex: 1, paddingHorizontal: 20, paddingTop: 8 },
+    sectionTitle: { fontSize: 22, fontWeight: '900', color: '#0f172a', marginBottom: 16 },
+
+    dateSelector: { flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 16, padding: 4, marginBottom: 24, alignSelf: 'center' },
+    dateBtn: { paddingVertical: 10, paddingHorizontal: 24, borderRadius: 12 },
+    dateBtnActive: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+    dateBtnText: { fontWeight: 'bold', color: '#64748b', fontSize: 15 },
+    dateBtnTextActive: { color: '#0f172a' },
+
+    subBanner: { backgroundColor: '#ffffff', padding: 16, borderRadius: 20, borderWidth: 1, borderColor: '#e0e7ff', shadowColor: '#4f46e5', shadowOpacity: 0.1, shadowRadius: 10, elevation: 4 },
+    subBannerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    iconCircle: { backgroundColor: '#e0e7ff', padding: 8, borderRadius: 12, marginRight: 10 },
+    subBannerTitle: { fontSize: 18, fontWeight: '900', color: '#0f172a' },
+    subStatusText: { fontWeight: '900', fontSize: 12 },
+    subBadgeRow: { flexDirection: 'row', gap: 8 },
+    subBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+    subBadgeText: { fontSize: 12, fontWeight: 'bold', color: '#475569' },
+
+    emptyState: { alignItems: 'center', justifyContent: 'center', padding: 40, marginTop: 40 },
+    emptyIconCircle: { backgroundColor: '#f1f5f9', padding: 24, borderRadius: 100, marginBottom: 16 },
+    emptyStateTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a' },
+    emptyStateSub: { fontSize: 14, color: '#64748b', marginTop: 8 },
+
+    card: { backgroundColor: '#ffffff', borderRadius: 24, padding: 20, marginBottom: 24, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 15, shadowOffset: { width: 0, height: 8 }, elevation: 5, borderWidth: 2, borderColor: 'transparent' },
+    cardComing: { borderColor: '#10b981', backgroundColor: '#f0fdf4' },
+    cardSkip: { borderColor: '#f43f5e', opacity: 0.7 },
+    cardHeader: { marginBottom: 20 },
+    badgeRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+    priceBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+    priceText: { color: '#0f172a', fontSize: 12, fontWeight: '900' },
+    shiftBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+    shiftMorning: { backgroundColor: '#fffbeb' },
+    shiftNight: { backgroundColor: '#e0e7ff' },
+    shiftText: { fontSize: 12, fontWeight: '900' },
+    shiftTextMorning: { color: '#d97706' },
+    shiftTextNight: { color: '#4338ca' },
+    messName: { fontSize: 26, fontWeight: '900', color: '#0f172a' },
+
+    joinBtn: { flexDirection: 'row', backgroundColor: '#4f46e5', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginBottom: 16 },
+    joinBtnText: { color: '#ffffff', fontSize: 14, fontWeight: 'bold' },
+
+    subForm: { backgroundColor: '#f8fafc', padding: 16, borderRadius: 16, marginBottom: 16 },
+    subFormLabel: { fontSize: 13, fontWeight: 'bold', color: '#64748b', marginBottom: 12 },
+    subFormButtons: { flexDirection: 'row', gap: 8 },
+    shiftSelectBtn: { flex: 1, backgroundColor: '#e2e8f0', paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+    shiftSelectBtnBoth: { flex: 1, backgroundColor: '#4f46e5', paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+    shiftSelectText: { color: '#0f172a', fontSize: 13, fontWeight: 'bold' },
+    shiftSelectTextBoth: { color: '#ffffff', fontSize: 13, fontWeight: 'bold' },
+    cancelText: { color: '#ef4444', fontSize: 13, fontWeight: 'bold', textAlign: 'center', padding: 8 },
+
+    menuContainer: { backgroundColor: '#f8fafc', padding: 16, borderRadius: 16, marginBottom: 20 },
+    menuTitle: { fontSize: 14, fontWeight: '900', color: '#0f172a' },
+    rateBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#e0e7ff', borderRadius: 8 },
+    rateBtnText: { fontSize: 11, fontWeight: 'bold', color: '#4f46e5' },
+    itemsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    itemBadge: { backgroundColor: '#ffffff', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0' },
+    itemText: { fontSize: 14, fontWeight: '700', color: '#334155' },
+
+    actionsRow: { flexDirection: 'row', gap: 12 },
+    actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 16, borderWidth: 1, gap: 8 },
+    btnComing: { backgroundColor: '#ffffff', borderColor: '#e2e8f0' },
+    btnSkip: { backgroundColor: '#ffffff', borderColor: '#e2e8f0' },
+    btnComingActive: { backgroundColor: '#10b981', borderColor: '#10b981' },
+    btnSkipActive: { backgroundColor: '#f43f5e', borderColor: '#f43f5e' },
+    btnDisabled: { backgroundColor: '#f1f5f9', borderColor: '#f1f5f9' },
+    actionBtnText: { fontSize: 16, fontWeight: '900' },
+
+    dirCard: { flexDirection: 'row', backgroundColor: '#ffffff', padding: 16, borderRadius: 20, marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, alignItems: 'center' },
+    dirInfo: { flex: 1, paddingRight: 12 },
+    dirType: { fontSize: 11, fontWeight: '900', color: '#4f46e5', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+    dirName: { fontSize: 18, fontWeight: '900', color: '#0f172a', marginBottom: 4 },
+    dirDesc: { fontSize: 13, color: '#64748b' },
+    callBtn: { backgroundColor: '#10b981', width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', shadowColor: '#10b981', shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+
+    floatingTabBar: { position: 'absolute', bottom: 20, left: 20, right: 20, backgroundColor: '#ffffff', flexDirection: 'row', borderRadius: 24, paddingVertical: 12, paddingHorizontal: 16, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 10, justifyContent: 'space-around' },
+    bottomTabBtn: { alignItems: 'center', justifyContent: 'center', flex: 1 },
+    bottomTabText: { fontSize: 11, fontWeight: 'bold', color: '#94a3b8', marginTop: 4 },
+    bottomTabTextActive: { color: '#4f46e5' },
+
+    // Modal Styles
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalBox: { width: '100%', backgroundColor: '#fff', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
+    modalTitle: { fontSize: 18, fontWeight: '900', marginBottom: 20, color: '#0f172a', textAlign: 'center' },
+    starRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginBottom: 24 },
+    input: { backgroundColor: '#f1f5f9', padding: 16, borderRadius: 16, marginBottom: 24, fontSize: 15, color: '#0f172a' },
+    modalActions: { flexDirection: 'row', gap: 12 },
+    modalBtnCancel: { flex: 1, padding: 16, alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 16 },
+    modalBtnSave: { flex: 1, padding: 16, alignItems: 'center', backgroundColor: '#4f46e5', borderRadius: 16 },
+
+    // Review List Styles
+    reviewCard: { backgroundColor: '#f8fafc', padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' },
+    reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    reviewAuthor: { fontWeight: 'bold', color: '#0f172a', fontSize: 14 },
+    reviewRating: { fontSize: 12 },
+    reviewComment: { color: '#475569', fontSize: 14, lineHeight: 20 },
+});
+
+
+================================================
+FILE: avasari-mobile/src/components/animated-icon.module.css
+================================================
+.expoLogoBackground {
+  background-image: linear-gradient(180deg, #3c9ffe, #0274df);
+  border-radius: 40px;
+  width: 128px;
+  height: 128px;
+}
+
+
+
+================================================
+FILE: avasari-mobile/src/components/animated-icon.tsx
+================================================
+import { Image } from 'expo-image';
+import * as SplashScreen from 'expo-splash-screen';
+import { useState } from 'react';
+import { Dimensions, StyleSheet, View } from 'react-native';
+import Animated, { Easing, Keyframe } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
+
+const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
+const DURATION = 600;
+
+export function AnimatedSplashOverlay() {
+  const [animate, setAnimate] = useState(false);
+  const [visible, setVisible] = useState(true);
+
+  if (!visible) return null;
+
+  const splashKeyframe = new Keyframe({
+    0: {
+      transform: [{ scale: 1 }],
+      opacity: 1,
+    },
+    20: {
+      opacity: 1,
+    },
+    70: {
+      opacity: 0,
+      easing: Easing.elastic(0.7),
+    },
+    100: {
+      opacity: 0,
+      transform: [{ scale: 1 }],
+      easing: Easing.elastic(0.7),
+    },
+  });
+
+  const image = <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />;
+
+  return animate ? (
+    <Animated.View
+      entering={splashKeyframe.duration(DURATION).withCallback((finished) => {
+        'worklet';
+        if (finished) {
+          scheduleOnRN(setVisible, false);
+        }
+      })}
+      style={styles.splashOverlay}>
+      {image}
+    </Animated.View>
+  ) : (
+    <View
+      onLayout={() => {
+        SplashScreen.hideAsync().finally(() => {
+          setAnimate(true);
+        });
+      }}
+      style={styles.splashOverlay}>
+      {image}
+    </View>
+  );
+}
+
+const keyframe = new Keyframe({
+  0: {
+    transform: [{ scale: INITIAL_SCALE_FACTOR }],
+  },
+  100: {
+    transform: [{ scale: 1 }],
+    easing: Easing.elastic(0.7),
+  },
+});
+
+const logoKeyframe = new Keyframe({
+  0: {
+    transform: [{ scale: 1.3 }],
+    opacity: 0,
+  },
+  40: {
+    transform: [{ scale: 1.3 }],
+    opacity: 0,
+    easing: Easing.elastic(0.7),
+  },
+  100: {
+    opacity: 1,
+    transform: [{ scale: 1 }],
+    easing: Easing.elastic(0.7),
+  },
+});
+
+const glowKeyframe = new Keyframe({
+  0: {
+    transform: [{ rotateZ: '0deg' }],
+  },
+  100: {
+    transform: [{ rotateZ: '7200deg' }],
+  },
+});
+
+export function AnimatedIcon() {
+  return (
+    <View style={styles.iconContainer}>
+      <Animated.View entering={glowKeyframe.duration(60 * 1000 * 4)} style={styles.glow}>
+        <Image style={styles.glow} source={require('@/assets/images/logo-glow.png')} />
+      </Animated.View>
+
+      <Animated.View entering={keyframe.duration(DURATION)} style={styles.background} />
+      <Animated.View style={styles.imageContainer} entering={logoKeyframe.duration(DURATION)}>
+        <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+      </Animated.View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  imageContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  glow: {
+    width: 201,
+    height: 201,
+    position: 'absolute',
+  },
+  iconContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 128,
+    height: 128,
+    zIndex: 100,
+  },
+  image: {
+    width: 76,
+    height: 71,
+  },
+  background: {
+    borderRadius: 40,
+    experimental_backgroundImage: `linear-gradient(180deg, #3C9FFE, #0274DF)`,
+    width: 128,
+    height: 128,
+    position: 'absolute',
+  },
+  splashOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: '#208AEF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+});
+
+
+
+================================================
+FILE: avasari-mobile/src/components/animated-icon.web.tsx
+================================================
+import { Image } from 'expo-image';
+import { StyleSheet, View } from 'react-native';
+import Animated, { Keyframe, Easing } from 'react-native-reanimated';
+
+import classes from './animated-icon.module.css';
+const DURATION = 300;
+
+export function AnimatedSplashOverlay() {
+  return null;
+}
+
+const keyframe = new Keyframe({
+  0: {
+    transform: [{ scale: 0 }],
+  },
+  60: {
+    transform: [{ scale: 1.2 }],
+    easing: Easing.elastic(1.2),
+  },
+  100: {
+    transform: [{ scale: 1 }],
+    easing: Easing.elastic(1.2),
+  },
+});
+
+const logoKeyframe = new Keyframe({
+  0: {
+    opacity: 0,
+  },
+  60: {
+    transform: [{ scale: 1.2 }],
+    opacity: 0,
+    easing: Easing.elastic(1.2),
+  },
+  100: {
+    transform: [{ scale: 1 }],
+    opacity: 1,
+    easing: Easing.elastic(1.2),
+  },
+});
+
+const glowKeyframe = new Keyframe({
+  0: {
+    transform: [{ rotateZ: '-180deg' }, { scale: 0.8 }],
+    opacity: 0,
+  },
+  [DURATION / 1000]: {
+    transform: [{ rotateZ: '0deg' }, { scale: 1 }],
+    opacity: 1,
+    easing: Easing.elastic(0.7),
+  },
+  100: {
+    transform: [{ rotateZ: '7200deg' }],
+  },
+});
+
+export function AnimatedIcon() {
+  return (
+    <View style={styles.iconContainer}>
+      <Animated.View entering={glowKeyframe.duration(60 * 1000 * 4)} style={styles.glow}>
+        <Image style={styles.glow} source={require('@/assets/images/logo-glow.png')} />
+      </Animated.View>
+
+      <Animated.View style={styles.background} entering={keyframe.duration(DURATION)}>
+        <div className={classes.expoLogoBackground} />
+      </Animated.View>
+
+      <Animated.View style={styles.imageContainer} entering={logoKeyframe.duration(DURATION)}>
+        <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+      </Animated.View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+    width: '100%',
+    zIndex: 1000,
+    position: 'absolute',
+    top: 128 / 2 + 138,
+  },
+  imageContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  glow: {
+    width: 201,
+    height: 201,
+    position: 'absolute',
+  },
+  iconContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 128,
+    height: 128,
+  },
+  image: {
+    position: 'absolute',
+    width: 76,
+    height: 71,
+  },
+  background: {
+    width: 128,
+    height: 128,
+    position: 'absolute',
+  },
+});
+
+
+
+================================================
+FILE: avasari-mobile/src/components/app-tabs.tsx
+================================================
+import { NativeTabs } from 'expo-router/unstable-native-tabs';
+import { useColorScheme } from 'react-native';
+
+import { Colors } from '@/constants/theme';
+
+export default function AppTabs() {
+  const scheme = useColorScheme();
+  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+
+  return (
+    <NativeTabs
+      backgroundColor={colors.background}
+      indicatorColor={colors.backgroundElement}
+      labelStyle={{ selected: { color: colors.text } }}>
+      <NativeTabs.Trigger name="index">
+        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          src={require('@/assets/images/tabIcons/home.png')}
+          renderingMode="template"
+        />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="explore">
+        <NativeTabs.Trigger.Label>Explore</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          src={require('@/assets/images/tabIcons/explore.png')}
+          renderingMode="template"
+        />
+      </NativeTabs.Trigger>
+    </NativeTabs>
+  );
+}
+
+
+
+================================================
+FILE: avasari-mobile/src/components/app-tabs.web.tsx
+================================================
+import {
+  Tabs,
+  TabList,
+  TabTrigger,
+  TabSlot,
+  TabTriggerSlotProps,
+  TabListProps,
+} from 'expo-router/ui';
+import { SymbolView } from 'expo-symbols';
+import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
+
+import { ExternalLink } from './external-link';
+import { ThemedText } from './themed-text';
+import { ThemedView } from './themed-view';
+
+import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+
+export default function AppTabs() {
+  return (
+    <Tabs>
+      <TabSlot style={{ height: '100%' }} />
+      <TabList asChild>
+        <CustomTabList>
+          <TabTrigger name="home" href="/" asChild>
+            <TabButton>Home</TabButton>
+          </TabTrigger>
+          <TabTrigger name="explore" href="/explore" asChild>
+            <TabButton>Explore</TabButton>
+          </TabTrigger>
+        </CustomTabList>
+      </TabList>
+    </Tabs>
+  );
+}
+
+export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps) {
+  return (
+    <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
+      <ThemedView
+        type={isFocused ? 'backgroundSelected' : 'backgroundElement'}
+        style={styles.tabButtonView}>
+        <ThemedText type="small" themeColor={isFocused ? 'text' : 'textSecondary'}>
+          {children}
+        </ThemedText>
+      </ThemedView>
+    </Pressable>
+  );
+}
+
+export function CustomTabList(props: TabListProps) {
+  const scheme = useColorScheme();
+  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+
+  return (
+    <View {...props} style={styles.tabListContainer}>
+      <ThemedView type="backgroundElement" style={styles.innerContainer}>
+        <ThemedText type="smallBold" style={styles.brandText}>
+          Expo Starter
+        </ThemedText>
+
+        {props.children}
+
+        <ExternalLink href="https://docs.expo.dev" asChild>
+          <Pressable style={styles.externalPressable}>
+            <ThemedText type="link">Docs</ThemedText>
+            <SymbolView
+              tintColor={colors.text}
+              name={{ ios: 'arrow.up.right.square', web: 'link' }}
+              size={12}
+            />
+          </Pressable>
+        </ExternalLink>
+      </ThemedView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  tabListContainer: {
+    position: 'absolute',
+    width: '100%',
+    padding: Spacing.three,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  innerContainer: {
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.five,
+    borderRadius: Spacing.five,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexGrow: 1,
+    gap: Spacing.two,
+    maxWidth: MaxContentWidth,
+  },
+  brandText: {
+    marginRight: 'auto',
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  tabButtonView: {
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.three,
+  },
+  externalPressable: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: Spacing.one,
+    marginLeft: Spacing.three,
+  },
+});
+
+
+
+================================================
+FILE: avasari-mobile/src/components/external-link.tsx
+================================================
+import { Href, Link } from 'expo-router';
+import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
+import { type ComponentProps } from 'react';
+
+type Props = Omit<ComponentProps<typeof Link>, 'href'> & { href: Href & string };
+
+export function ExternalLink({ href, ...rest }: Props) {
+  return (
+    <Link
+      target="_blank"
+      {...rest}
+      href={href}
+      onPress={async (event) => {
+        if (process.env.EXPO_OS !== 'web') {
+          // Prevent the default behavior of linking to the default browser on native.
+          event.preventDefault();
+          // Open the link in an in-app browser.
+          await openBrowserAsync(href, {
+            presentationStyle: WebBrowserPresentationStyle.AUTOMATIC,
+          });
+        }
+      }}
+    />
+  );
+}
+
+
+
+================================================
+FILE: avasari-mobile/src/components/hint-row.tsx
+================================================
+import type { ReactNode } from 'react';
+import { View, StyleSheet } from 'react-native';
+
+import { ThemedText } from './themed-text';
+import { ThemedView } from './themed-view';
+
+import { Spacing } from '@/constants/theme';
+
+type HintRowProps = {
+  title?: string;
+  hint?: ReactNode;
+};
+
+export function HintRow({ title = 'Try editing', hint = 'app/index.tsx' }: HintRowProps) {
+  return (
+    <View style={styles.stepRow}>
+      <ThemedText type="small">{title}</ThemedText>
+      <ThemedView type="backgroundSelected" style={styles.codeSnippet}>
+        <ThemedText themeColor="textSecondary">{hint}</ThemedText>
+      </ThemedView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  stepRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  codeSnippet: {
+    borderRadius: Spacing.two,
+    paddingVertical: Spacing.half,
+    paddingHorizontal: Spacing.two,
+  },
+});
+
+
+
+================================================
+FILE: avasari-mobile/src/components/MessMap.tsx
+================================================
+Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x90 in position 2725: character maps to <undefined>
+
+
+================================================
+FILE: avasari-mobile/src/components/themed-text.tsx
+================================================
+import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
+
+import { Fonts, ThemeColor } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+
+export type ThemedTextProps = TextProps & {
+  type?: 'default' | 'title' | 'small' | 'smallBold' | 'subtitle' | 'link' | 'linkPrimary' | 'code';
+  themeColor?: ThemeColor;
+};
+
+export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
+  const theme = useTheme();
+
+  return (
+    <Text
+      style={[
+        { color: theme[themeColor ?? 'text'] },
+        type === 'default' && styles.default,
+        type === 'title' && styles.title,
+        type === 'small' && styles.small,
+        type === 'smallBold' && styles.smallBold,
+        type === 'subtitle' && styles.subtitle,
+        type === 'link' && styles.link,
+        type === 'linkPrimary' && styles.linkPrimary,
+        type === 'code' && styles.code,
+        style,
+      ]}
+      {...rest}
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  small: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: 500,
+  },
+  smallBold: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: 700,
+  },
+  default: {
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: 500,
+  },
+  title: {
+    fontSize: 48,
+    fontWeight: 600,
+    lineHeight: 52,
+  },
+  subtitle: {
+    fontSize: 32,
+    lineHeight: 44,
+    fontWeight: 600,
+  },
+  link: {
+    lineHeight: 30,
+    fontSize: 14,
+  },
+  linkPrimary: {
+    lineHeight: 30,
+    fontSize: 14,
+    color: '#3c87f7',
+  },
+  code: {
+    fontFamily: Fonts.mono,
+    fontWeight: Platform.select({ android: 700 }) ?? 500,
+    fontSize: 12,
+  },
+});
+
+
+
+================================================
+FILE: avasari-mobile/src/components/themed-view.tsx
+================================================
+import { View, type ViewProps } from 'react-native';
+
+import { ThemeColor } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+
+export type ThemedViewProps = ViewProps & {
+  lightColor?: string;
+  darkColor?: string;
+  type?: ThemeColor;
+};
+
+export function ThemedView({ style, lightColor, darkColor, type, ...otherProps }: ThemedViewProps) {
+  const theme = useTheme();
+
+  return <View style={[{ backgroundColor: theme[type ?? 'background'] }, style]} {...otherProps} />;
+}
+
+
+
+================================================
+FILE: avasari-mobile/src/components/web-badge.tsx
+================================================
+import { version } from 'expo/package.json';
+import { Image } from 'expo-image';
+import { useColorScheme, StyleSheet } from 'react-native';
+
+import { ThemedText } from './themed-text';
+import { ThemedView } from './themed-view';
+
+import { Spacing } from '@/constants/theme';
+
+export function WebBadge() {
+  const scheme = useColorScheme();
+
+  return (
+    <ThemedView style={styles.container}>
+      <ThemedText type="code" themeColor="textSecondary" style={styles.versionText}>
+        v{version}
+      </ThemedText>
+      <Image
+        source={
+          scheme === 'dark'
+            ? require('@/assets/images/expo-badge-white.png')
+            : require('@/assets/images/expo-badge.png')
+        }
+        style={styles.badgeImage}
+      />
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    padding: Spacing.five,
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  versionText: {
+    textAlign: 'center',
+  },
+  badgeImage: {
+    width: 123,
+    aspectRatio: 123 / 24,
+  },
+});
+
+
+
+================================================
+FILE: avasari-mobile/src/components/ui/collapsible.tsx
+================================================
+import { SymbolView } from 'expo-symbols';
+import { PropsWithChildren, useState } from 'react';
+import { Pressable, StyleSheet } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
+
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+
+export function Collapsible({ children, title }: PropsWithChildren & { title: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const theme = useTheme();
+
+  return (
+    <ThemedView>
+      <Pressable
+        style={({ pressed }) => [styles.heading, pressed && styles.pressedHeading]}
+        onPress={() => setIsOpen((value) => !value)}>
+        <ThemedView type="backgroundElement" style={styles.button}>
+          <SymbolView
+            name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }}
+            size={14}
+            weight="bold"
+            tintColor={theme.text}
+            style={{ transform: [{ rotate: isOpen ? '-90deg' : '90deg' }] }}
+          />
+        </ThemedView>
+
+        <ThemedText type="small">{title}</ThemedText>
+      </Pressable>
+      {isOpen && (
+        <Animated.View entering={FadeIn.duration(200)}>
+          <ThemedView type="backgroundElement" style={styles.content}>
+            {children}
+          </ThemedView>
+        </Animated.View>
+      )}
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  heading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  pressedHeading: {
+    opacity: 0.7,
+  },
+  button: {
+    width: Spacing.four,
+    height: Spacing.four,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  content: {
+    marginTop: Spacing.three,
+    borderRadius: Spacing.three,
+    marginLeft: Spacing.four,
+    padding: Spacing.four,
+  },
+});
+
+
+
+================================================
+FILE: avasari-mobile/src/constants/theme.ts
+================================================
+/**
+ * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
+ * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ */
+
+import '@/global.css';
+
+import { Platform } from 'react-native';
+
+export const Colors = {
+  light: {
+    text: '#000000',
+    background: '#ffffff',
+    backgroundElement: '#F0F0F3',
+    backgroundSelected: '#E0E1E6',
+    textSecondary: '#60646C',
+  },
+  dark: {
+    text: '#ffffff',
+    background: '#000000',
+    backgroundElement: '#212225',
+    backgroundSelected: '#2E3135',
+    textSecondary: '#B0B4BA',
+  },
+} as const;
+
+export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+
+export const Fonts = Platform.select({
+  ios: {
+    /** iOS `UIFontDescriptorSystemDesignDefault` */
+    sans: 'system-ui',
+    /** iOS `UIFontDescriptorSystemDesignSerif` */
+    serif: 'ui-serif',
+    /** iOS `UIFontDescriptorSystemDesignRounded` */
+    rounded: 'ui-rounded',
+    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
+    mono: 'ui-monospace',
+  },
+  default: {
+    sans: 'normal',
+    serif: 'serif',
+    rounded: 'normal',
+    mono: 'monospace',
+  },
+  web: {
+    sans: 'var(--font-display)',
+    serif: 'var(--font-serif)',
+    rounded: 'var(--font-rounded)',
+    mono: 'var(--font-mono)',
+  },
+});
+
+export const Spacing = {
+  half: 2,
+  one: 4,
+  two: 8,
+  three: 16,
+  four: 24,
+  five: 32,
+  six: 64,
+} as const;
+
+export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+export const MaxContentWidth = 800;
+
+
+
+================================================
+FILE: avasari-mobile/src/hooks/use-color-scheme.ts
+================================================
+export { useColorScheme } from 'react-native';
+
+
+
+================================================
+FILE: avasari-mobile/src/hooks/use-color-scheme.web.ts
+================================================
+import { useEffect, useState } from 'react';
+import { useColorScheme as useRNColorScheme } from 'react-native';
+
+/**
+ * To support static rendering, this value needs to be re-calculated on the client side for web
+ */
+export function useColorScheme() {
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
+
+  const colorScheme = useRNColorScheme();
+
+  if (hasHydrated) {
+    return colorScheme;
+  }
+
+  return 'light';
+}
+
+
+
+================================================
+FILE: avasari-mobile/src/hooks/use-theme.ts
+================================================
+/**
+ * Learn more about light and dark modes:
+ * https://docs.expo.dev/guides/color-schemes/
+ */
+
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+
+export function useTheme() {
+  const scheme = useColorScheme();
+  const theme = scheme === 'unspecified' ? 'light' : scheme;
+
+  return Colors[theme];
+}
+
+
+
+================================================
+FILE: avasari-mobile/.claude/settings.json
+================================================
+{
+  "enabledPlugins": {
+    "expo@claude-plugins-official": true
+  }
+}
+
+
 
 ================================================
 FILE: backend/package.json
@@ -106,37 +2912,42 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
+// UPDATED: Added shift to separate Morning and Night Menus
 const MenuSchema = new mongoose.Schema({
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   messName: { type: String, required: true },
   date: { type: String, required: true }, // Target Date YYYY-MM-DD
+  shift: { type: String, enum: ['morning', 'night'], required: true }, // <-- NEW
   items: [{ type: String }],
   price: { type: Number }
 });
 const Menu = mongoose.model('Menu', MenuSchema);
 
-// UPDATED: Added shift type and end date for absenteeism extensions
+// UPDATED: Added skip tracking system
 const SubscriptionSchema = new mongoose.Schema({
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   studentName: String,
   studentPhone: String,
   messId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   messName: String,
-  shift: { type: String, enum: ['morning', 'night', 'both'], default: 'both' }, // <-- NEW
+  shift: { type: String, enum: ['morning', 'night', 'both'], default: 'both' },
   startDate: { type: Date, default: Date.now },
-  endDate: { type: Date }, // <-- NEW
+  endDate: { type: Date },
   status: { type: String, enum: ['pending', 'paid'], default: 'pending' },
-  monthlyFee: { type: Number, default: 0 } // Owner sets this now
+  monthlyFee: { type: Number, default: 0 },
+  allowedSkips: { type: Number, default: 5 }, // <-- NEW: Max allowed skips
+  usedSkips: { type: Number, default: 0 }     // <-- NEW: Skips used so far
 });
 const Subscription = mongoose.model('Subscription', SubscriptionSchema);
 
-// FIXED: Using mongoose.Schema.Types.ObjectId for relational integrity
+// UPDATED: Added shift to Attendance tracking
 const AttendanceSchema = new mongoose.Schema({
   messId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   messName: String,
+  shift: { type: String, enum: ['morning', 'night'], required: true }, // <-- NEW
   status: { type: String, enum: ['coming', 'not_coming'] },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  targetDate: { type: String, required: true }, // The date the meal is for
+  targetDate: { type: String, required: true },
   timestamp: { type: Date, default: Date.now }
 });
 const Attendance = mongoose.model('Attendance', AttendanceSchema);
@@ -172,7 +2983,6 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// ADDED: Admin verification middleware
 const authenticateAdmin = (req, res, next) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin access required.' });
@@ -188,37 +2998,25 @@ const authenticateAdmin = (req, res, next) => {
 app.post('/api/register', async (req, res) => {
   try {
     const { role, name, phone, password, messName, messAddress, fssaiNumber, yearBranch, latitude, longitude } = req.body;
-
     const phoneRegex = /^[6-9]\d{9}$/;
-    if (!phoneRegex.test(phone)) {
-      return res.status(400).json({ error: 'Invalid mobile number. Must be 10 digits and start with 6, 7, 8, or 9.' });
-    }
-
+    if (!phoneRegex.test(phone)) return res.status(400).json({ error: 'Invalid mobile number.' });
     if (await User.findOne({ phone })) return res.status(400).json({ error: 'Phone number already registered' });
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-
     const userData = { role, name, phone, password: hashedPassword, messName, messAddress, fssaiNumber, yearBranch };
 
     if (latitude && longitude) {
-      userData.location = {
-        type: 'Point',
-        coordinates: [longitude, latitude]
-      };
+      userData.location = { type: 'Point', coordinates: [longitude, latitude] };
     }
 
     const newUser = new User(userData);
     await newUser.save();
-
     const token = jwt.sign({ id: newUser._id, role: newUser.role }, JWT_SECRET, { expiresIn: '7d' });
     const userResponse = { ...newUser._doc }; delete userResponse.password;
 
     res.status(201).json({ message: 'Registration successful', user: userResponse, token });
-  } catch (error) {
-    console.error("Registration Error:", error);
-    res.status(500).json({ error: 'Server error' });
-  }
+  } catch (error) { res.status(500).json({ error: 'Server error' }); }
 });
 
 app.post('/api/login', async (req, res) => {
@@ -243,25 +3041,18 @@ app.get('/api/me', authenticateToken, async (req, res) => {
 
 // --- ADMIN ROUTES ---
 app.get('/api/admin/users', authenticateToken, authenticateAdmin, async (req, res) => {
-  try {
-    const users = await User.find().select('-password').sort({ createdAt: -1 });
-    res.status(200).json(users);
-  } catch (error) { res.status(500).json({ error: 'Failed to fetch users' }); }
+  try { res.status(200).json(await User.find().select('-password').sort({ createdAt: -1 })); } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 app.put('/api/admin/verify/:id', authenticateToken, authenticateAdmin, async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(req.params.id, { isVerified: true }, { new: true });
-    if (!user) return res.status(404).json({ error: 'User not found' });
     res.status(200).json({ message: 'Owner verified successfully', user });
-  } catch (error) { res.status(500).json({ error: 'Failed to verify owner' }); }
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 app.delete('/api/admin/users/:id', authenticateToken, authenticateAdmin, async (req, res) => {
-  try {
-    await User.findByIdAndDelete(req.params.id);
-    res.status(200).json({ message: 'User deleted' });
-  } catch (error) { res.status(500).json({ error: 'Failed to delete user' }); }
+  try { await User.findByIdAndDelete(req.params.id); res.status(200).json({ message: 'User deleted' }); } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 app.post('/api/admin/directory', authenticateToken, authenticateAdmin, async (req, res) => {
@@ -269,14 +3060,11 @@ app.post('/api/admin/directory', authenticateToken, authenticateAdmin, async (re
     const newDir = new Directory(req.body);
     await newDir.save();
     res.status(201).json({ message: 'Directory item added', item: newDir });
-  } catch (error) { res.status(500).json({ error: 'Failed to add directory item' }); }
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 app.delete('/api/admin/directory/:id', authenticateToken, authenticateAdmin, async (req, res) => {
-  try {
-    await Directory.findByIdAndDelete(req.params.id);
-    res.status(200).json({ message: 'Directory item deleted' });
-  } catch (error) { res.status(500).json({ error: 'Failed to delete directory item' }); }
+  try { await Directory.findByIdAndDelete(req.params.id); res.status(200).json({ message: 'Directory item deleted' }); } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 // --- MENU ROUTES ---
@@ -284,18 +3072,20 @@ app.post('/api/menus', authenticateToken, async (req, res) => {
   if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized.' });
   try {
     const ownerId = req.user.id;
-    const { messName, date, items, price } = req.body;
+    // UPDATED: Accept shift
+    const { messName, date, shift, items, price } = req.body;
+    if (!shift) return res.status(400).json({ error: 'Shift (morning or night) is required.' });
 
-    const existingMenu = await Menu.findOne({ ownerId, date });
+    const existingMenu = await Menu.findOne({ ownerId, date, shift });
     if (existingMenu) {
       existingMenu.items = items;
       existingMenu.price = price;
       await existingMenu.save();
-      return res.status(200).json({ message: 'Menu updated!' });
+      return res.status(200).json({ message: `${shift} menu updated!` });
     }
-    const newMenu = new Menu({ ownerId, messName, date, items, price });
+    const newMenu = new Menu({ ownerId, messName, date, shift, items, price });
     await newMenu.save();
-    res.status(201).json({ message: 'Menu published!' });
+    res.status(201).json({ message: `${shift} menu published!` });
   } catch (error) { res.status(500).json({ error: 'Failed to publish' }); }
 });
 
@@ -309,11 +3099,36 @@ app.get('/api/menus/:date', authenticateToken, async (req, res) => {
 // --- ATTENDANCE ROUTES ---
 app.post('/api/attendance', authenticateToken, async (req, res) => {
   try {
-    const { messId, messName, status, targetDate } = req.body;
+    // UPDATED: Accept shift from the UI
+    const { messId, messName, shift, status, targetDate } = req.body;
+    if (!shift) return res.status(400).json({ error: 'Shift is required.' });
     const userId = req.user.id;
 
+    // Check if the user is a monthly member
+    const sub = await Subscription.findOne({ studentId: userId, messId });
+    const existingAtt = await Attendance.findOne({ userId, targetDate, shift });
+
+    if (sub) {
+      // If they are trying to SKIP
+      if (status === 'not_coming' && (!existingAtt || existingAtt.status !== 'not_coming')) {
+        if (sub.usedSkips >= sub.allowedSkips) {
+          return res.status(400).json({ error: `Skip limit reached (${sub.allowedSkips} max). Please contact the owner for more skips.` });
+        }
+        sub.usedSkips += 1;
+        await sub.save();
+      }
+      // If they change mind and revert back to COMING, refund their skip
+      else if (status === 'coming' && existingAtt && existingAtt.status === 'not_coming') {
+        if (sub.usedSkips > 0) {
+          sub.usedSkips -= 1;
+          await sub.save();
+        }
+      }
+    }
+
+    // Upsert attendance record for the specific shift
     await Attendance.findOneAndUpdate(
-      { userId, targetDate },
+      { userId, targetDate, shift },
       { messId, messName, status, timestamp: new Date() },
       { upsert: true, new: true }
     );
@@ -329,12 +3144,19 @@ app.get('/api/attendance/me/:date', authenticateToken, async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Failed to fetch your attendance' }); }
 });
 
+// UPDATED: Returns separate stats for Morning vs Night
 app.get('/api/attendance/stats/:messName/:date', authenticateToken, async (req, res) => {
   try {
     const records = await Attendance.find({ messName: decodeURIComponent(req.params.messName), targetDate: req.params.date });
-    const coming = records.filter(r => r.status === 'coming').length;
-    const notComing = records.filter(r => r.status === 'not_coming').length;
-    res.status(200).json({ coming, notComing, total: coming + notComing });
+
+    // Separate by shift
+    const morningRecords = records.filter(r => r.shift === 'morning');
+    const nightRecords = records.filter(r => r.shift === 'night');
+
+    res.status(200).json({
+      morning: { coming: morningRecords.filter(r => r.status === 'coming').length, notComing: morningRecords.filter(r => r.status === 'not_coming').length },
+      night: { coming: nightRecords.filter(r => r.status === 'coming').length, notComing: nightRecords.filter(r => r.status === 'not_coming').length }
+    });
   } catch (error) { res.status(500).json({ error: 'Failed to fetch stats' }); }
 });
 
@@ -380,13 +3202,8 @@ app.post('/api/messes/:ownerId/rate', authenticateToken, async (req, res) => {
     const { rating, comment } = req.body;
     const owner = await User.findById(req.params.ownerId);
     const student = await User.findById(req.user.id);
-
-    if (!owner || owner.role !== 'owner') {
-      return res.status(404).json({ error: 'Owner not found.' });
-    }
-    if (!student) {
-      return res.status(401).json({ error: 'Student profile not found. Please log out and log back in.' });
-    }
+    if (!owner || owner.role !== 'owner') return res.status(404).json({ error: 'Owner not found.' });
+    if (!student) return res.status(401).json({ error: 'Student profile not found. Please log out and log back in.' });
 
     owner.ratingTotal = (owner.ratingTotal || 0) + rating;
     owner.ratingCount += 1;
@@ -394,53 +3211,34 @@ app.post('/api/messes/:ownerId/rate', authenticateToken, async (req, res) => {
     await owner.save();
 
     const safeStudentName = student.name || 'Anonymous Student';
-
     if (comment) {
-      const review = new Review({
-        messId: owner._id,
-        studentName: safeStudentName,
-        rating,
-        comment
-      });
+      const review = new Review({ messId: owner._id, studentName: safeStudentName, rating, comment });
       await review.save();
     }
-
     res.status(200).json({ message: 'Rating submitted successfully!' });
-  } catch (error) {
-    console.error("Backend Review Error:", error);
-    res.status(500).json({ error: error.message || 'Server crashed while submitting rating.' });
-  }
+  } catch (error) { res.status(500).json({ error: 'Server crashed' }); }
 });
 
 app.get('/api/messes/:ownerId/reviews', authenticateToken, async (req, res) => {
-  try {
-    const reviews = await Review.find({ messId: req.params.ownerId }).sort({ date: -1 }).limit(5);
-    res.status(200).json(reviews);
-  } catch (error) { res.status(500).json({ error: 'Failed to fetch reviews' }); }
+  try { res.status(200).json(await Review.find({ messId: req.params.ownerId }).sort({ date: -1 }).limit(5)); } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 // --- DIRECTORY ROUTES ---
 app.get('/api/directory', authenticateToken, async (req, res) => {
-  try { res.json(await Directory.find()); } catch (error) { res.status(500).json({ error: 'Failed to fetch' }); }
+  try { res.json(await Directory.find()); } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 // --- SUBSCRIPTION ROUTES ---
-
-// 1. Student subscribes to a mess
 app.post('/api/subscriptions', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'student') return res.status(403).json({ error: 'Only students can subscribe.' });
-
-    // ADDED: Accept 'shift' from frontend (morning, night, both)
     const { messId, messName, shift } = req.body;
     const student = await User.findById(req.user.id);
 
-    // Prevent duplicate subscriptions
     const existing = await Subscription.findOne({ studentId: student._id, messId });
     if (existing) return res.status(400).json({ error: 'You are already a member of this mess.' });
 
     const startDate = new Date();
-    // Default duration is 30 days
     const endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     const newSub = new Subscription({
@@ -449,10 +3247,12 @@ app.post('/api/subscriptions', authenticateToken, async (req, res) => {
       studentPhone: student.phone,
       messId,
       messName,
-      shift: shift || 'both', // Save the specific shift
+      shift: shift || 'both',
       startDate,
       endDate,
-      monthlyFee: 0 // Owner will set the exact price later from their dashboard
+      monthlyFee: 0,
+      allowedSkips: 5, // Default skips
+      usedSkips: 0
     });
 
     await newSub.save();
@@ -460,39 +3260,30 @@ app.post('/api/subscriptions', authenticateToken, async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Failed to subscribe' }); }
 });
 
-// 2. Student fetches their own subscriptions
 app.get('/api/subscriptions/me', authenticateToken, async (req, res) => {
-  try {
-    const subs = await Subscription.find({ studentId: req.user.id });
-    res.status(200).json(subs);
-  } catch (error) { res.status(500).json({ error: 'Failed to fetch your subscriptions' }); }
+  try { res.status(200).json(await Subscription.find({ studentId: req.user.id })); } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// 3. Owner fetches all their monthly members
 app.get('/api/subscriptions/mess', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized' });
-    const subs = await Subscription.find({ messId: req.user.id });
-    res.status(200).json(subs);
-  } catch (error) { res.status(500).json({ error: 'Failed to fetch members' }); }
+    res.status(200).json(await Subscription.find({ messId: req.user.id }));
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
-// 4. UPDATED: Owner updates payment status, sets fee, or extends absentee dates
+// UPDATED: Added allowedSkips handling for the owner
 app.put('/api/subscriptions/:subId', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized' });
-
-    // We can accept status, fee, or days to extend
-    const { status, monthlyFee, extendDays } = req.body;
+    const { status, monthlyFee, extendDays, allowedSkips } = req.body;
 
     const sub = await Subscription.findOne({ _id: req.params.subId, messId: req.user.id });
     if (!sub) return res.status(404).json({ error: 'Subscription not found' });
 
-    // Update fields if provided
     if (status) sub.status = status;
     if (monthlyFee !== undefined) sub.monthlyFee = monthlyFee;
+    if (allowedSkips !== undefined) sub.allowedSkips = allowedSkips;
 
-    // Extend end date by X days if absent
     if (extendDays) {
       const currentEnd = sub.endDate ? new Date(sub.endDate) : new Date();
       sub.endDate = new Date(currentEnd.getTime() + (extendDays * 24 * 60 * 60 * 1000));
@@ -506,25 +3297,18 @@ app.put('/api/subscriptions/:subId', authenticateToken, async (req, res) => {
 // --- LOCATION/MAP ROUTES ---
 app.get('/api/messes/nearby', authenticateToken, async (req, res) => {
   try {
-    const messes = await User.find({
-      role: 'owner',
-      isVerified: true,
-      'location.coordinates': { $ne: [0, 0] }
-    }).select('messName messAddress location rating ratingCount');
-    res.status(200).json(messes);
-  } catch (error) { res.status(500).json({ error: 'Failed to fetch nearby messes' }); }
+    res.status(200).json(await User.find({ role: 'owner', isVerified: true, 'location.coordinates': { $ne: [0, 0] } }).select('messName messAddress location rating ratingCount'));
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 app.put('/api/owner/location', authenticateToken, async (req, res) => {
   if (req.user.role !== 'owner') return res.status(403).json({ error: 'Unauthorized.' });
   try {
     const { latitude, longitude } = req.body;
-    if (!latitude || !longitude) return res.status(400).json({ error: 'Latitude and longitude are required.' });
-    await User.findByIdAndUpdate(req.user.id, {
-      location: { type: 'Point', coordinates: [longitude, latitude] }
-    });
+    if (!latitude || !longitude) return res.status(400).json({ error: 'Coords required.' });
+    await User.findByIdAndUpdate(req.user.id, { location: { type: 'Point', coordinates: [longitude, latitude] } });
     res.status(200).json({ message: 'Location updated successfully!' });
-  } catch (error) { res.status(500).json({ error: 'Failed to update location' }); }
+  } catch (error) { res.status(500).json({ error: 'Failed' }); }
 });
 
 const PORT = process.env.PORT || 3000;
@@ -1039,439 +3823,13 @@ Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8d in posi
 ================================================
 FILE: frontend/src/pages/OwnerDashboard.jsx
 ================================================
-Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8f in position 13538: character maps to <undefined>
+Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8f in position 13943: character maps to <undefined>
 
 
 ================================================
 FILE: frontend/src/pages/StudentDashboard.jsx
 ================================================
-import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Utensils, MapPin, Navigation, Home, Phone, CheckCircle2, XCircle, LogOut, Loader2, IndianRupee, Star, AlertTriangle, Sparkles, CalendarDays, Trophy, MessageSquareQuote, Map, Award } from 'lucide-react';
-import MessMap from '../components/MessMap';
-import ThemeToggle from '../components/ThemeToggle';
-import LanguageToggle from '../components/LanguageToggle';
-import { translations } from '../utils/translations';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-
-const getLocalDateString = (offsetDays = 0) => {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-};
-
-const MessCard = ({ mess, user, initialAttendance, targetDate, globalHasCommitted, onAttendanceUpdate, mySub, onSubscribe, t }) => {
-  const [attendance, setAttendance] = useState(initialAttendance || null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState('');
-  const [hasRated, setHasRated] = useState(false);
-  const [reviews, setReviews] = useState([]);
-  const [showReviews, setShowReviews] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-
-  // NEW STATE: For handling subscription shift selection
-  const [showSubForm, setShowSubForm] = useState(false);
-  const [selectedShift, setSelectedShift] = useState('both');
-
-  // Auto-set attendance to 'coming' if they are a monthly member and haven't chosen yet
-  useEffect(() => {
-    if (mySub && initialAttendance === undefined) {
-      setAttendance('coming');
-    } else {
-      setAttendance(initialAttendance || null);
-    }
-  }, [initialAttendance, mySub]);
-
-  const fetchReviews = async () => {
-    const token = localStorage.getItem('token');
-    try {
-      const res = await fetch(`${API_URL}/api/messes/${mess.ownerId._id}/reviews`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (res.ok) setReviews(await res.json());
-      setShowReviews(!showReviews);
-    } catch (e) { console.error(e); }
-  };
-
-  const handleAttendance = async (status) => {
-    setIsSubmitting(true); setErrorMsg('');
-    const token = localStorage.getItem('token');
-    try {
-      const response = await fetch(`${API_URL}/api/attendance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ messId: mess._id, messName: mess.messName, status, targetDate, timestamp: new Date().toISOString() })
-      });
-      const data = await response.json();
-      if (response.ok) { setAttendance(status); onAttendanceUpdate(true); }
-      else setErrorMsg(data.error || "Action not allowed.");
-    } catch (error) { setErrorMsg("Connection failed."); }
-    finally { setIsSubmitting(false); }
-  };
-
-  const handleRating = async (e) => {
-    e.preventDefault();
-    if (rating === 0) { alert("Please select a star rating before submitting your review!"); return; }
-    const token = localStorage.getItem('token');
-    try {
-      const response = await fetch(`${API_URL}/api/messes/${mess.ownerId._id}/rate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ rating, comment, studentName: user?.name || 'Student' })
-      });
-      const data = await response.json();
-      if (response.ok) { setHasRated(true); fetchReviews(); }
-      else { alert(`Server Error: ${data.error}`); }
-    } catch (error) { alert("Network error: Failed to connect to server."); }
-  };
-
-  const handleSubscribe = async () => {
-    const token = localStorage.getItem('token');
-    try {
-      const res = await fetch(`${API_URL}/api/subscriptions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        // UPDATED: Send specific shift, removed monthlyFee so owner can set it
-        body: JSON.stringify({ messId: mess.ownerId._id, messName: mess.messName, shift: selectedShift })
-      });
-      if (res.ok) {
-        alert("Subscribed successfully! The owner will set your exact monthly fee.");
-        setShowSubForm(false);
-        onSubscribe();
-      }
-      else { const d = await res.json(); alert(d.error); }
-    } catch (e) { alert("Failed to subscribe"); }
-  };
-
-  const currentRating = mess.ownerId?.rating ? Number(mess.ownerId.rating).toFixed(1) : 'New';
-  const isLocked = attendance !== null;
-  const disableComing = isSubmitting || isLocked || (globalHasCommitted && attendance !== 'coming');
-  const disableSkip = isSubmitting || isLocked;
-
-  return (
-    <div className={`relative bg-white/60 dark:bg-slate-800/60 backdrop-blur-2xl rounded-[2rem] border transition-all duration-300 hover:shadow-2xl group mb-8 overflow-hidden
-      ${attendance === 'coming' ? 'border-emerald-400 dark:border-emerald-500 shadow-[0_0_40px_rgba(16,185,129,0.15)]' :
-        attendance === 'not_coming' ? 'border-rose-200 dark:border-rose-900/50 opacity-80' : 'border-white/80 dark:border-slate-700 shadow-xl'}`}>
-
-      <div className={`h-2 w-full transition-colors duration-500 ${attendance === 'coming' ? 'bg-emerald-500' : attendance === 'not_coming' ? 'bg-rose-500' : 'bg-gradient-to-r from-orange-500 to-rose-500'}`}></div>
-
-      <div className="p-6 sm:p-8 pb-2">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <span className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-1 shadow-sm"><Star size={10} className="fill-amber-400 text-amber-400" /> {currentRating}</span>
-              <span className="bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400 text-[10px] font-bold px-3 py-1 rounded-full uppercase flex items-center gap-1"><IndianRupee size={12} /> {mess.price || '60'} {t.thali}</span>
-
-              {/* UPDATED: MEMBERSHIP BADGE OR SHIFT SELECTION FORM */}
-              {mySub ? (
-                <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-1 shadow-sm ${mySub.status === 'paid' ? 'bg-indigo-500 text-white' : 'bg-rose-100 text-rose-600 border border-rose-200'}`}>
-                  <Award size={12} /> Member: {mySub.status} ({mySub.shift})
-                </span>
-              ) : showSubForm ? (
-                <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900 p-1 rounded-full border border-slate-200 dark:border-slate-700">
-                  <select
-                    value={selectedShift}
-                    onChange={(e) => setSelectedShift(e.target.value)}
-                    className="text-[10px] font-bold px-2 py-1 rounded-full bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-none outline-none cursor-pointer"
-                  >
-                    <option value="morning">Morning Only</option>
-                    <option value="night">Night Only</option>
-                    <option value="both">Both Shifts</option>
-                  </select>
-                  <button onClick={handleSubscribe} className="bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-colors">Confirm</button>
-                  <button onClick={() => setShowSubForm(false)} className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-colors">Cancel</button>
-                </div>
-              ) : (
-                <button onClick={() => setShowSubForm(true)} className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100 text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-colors">
-                  Join Monthly
-                </button>
-              )}
-            </div>
-            <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">{mess.messName}</h3>
-          </div>
-        </div>
-
-        <div className="bg-slate-50/80 dark:bg-slate-900/50 rounded-2xl p-5 border border-slate-100 dark:border-slate-700/50 relative overflow-hidden mb-6">
-          <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl"></div>
-          <h4 className="font-bold text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-2 text-xs uppercase tracking-widest"><Sparkles size={14} className="text-orange-400" /> {t.feastMenu}</h4>
-          <div className="flex flex-wrap gap-2 relative z-10">
-            {mess.items.map((item, idx) => (
-              <span key={idx} className="bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm border border-slate-200 dark:border-slate-600 px-3.5 py-1.5 rounded-xl text-sm font-semibold">{item}</span>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          <button onClick={() => handleAttendance('coming')} disabled={disableComing} className={`flex-1 flex justify-center items-center gap-2 py-3.5 rounded-xl font-bold transition-all duration-300 ${attendance === 'coming' ? 'bg-emerald-500 text-white shadow-lg ring-4 ring-emerald-500/20' : disableComing ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-300 dark:text-slate-600 cursor-not-allowed border border-transparent' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-500/20 hover:text-emerald-600 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-600 active:scale-95 shadow-sm hover:shadow'}`}><CheckCircle2 size={20} /> {t.coming}</button>
-          <button onClick={() => handleAttendance('not_coming')} disabled={disableSkip} className={`flex-1 flex justify-center items-center gap-2 py-3.5 rounded-xl font-bold transition-all duration-300 ${attendance === 'not_coming' ? 'bg-rose-500 text-white shadow-lg ring-4 ring-rose-500/20' : disableSkip ? 'bg-slate-100 dark:bg-slate-800/50 text-slate-300 dark:text-slate-600 cursor-not-allowed border border-transparent' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 hover:bg-rose-50 dark:hover:bg-rose-500/20 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-600 active:scale-95 shadow-sm hover:shadow'}`}><XCircle size={20} /> {t.skip}</button>
-        </div>
-
-        {errorMsg && <p className="text-rose-500 dark:text-rose-400 text-sm font-bold text-center mt-4">{errorMsg}</p>}
-
-        {attendance === 'coming' && (
-          <div className="mt-6 border-t border-slate-100 dark:border-slate-700 pt-6 animate-in slide-in-from-bottom-2">
-            {!hasRated ? (
-              <form onSubmit={handleRating} className="bg-slate-50 dark:bg-slate-900/50 p-5 rounded-2xl border border-slate-200 dark:border-slate-700">
-                <p className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">Leave a review!</p>
-                <div className="flex gap-1 mb-3">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button key={star} type="button" onClick={() => setRating(star)} className="focus:outline-none transition-transform hover:scale-110">
-                      <Star size={24} className={star <= rating ? "text-amber-400 fill-amber-400 drop-shadow-md" : "text-slate-300 dark:text-slate-600"} />
-                    </button>
-                  ))}
-                </div>
-                <textarea rows="2" placeholder="How was the food?" value={comment} onChange={e => setComment(e.target.value)} className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none mb-3 dark:text-white" />
-                <button type="submit" className="w-full bg-slate-900 dark:bg-orange-500 hover:bg-slate-800 dark:hover:bg-orange-600 transition-colors text-white font-bold py-2.5 rounded-xl">Submit Review</button>
-              </form>
-            ) : (
-              <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl border border-emerald-100 dark:border-emerald-500/20 text-center text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center gap-2"><CheckCircle2 size={18} /> Review Submitted</div>
-            )}
-          </div>
-        )}
-
-        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-center">
-          <button onClick={fetchReviews} className="text-xs font-bold text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 flex items-center gap-1"><MessageSquareQuote size={14} /> {showReviews ? t.hideReviews : t.readReviews}</button>
-        </div>
-
-        {showReviews && (
-          <div className="mt-4 space-y-3 animate-in fade-in">
-            {reviews.length === 0 ? <p className="text-xs text-center text-slate-400">No reviews yet.</p> : reviews.map(r => (
-              <div key={r._id} className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl text-sm border border-slate-100 dark:border-slate-800">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="font-bold text-slate-700 dark:text-slate-300">{r.studentName}</span>
-                  <span className="flex text-amber-400"><Star size={12} className="fill-amber-400" /> {r.rating}</span>
-                </div>
-                <p className="text-slate-500 dark:text-slate-400 text-xs italic">"{r.comment || 'No comment provided'}"</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const DirectoryCard = ({ title, items, icon: Icon, colorClass, t }) => {
-  if (items.length === 0) return null;
-  return (
-    <div className="mb-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-      <h3 className="text-xl font-black text-slate-800 dark:text-white mb-6 flex items-center gap-3"><div className={`p-3 rounded-2xl text-white shadow-lg ${colorClass}`}><Icon size={20} /></div> {title}</h3>
-      <div className="grid sm:grid-cols-2 gap-4">
-        {items.map((item, idx) => (
-          <div key={idx} className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl p-5 rounded-3xl border border-slate-200/60 dark:border-slate-700 hover:-translate-y-1 transition-all hover:shadow-xl group flex flex-col justify-between">
-            <div className="mb-4">
-              <h4 className="font-extrabold text-slate-900 dark:text-white text-lg">{item.name}</h4>
-              <p className="text-slate-500 dark:text-slate-400 font-medium text-sm mt-1">{item.area || item.status}</p>
-            </div>
-            <a href={`tel:${item.phone}`} className="w-full flex items-center justify-center gap-2 py-3 bg-slate-900 dark:bg-slate-700 hover:bg-indigo-600 text-white font-bold rounded-xl transition-all shadow-md">
-              <Phone size={16} /> {t.call} {item.phone}
-            </a>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const StudentDashboard = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const user = location.state?.user;
-
-  const [lang, setLang] = useState(() => localStorage.getItem('app_lang') || 'en');
-  const t = translations[lang];
-
-  const [activeTab, setActiveTab] = useState('menus');
-  const [targetDate, setTargetDate] = useState(getLocalDateString(0));
-
-  const [menus, setMenus] = useState([]);
-  const [myAttendance, setMyAttendance] = useState([]);
-  const [mySubscriptions, setMySubscriptions] = useState([]); // NEW STATE
-  const [globalHasCommitted, setGlobalHasCommitted] = useState(false);
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [directory, setDirectory] = useState({ rickshaws: [], rooms: [], emergency: [] });
-  const [isLoading, setIsLoading] = useState(true);
-  const [nearbyMesses, setNearbyMesses] = useState([]);
-
-  if (!user || user.role !== 'student') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900"><button onClick={() => navigate('/')} className="text-indigo-400 font-bold underline">Go to Login</button></div>
-    );
-  }
-
-  useEffect(() => {
-    fetchData(false);
-    fetchLeaderboard();
-
-    const intervalId = setInterval(() => {
-      fetchData(true);
-      fetchLeaderboard();
-    }, 10000);
-
-    return () => clearInterval(intervalId);
-  }, [targetDate]);
-
-  const fetchData = async (isSilent = false) => {
-    if (!isSilent) setIsLoading(true);
-    const token = localStorage.getItem('token');
-    const headers = { 'Authorization': `Bearer ${token}` };
-    try {
-      const menuRes = await fetch(`${API_URL}/api/menus/${targetDate}`, { headers });
-      if (menuRes.ok) setMenus(await menuRes.json());
-
-      const attRes = await fetch(`${API_URL}/api/attendance/me/${targetDate}`, { headers });
-      if (attRes.ok) {
-        const myAtt = await attRes.json();
-        setMyAttendance(myAtt);
-        setGlobalHasCommitted(myAtt.some(a => a.status === 'coming'));
-      }
-
-      // FETCH SUBSCRIPTIONS
-      const subRes = await fetch(`${API_URL}/api/subscriptions/me`, { headers });
-      if (subRes.ok) setMySubscriptions(await subRes.json());
-
-      const dirRes = await fetch(`${API_URL}/api/directory`, { headers });
-      if (dirRes.ok) {
-        const rawDir = await dirRes.json();
-        setDirectory({ rickshaws: rawDir.filter(d => d.category === 'rickshaws'), rooms: rawDir.filter(d => d.category === 'rooms'), emergency: rawDir.filter(d => d.category === 'emergency') });
-      }
-    } catch (error) { console.error(error); }
-    finally { if (!isSilent) setIsLoading(false); }
-  };
-
-  const fetchLeaderboard = async () => {
-    const token = localStorage.getItem('token');
-    try {
-      const res = await fetch(`${API_URL}/api/messes/leaderboard`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (res.ok) setLeaderboard(await res.json());
-    } catch (e) { console.error(e); }
-  };
-
-  const fetchNearbyMesses = async () => {
-    const token = localStorage.getItem('token');
-    try {
-      const res = await fetch(`${API_URL}/api/messes/nearby`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (res.ok) setNearbyMesses(await res.json());
-    } catch (e) { console.error(e); }
-  };
-
-  const getAttendanceStatus = (messName) => {
-    const record = myAttendance.find(a => a.messName === messName);
-    return record ? record.status : undefined;
-  };
-
-  const studentName = (user.name || user.fullName || 'Student').split(' ')[0];
-
-  return (
-    <div className="font-sans relative z-10 min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-500 overflow-hidden">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-indigo-500/10 dark:bg-indigo-500/5 rounded-[100%] blur-[100px] -z-10 pointer-events-none"></div>
-
-      <nav className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-b border-white dark:border-slate-800 p-4 sticky top-0 z-50 transition-colors duration-500">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-600/20"><Utensils size={20} /></div>
-            <h1 className="font-black text-slate-900 dark:text-white text-xl tracking-tight hidden sm:block">{t.appName || 'AvasariConnect'}</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <LanguageToggle lang={lang} setLang={setLang} />
-            <ThemeToggle />
-            <button onClick={() => { localStorage.removeItem('token'); navigate('/'); }} className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-rose-600 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 px-4 py-2.5 rounded-xl transition-all"><LogOut size={16} /> {t.logout}</button>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-6xl mx-auto px-4 pt-8 pb-24 grid grid-cols-1 lg:grid-cols-4 gap-8">
-
-        <div className="lg:col-span-3">
-          <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-2">{t.greeting}, {studentName} ðŸ‘‹</h2>
-            <p className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-2">{t.subtitle} <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span> Live</p>
-          </div>
-
-          <div className="bg-slate-200/50 dark:bg-slate-800/80 backdrop-blur-md p-1.5 rounded-full shadow-inner mb-6 flex relative z-20 w-fit">
-            <button onClick={() => setActiveTab('menus')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all flex gap-2 ${activeTab === 'menus' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}><Utensils size={18} /> {t.dailyMenus}</button>
-            <button onClick={() => setActiveTab('directory')} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all flex gap-2 ${activeTab === 'directory' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}><MapPin size={18} /> {t.directory}</button>
-            <button onClick={() => { setActiveTab('map'); fetchNearbyMesses(); }} className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all flex gap-2 ${activeTab === 'map' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-200'}`}><Map size={18} /> {t.map}</button>
-          </div>
-
-          {activeTab === 'menus' && (
-            <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
-
-              <div className="flex mb-8 bg-white dark:bg-slate-800 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm w-fit">
-                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl">
-                  <button onClick={() => setTargetDate(getLocalDateString(0))} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${targetDate === getLocalDateString(0) ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>{t.today}</button>
-                  <button onClick={() => setTargetDate(getLocalDateString(1))} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1 ${targetDate === getLocalDateString(1) ? 'bg-orange-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>{t.tomorrow} <Sparkles size={14} /></button>
-                </div>
-              </div>
-
-              {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-24 text-indigo-600 dark:text-indigo-400"><Loader2 className="animate-spin mb-4" size={48} /><p className="font-bold text-slate-500 dark:text-slate-400">Loading menus...</p></div>
-              ) : menus.length === 0 ? (
-                <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl p-16 rounded-[2.5rem] text-center border border-white dark:border-slate-700 shadow-xl">
-                  <div className="bg-slate-100 dark:bg-slate-700 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"><CalendarDays className="text-slate-400 dark:text-slate-500" size={40} /></div>
-                  <h3 className="font-black text-slate-900 dark:text-white text-2xl mb-2">{t.noMenus}</h3>
-                  <p className="text-slate-500 dark:text-slate-400">{t.noMenusDesc}</p>
-                </div>
-              ) : (
-                <div className="space-y-8">
-                  {menus.map(mess => (
-                    <MessCard
-                      key={mess._id}
-                      mess={mess}
-                      user={user}
-                      targetDate={targetDate}
-                      initialAttendance={getAttendanceStatus(mess.messName)}
-                      globalHasCommitted={globalHasCommitted}
-                      mySub={mySubscriptions.find(s => s.messId === mess.ownerId._id)} // Pass sub data
-                      onSubscribe={() => fetchData(false)} // Refresh on sub
-                      onAttendanceUpdate={(silent = true) => fetchData(silent)}
-                      t={t}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'directory' && (
-            <div className="animate-in fade-in slide-in-from-bottom-8">
-              <DirectoryCard title={t.autoRickshaws} icon={Navigation} colorClass="bg-gradient-to-br from-blue-500 to-indigo-600" items={directory.rickshaws} t={t} />
-              <DirectoryCard title={t.pgRooms} icon={Home} colorClass="bg-gradient-to-br from-emerald-500 to-teal-600" items={directory.rooms} t={t} />
-              <DirectoryCard title={t.emergency} icon={AlertTriangle} colorClass="bg-gradient-to-br from-rose-500 to-pink-600" items={directory.emergency} t={t} />
-            </div>
-          )}
-
-          {activeTab === 'map' && (
-            <MessMap messes={nearbyMesses} />
-          )}
-        </div>
-
-        <div className="lg:col-span-1">
-          <div className="bg-gradient-to-b from-amber-100 to-orange-50 dark:from-amber-900/40 dark:to-orange-900/10 p-6 rounded-[2rem] border border-amber-200 dark:border-amber-700/50 shadow-xl shadow-amber-500/10 sticky top-24">
-            <h3 className="font-black text-amber-900 dark:text-amber-400 text-xl mb-5 flex items-center gap-2"><Trophy size={24} className="text-amber-500" /> {t.topRated}</h3>
-            <div className="space-y-4">
-              {leaderboard.length === 0 ? <p className="text-sm text-amber-700/60 dark:text-amber-500/60 font-bold text-center py-4">No ratings yet.</p> : leaderboard.map((mess, i) => (
-                <div key={mess._id} className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-sm p-4 rounded-2xl flex items-center justify-between border border-white dark:border-slate-700 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${i === 0 ? 'bg-amber-400 text-white shadow-lg shadow-amber-400/40' : i === 1 ? 'bg-slate-300 text-slate-700' : 'bg-orange-300 text-orange-900'}`}>{i + 1}</div>
-                    <div>
-                      <p className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-[120px]">{mess.messName}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">{mess.ratingCount} {t.reviews}</p>
-                    </div>
-                  </div>
-                  <div className="bg-amber-50 dark:bg-amber-500/10 px-2 py-1 rounded-lg flex items-center gap-1 text-xs font-black text-amber-600 dark:text-amber-400"><Star size={12} className="fill-amber-500" /> {Number(mess.rating).toFixed(1)}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-      </main>
-    </div>
-  );
-};
-
-export default StudentDashboard;
+Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8f in position 6611: character maps to <undefined>
 
 
 ================================================
