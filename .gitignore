@@ -79,3 +79,5 @@ yarn-error.log*
 coverage/
 
 createAdmin.js
+
+digest.txt
