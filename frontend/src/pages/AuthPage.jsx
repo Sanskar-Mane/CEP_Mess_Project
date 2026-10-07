@@ -6,7 +6,7 @@ import {
   MapPin, FileText, CheckCircle2, AlertCircle, LogIn
 } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { API_URL } from '../utils/config';
 
 const AuthPage = () => {
   const navigate = useNavigate();

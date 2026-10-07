@@ -51,7 +51,9 @@ export const translations = {
         locationSavedAt: "Location currently saved at:",
         useCurrentLocation: "Use My Current Location",
         updateCurrentLocation: "Update Current Location",
-        detecting: "Detecting..."
+        detecting: "Detecting...",
+        rides: "Auto Pooling",
+        createPool: "Create Ride Pool"
     },
     mr: {
         // Student Side
@@ -105,6 +107,8 @@ export const translations = {
         locationSavedAt: "लोकेशन येथे सेव्ह केले आहे:",
         useCurrentLocation: "सध्याचे लोकेशन वापरा",
         updateCurrentLocation: "लोकेशन अपडेट करा",
-        detecting: "शोधत आहे..."
+        detecting: "शोधत आहे...",
+        rides: "ऑटो पूलिंग",
+        createPool: "राईड पूल तयार करा"
     }
 };

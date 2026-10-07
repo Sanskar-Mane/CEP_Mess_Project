@@ -1,62 +1,51 @@
-==============================
-
-Node.js & Dependencies
-
-==============================
-
+# ==============================
+# Node.js & Dependencies
+# ==============================
 node_modules/
-npm-debug.log
-yarn-error.log
-yarn-debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-==============================
-
-Security / Environment Variables
-
-==============================
-
-CRITICAL: Never commit your .env files to GitHub!
-
-This protects your MongoDB passwords and API keys.
-
+# ==============================
+# Security / Environment Variables
+# ==============================
+# CRITICAL: Never commit your .env files to GitHub!
 .env
-.env.local
+.env*.local
 .env.development
 .env.test
 .env.production
 
-==============================
-
-Vite / React Frontend Build
-
-==============================
-
-Ignore production build outputs
-
+# ==============================
+# Vite / React Frontend Build
+# ==============================
+dist/
+dist-ssr/
+*.local
 /frontend/dist/
 /frontend/build/
 .vite/
 
-==============================
+# ==============================
+# Expo / React Native
+# ==============================
+.expo/
+web-build/
 
-OS & Editor Files
-
-==============================
-
-Mac
-
+# ==============================
+# OS & Editor Files
+# ==============================
+# Mac
 .DS_Store
 .AppleDouble
 .LSOverride
 
-Windows
-
+# Windows
 Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-IDEs (VS Code, WebStorm, etc.)
-
+# IDEs (VS Code, WebStorm, etc.)
 .vscode/
 .idea/
 *.suo
@@ -65,17 +54,12 @@ IDEs (VS Code, WebStorm, etc.)
 *.sln
 *.sw?
 
-==============================
-
-Logs & Testing
-
-==============================
-
-logs
-.log
-npm-debug.log
-yarn-debug.log*
-yarn-error.log*
+# ==============================
+# Logs & Testing
+# ==============================
+logs/
+*.log
 coverage/
 
 createAdmin.js
+digest.txt
