@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChefHat, Users, CheckCircle2, XCircle, LogOut, Loader2, PlusCircle, TrendingUp, CalendarDays, LineChart, Calculator, MapPin, Navigation, IndianRupee, CalendarPlus, Edit3, Phone } from 'lucide-react';
+import { ChefHat, Users, CheckCircle2, XCircle, LogOut, Loader2, PlusCircle, TrendingUp, CalendarDays, LineChart, Calculator, MapPin, Navigation, IndianRupee, CalendarPlus, Edit3, Phone, Clock, Bell, QrCode, AlertCircle, X, Scale, Leaf, Settings2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import ThemeToggle from '../components/ThemeToggle';
 import LanguageToggle from '../components/LanguageToggle';
 import { translations } from '../utils/translations';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { API_URL } from '../utils/config';
+import { getSocket } from '../utils/socket';
 
 const getLocalDateString = (offsetDays = 0) => {
   const d = new Date(); d.setDate(d.getDate() + offsetDays);
@@ -17,7 +17,7 @@ const OwnerDashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // --- NEW AUTHENTICATION LOGIC ---
+  // --- AUTHENTICATION LOGIC ---
   const [user, setUser] = useState(location.state?.user || null);
   const [isAuthLoading, setIsAuthLoading] = useState(!user);
 
@@ -31,16 +31,43 @@ const OwnerDashboard = () => {
   const [menuItems, setMenuItems] = useState('');
   const [price, setPrice] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
-  const [isMenuExisting, setIsMenuExisting] = useState(false); // <-- NEW STATE FOR EDIT VS PUBLISH
+  const [isMenuExisting, setIsMenuExisting] = useState(false);
 
   // Analytics & Members State
   const [analyticsShift, setAnalyticsShift] = useState('morning');
   const [stats, setStats] = useState({
-    morning: { coming: 0, notComing: 0 },
-    night: { coming: 0, notComing: 0 }
+    morning: { coming: 0, notComing: 0, consumed: 0, estimates: { requiredKg: { rice: 0, flour: 0, dal: 0, veggies: 0 }, foodSavedKg: 0 } },
+    night: { coming: 0, notComing: 0, consumed: 0, estimates: { requiredKg: { rice: 0, flour: 0, dal: 0, veggies: 0 }, foodSavedKg: 0 } }
   });
   const [historyData, setHistoryData] = useState([]);
   const [members, setMembers] = useState([]);
+
+  // Kitchen Ration Estimator State
+  const [rationModalOpen, setRationModalOpen] = useState(false);
+  const [customRationConfig, setCustomRationConfig] = useState({
+    riceGrams: 120,
+    flourGrams: 110,
+    dalGrams: 45,
+    veggieGrams: 150
+  });
+  const [isSavingRation, setIsSavingRation] = useState(false);
+  const [rationMsg, setRationMsg] = useState('');
+
+  // QR Meal Pass Verification Modal State
+  const [verifyModalOpen, setVerifyModalOpen] = useState(false);
+  const [qrTokenInput, setQrTokenInput] = useState('');
+  const [isVerifyingQr, setIsVerifyingQr] = useState(false);
+  const [verifyResult, setVerifyResult] = useState(null);
+
+  // UPI Configuration State
+  const [upiId, setUpiId] = useState(user?.upiId || '');
+  const [isSavingUpi, setIsSavingUpi] = useState(false);
+  const [upiMsg, setUpiMsg] = useState('');
+
+  // Notifications State
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
+  const [notifDrawerOpen, setNotifDrawerOpen] = useState(false);
 
   // Calculator State
   const [estThalis, setEstThalis] = useState('');
@@ -49,6 +76,12 @@ const OwnerDashboard = () => {
   const [isSettingLocation, setIsSettingLocation] = useState(false);
   const [locationMsg, setLocationMsg] = useState('');
   const [savedLocation, setSavedLocation] = useState(null);
+
+  // Cut-off Timers State
+  const [morningCutoff, setMorningCutoff] = useState(user?.morningCutoff || '09:30');
+  const [nightCutoff, setNightCutoff] = useState(user?.nightCutoff || '17:30');
+  const [isSavingCutoff, setIsSavingCutoff] = useState(false);
+  const [cutoffMsg, setCutoffMsg] = useState('');
 
   const displayDate = new Date(menuDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 
@@ -64,6 +97,10 @@ const OwnerDashboard = () => {
           if (data.role !== 'owner') navigate('/');
           else {
             setUser(data);
+            if (data.upiId) setUpiId(data.upiId);
+            if (data.morningCutoff) setMorningCutoff(data.morningCutoff);
+            if (data.nightCutoff) setNightCutoff(data.nightCutoff);
+            if (data.rationConfig) setCustomRationConfig(data.rationConfig);
             if (data.location && data.location.coordinates && data.location.coordinates[0] !== 0) {
               setSavedLocation({
                 lng: data.location.coordinates[0],
@@ -80,7 +117,13 @@ const OwnerDashboard = () => {
     };
 
     if (!user) verifyToken();
-    else setIsAuthLoading(false);
+    else {
+      if (user.upiId) setUpiId(user.upiId);
+      if (user.morningCutoff) setMorningCutoff(user.morningCutoff);
+      if (user.nightCutoff) setNightCutoff(user.nightCutoff);
+      if (user.rationConfig) setCustomRationConfig(user.rationConfig);
+      setIsAuthLoading(false);
+    }
   }, [navigate, user]);
 
   // 2. Fetch Menu whenever the date OR shift changes
@@ -96,11 +139,11 @@ const OwnerDashboard = () => {
           if (myMenu) {
             setMenuItems(myMenu.items.join(', '));
             setPrice(myMenu.price.toString());
-            setIsMenuExisting(true); // Menu exists -> Edit mode
+            setIsMenuExisting(true);
           } else {
             setMenuItems('');
             setPrice('');
-            setIsMenuExisting(false); // Menu doesn't exist -> Publish mode
+            setIsMenuExisting(false);
           }
         }
       } catch (e) { console.error("Failed to fetch menus", e); }
@@ -116,7 +159,18 @@ const OwnerDashboard = () => {
       const token = localStorage.getItem('token');
       try {
         const response = await fetch(`${API_URL}/api/attendance/stats/${encodeURIComponent(user.messName || 'Partner Mess')}/${menuDate}`, { headers: { 'Authorization': `Bearer ${token}` } });
-        if (response.ok) setStats(await response.json());
+        if (response.ok) {
+          const data = await response.json();
+          setStats(data);
+          if (data.rationConfig) setCustomRationConfig(data.rationConfig);
+        }
+
+        const notifRes = await fetch(`${API_URL}/api/notifications`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (notifRes.ok) {
+          const notifs = await notifRes.json();
+          setNotifications(notifs);
+          setUnreadNotifsCount(notifs.filter(n => !n.isRead).length);
+        }
       } catch (e) { console.error(e); }
     };
 
@@ -140,14 +194,178 @@ const OwnerDashboard = () => {
     fetchHistory();
     fetchMembers();
 
-    const intervalId = setInterval(() => {
+    const socket = getSocket();
+    const onAttendanceUpdated = (data) => {
+      if (!data?.messName || data.messName === user.messName) {
+        fetchStats();
+        fetchHistory();
+      }
+    };
+    const onAttendanceConsumed = () => {
       fetchStats();
       fetchHistory();
-      fetchMembers();
-    }, 10000);
+    };
+    const onSubscriptionUpdated = (data) => {
+      if (!data?.messId || data.messId === user._id) {
+        fetchMembers();
+      }
+    };
+    const onNotificationNew = (data) => {
+      if (!user) return;
+      if (!data?.userIds || data.userIds.includes(user._id)) {
+        setUnreadNotifsCount(prev => prev + 1);
+        const token = localStorage.getItem('token');
+        if (token) {
+          fetch(`${API_URL}/api/notifications`, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(r => r.ok ? r.json() : null)
+            .then(notifs => {
+              if (notifs) {
+                setNotifications(notifs);
+                setUnreadNotifsCount(notifs.filter(n => !n.isRead).length);
+              }
+            });
+        }
+      }
+    };
 
-    return () => clearInterval(intervalId);
+    socket.on('attendance:updated', onAttendanceUpdated);
+    socket.on('attendance:consumed', onAttendanceConsumed);
+    socket.on('subscription:updated', onSubscriptionUpdated);
+    socket.on('notification:new', onNotificationNew);
+
+    return () => {
+      socket.off('attendance:updated', onAttendanceUpdated);
+      socket.off('attendance:consumed', onAttendanceConsumed);
+      socket.off('subscription:updated', onSubscriptionUpdated);
+      socket.off('notification:new', onNotificationNew);
+    };
   }, [menuDate, user]);
+
+  const handleOpenNotifications = async () => {
+    setNotifDrawerOpen(true);
+    setUnreadNotifsCount(0);
+    const token = localStorage.getItem('token');
+    try {
+      await fetch(`${API_URL}/api/notifications/read-all`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+    } catch (e) {}
+  };
+
+  const handleSaveUpi = async (e) => {
+    e.preventDefault();
+    if (!upiId.trim()) return;
+    setIsSavingUpi(true);
+    setUpiMsg('');
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/owner/upi`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ upiId: upiId.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUpiMsg('✅ UPI ID saved successfully!');
+        setUser(prev => ({ ...prev, upiId: upiId.trim() }));
+      } else {
+        setUpiMsg(`❌ ${data.error || 'Failed to save UPI ID'}`);
+      }
+    } catch {
+      setUpiMsg('❌ Network error saving UPI ID');
+    } finally {
+      setIsSavingUpi(false);
+    }
+  };
+
+  const handleSaveRationConfig = async (e) => {
+    e.preventDefault();
+    setIsSavingRation(true);
+    setRationMsg('');
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/owner/ration-config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(customRationConfig)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRationMsg('✅ Ration norms updated successfully!');
+        setUser(prev => ({ ...prev, rationConfig: customRationConfig }));
+        forceStatsRefresh();
+      } else {
+        setRationMsg(`❌ ${data.error || 'Failed to update norms'}`);
+      }
+    } catch {
+      setRationMsg('❌ Network error updating ration norms');
+    } finally {
+      setIsSavingRation(false);
+    }
+  };
+
+  const handleVerifyQr = async (e) => {
+    if (e) e.preventDefault();
+    if (!qrTokenInput.trim() || isVerifyingQr) return;
+    setIsVerifyingQr(true);
+    setVerifyResult(null);
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/attendance/verify-qr`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ qrToken: qrTokenInput.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setVerifyResult({
+          type: 'success',
+          message: `Meal Verified for ${data.shift.toUpperCase()} Shift!`,
+          studentName: data.studentName
+        });
+        setQrTokenInput('');
+        forceStatsRefresh();
+      } else {
+        setVerifyResult({
+          type: 'error',
+          message: data.error || 'Failed to verify meal pass.'
+        });
+      }
+    } catch {
+      setVerifyResult({
+        type: 'error',
+        message: 'Network error connecting to verification server.'
+      });
+    } finally {
+      setIsVerifyingQr(false);
+    }
+  };
+
+  const handleSaveCutoff = async (e) => {
+    e.preventDefault();
+    setIsSavingCutoff(true);
+    setCutoffMsg('');
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/owner/cutoff`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ morningCutoff, nightCutoff })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCutoffMsg('✅ Attendance cut-offs updated successfully!');
+        setUser(prev => ({ ...prev, morningCutoff, nightCutoff }));
+      } else {
+        setCutoffMsg(`❌ ${data.error || 'Failed to update cut-offs'}`);
+      }
+    } catch {
+      setCutoffMsg('❌ Network error saving cut-offs');
+    } finally {
+      setIsSavingCutoff(false);
+    }
+  };
 
   // --- RENDER GUARDS ---
   if (isAuthLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-900"><Loader2 className="animate-spin text-orange-500" size={48} /></div>;
@@ -257,7 +475,7 @@ const OwnerDashboard = () => {
     return null;
   };
 
-  const currentStats = stats[analyticsShift] || { coming: 0, notComing: 0 };
+  const currentStats = stats[analyticsShift] || { coming: 0, notComing: 0, consumed: 0 };
 
   return (
     <div className="min-h-screen font-sans bg-slate-50 dark:bg-slate-950 transition-colors duration-500 pb-12 selection:bg-orange-500 selection:text-white">
@@ -270,11 +488,29 @@ const OwnerDashboard = () => {
             </div>
             <h1 className="font-black text-slate-900 dark:text-white text-lg tracking-tight hidden sm:block">{user.messName || 'Partner Mess'} <span className="text-orange-500">{t.partner}</span></h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => { setVerifyModalOpen(true); setVerifyResult(null); }}
+              className="flex items-center gap-2 text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 px-3 py-2 rounded-xl transition-all border border-emerald-200 dark:border-emerald-500/20"
+            >
+              <QrCode size={16} /> <span className="hidden md:inline">Verify Meal Pass</span>
+            </button>
+            <button
+              onClick={handleOpenNotifications}
+              className="relative p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-orange-500 transition-colors"
+              title="Notifications"
+            >
+              <Bell size={18} />
+              {unreadNotifsCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
+                  {unreadNotifsCount > 9 ? '9+' : unreadNotifsCount}
+                </span>
+              )}
+            </button>
             <LanguageToggle lang={lang} setLang={setLang} />
             <ThemeToggle />
             <button onClick={handleLogout} className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/10 px-4 py-2 rounded-xl transition-all">
-              <LogOut size={16} /> {t.logout}
+              <LogOut size={16} /> <span className="hidden sm:inline">{t.logout}</span>
             </button>
           </div>
         </div>
@@ -299,13 +535,23 @@ const OwnerDashboard = () => {
           <button onClick={() => forceStatsRefresh()} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm text-sm flex items-center gap-2"><LineChart size={16} /> {t.refreshMetrics}</button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="bg-gradient-to-br from-emerald-500 to-teal-500 rounded-[2rem] p-6 shadow-xl shadow-emerald-500/20 text-white relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-6 opacity-20 transition-transform group-hover:scale-110"><CheckCircle2 size={80} /></div>
             <p className="text-sm font-bold text-emerald-50 mb-1">{t.confirmedComing} ({analyticsShift})</p>
             <h3 className="text-4xl font-black">{currentStats.coming}</h3>
             <div className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-emerald-900 bg-emerald-400/40 px-2.5 py-1 rounded-md backdrop-blur-sm">{t.prepareExactly} {currentStats.coming} {t.thali}</div>
           </div>
+
+          <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] p-6 shadow-xl shadow-indigo-500/20 text-white relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-6 opacity-20 transition-transform group-hover:scale-110"><QrCode size={80} /></div>
+            <p className="text-sm font-bold text-indigo-100 mb-1">Served / Consumed ({analyticsShift})</p>
+            <h3 className="text-4xl font-black">{currentStats.consumed || 0}</h3>
+            <div className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-indigo-900 bg-indigo-200/50 px-2.5 py-1 rounded-md backdrop-blur-sm">
+              {currentStats.coming > 0 ? `${Math.round(((currentStats.consumed || 0) / currentStats.coming) * 100)}% Claimed` : 'Verified at Counter'}
+            </div>
+          </div>
+
           <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 border border-slate-100 dark:border-slate-700 relative overflow-hidden transition-colors">
             <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">{t.skippedAttendance} ({analyticsShift})</p>
             <h3 className="text-4xl font-black text-rose-500">{currentStats.notComing}</h3>
@@ -337,6 +583,97 @@ const OwnerDashboard = () => {
                 🚨 {t.shortfallOf} {currentStats.coming - Number(estThalis)} {t.cookMore}
               </div>
             ) : null}
+          </div>
+        </div>
+
+        {/* TASK 1: SMART KITCHEN RATION & FOOD WASTE ESTIMATOR */}
+        <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-2xl">
+                <Scale size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white">Smart Kitchen Ration Estimator ⚖️</h3>
+                <p className="text-xs text-slate-400 font-bold">
+                  Translates your live {analyticsShift} headcount ({currentStats.coming} students) into exact raw cooking ingredients
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => { setRationModalOpen(true); setRationMsg(''); }}
+              className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 px-4 py-2.5 rounded-xl transition-all w-fit active:scale-95"
+            >
+              <Settings2 size={15} /> Customize Per-Plate Norms
+            </button>
+          </div>
+
+          {/* 4 Ingredient Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="p-4 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
+              <span className="text-2xl">🍚</span>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-2">Rice Required</p>
+              <h4 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                {currentStats.estimates?.requiredKg?.rice !== undefined ? currentStats.estimates.requiredKg.rice : ((currentStats.coming * (customRationConfig.riceGrams || 120)) / 1000).toFixed(2)} <span className="text-sm font-bold text-slate-400">kg</span>
+              </h4>
+              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 rounded-md mt-2 inline-block">
+                {customRationConfig.riceGrams || 120}g / student
+              </span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-orange-50/60 dark:bg-orange-950/20 border border-orange-200/60 dark:border-orange-800/40">
+              <span className="text-2xl">🌾</span>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-2">Flour / Atta</p>
+              <h4 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                {currentStats.estimates?.requiredKg?.flour !== undefined ? currentStats.estimates.requiredKg.flour : ((currentStats.coming * (customRationConfig.flourGrams || 110)) / 1000).toFixed(2)} <span className="text-sm font-bold text-slate-400">kg</span>
+              </h4>
+              <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40 px-2 py-0.5 rounded-md mt-2 inline-block">
+                {customRationConfig.flourGrams || 110}g / student
+              </span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-yellow-50/60 dark:bg-yellow-950/20 border border-yellow-200/60 dark:border-yellow-800/40">
+              <span className="text-2xl">🥣</span>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-2">Dal & Lentils</p>
+              <h4 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                {currentStats.estimates?.requiredKg?.dal !== undefined ? currentStats.estimates.requiredKg.dal : ((currentStats.coming * (customRationConfig.dalGrams || 45)) / 1000).toFixed(2)} <span className="text-sm font-bold text-slate-400">kg</span>
+              </h4>
+              <span className="text-[10px] font-bold text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/40 px-2 py-0.5 rounded-md mt-2 inline-block">
+                {customRationConfig.dalGrams || 45}g / student
+              </span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40">
+              <span className="text-2xl">🥕</span>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-2">Fresh Veggies</p>
+              <h4 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                {currentStats.estimates?.requiredKg?.veggies !== undefined ? currentStats.estimates.requiredKg.veggies : ((currentStats.coming * (customRationConfig.veggieGrams || 150)) / 1000).toFixed(2)} <span className="text-sm font-bold text-slate-400">kg</span>
+              </h4>
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-md mt-2 inline-block">
+                {customRationConfig.veggieGrams || 150}g / student
+              </span>
+            </div>
+          </div>
+
+          {/* Food Waste Prevented Banner */}
+          <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-emerald-500 text-white rounded-xl shadow-md">
+                <Leaf size={20} />
+              </div>
+              <div>
+                <h4 className="font-black text-emerald-900 dark:text-emerald-300 text-sm">🌱 Food Waste Prevented</h4>
+                <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mt-0.5">
+                  Thanks to <strong>{currentStats.notComing}</strong> students skipping in advance for this {analyticsShift} shift, you saved raw ingredients!
+                </p>
+              </div>
+            </div>
+            <div className="text-right sm:border-l sm:border-emerald-200 dark:sm:border-emerald-800 sm:pl-6 shrink-0">
+              <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                {currentStats.estimates?.foodSavedKg !== undefined ? currentStats.estimates.foodSavedKg : '0.00'} kg
+              </span>
+              <span className="block text-[10px] font-bold uppercase text-emerald-600/80 dark:text-emerald-400/80">Saved from bin</span>
+            </div>
           </div>
         </div>
 
@@ -427,11 +764,18 @@ const OwnerDashboard = () => {
                       <td className="py-4 px-5">
                         <p className="font-bold text-slate-900 dark:text-white flex items-center gap-2">{member.studentName}</p>
                         <p className="text-xs font-bold text-slate-400 mt-0.5 flex items-center gap-1"><Phone size={10} /> {member.studentPhone || 'N/A'}</p>
+                        {member.status === 'verification_pending' && (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded uppercase bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-700/50 flex items-center gap-1 w-fit mt-1">
+                            <Clock size={10} /> Verification Pending
+                          </span>
+                        )}
                       </td>
                       <td className="py-4 px-5">
-                        <span className={`text-[10px] font-black px-2 py-1 rounded uppercase ${member.shift === 'both' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
-                          {member.shift || 'both'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-black px-2 py-1 rounded uppercase ${member.status === 'expired' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-700/50' : member.shift === 'both' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
+                            {member.status === 'expired' ? 'Expired' : (member.shift || 'both')}
+                          </span>
+                        </div>
                       </td>
                       <td className="py-4 px-5 text-xs">
                         <div className="text-slate-500 dark:text-slate-400 font-medium mb-1">
@@ -457,8 +801,7 @@ const OwnerDashboard = () => {
                       <td className="py-4 px-5">
                         <div className="flex items-center gap-2 text-sm font-bold text-orange-500 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 w-fit rounded-lg border border-orange-100 dark:border-orange-500/20">
                           <IndianRupee size={14} />{member.monthlyFee || 0}
-                          {/* FIX: Hide edit button if payment is locked */}
-                          {member.status !== 'paid' && (
+                          {member.status !== 'paid' && member.status !== 'expired' && (
                             <button onClick={() => handleSetFee(member._id, member.monthlyFee)} className="text-slate-400 hover:text-orange-500 ml-1 transition-colors">
                               <Edit3 size={14} />
                             </button>
@@ -466,16 +809,37 @@ const OwnerDashboard = () => {
                         </div>
                       </td>
                       <td className="py-4 px-5 text-right">
-                        <button
-                          onClick={() => togglePaymentStatus(member._id, member.status)}
-                          disabled={member.status === 'paid'}
-                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 ${member.status === 'paid'
-                              ? 'bg-emerald-500 text-white shadow-emerald-500/20 cursor-not-allowed opacity-80'
-                              : 'bg-rose-100 text-rose-600 border border-rose-200 hover:bg-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30 dark:hover:bg-rose-500/20'
-                            }`}
-                        >
-                          {member.status === 'paid' ? 'Paid ✓' : 'Mark as Paid'}
-                        </button>
+                        {member.status === 'verification_pending' ? (
+                          <div className="flex flex-col items-end gap-1.5">
+                            <span className="text-xs font-mono font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-700/40">
+                              UTR: {member.lastUtrNumber || 'N/A'}
+                            </span>
+                            <button
+                              onClick={() => updateSubscription(member._id, { status: 'paid' })}
+                              className="px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 active:scale-95"
+                            >
+                              <CheckCircle2 size={13} /> Approve Payment ✓
+                            </button>
+                          </div>
+                        ) : member.status === 'expired' ? (
+                          <button
+                            onClick={() => updateSubscription(member._id, { renew: true, status: 'paid' })}
+                            className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 bg-indigo-600 hover:bg-indigo-700 text-white"
+                          >
+                            Renew (30d)
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => togglePaymentStatus(member._id, member.status)}
+                            disabled={member.status === 'paid'}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 ${member.status === 'paid'
+                                ? 'bg-emerald-500 text-white shadow-emerald-500/20 cursor-not-allowed opacity-80'
+                                : 'bg-rose-100 text-rose-600 border border-rose-200 hover:bg-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30 dark:hover:bg-rose-500/20'
+                              }`}
+                          >
+                            {member.status === 'paid' ? 'Paid ✓' : 'Mark as Paid'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -483,6 +847,86 @@ const OwnerDashboard = () => {
               </table>
             </div>
           )}
+        </div>
+
+        {/* CUT-OFF TIMERS SECTION */}
+        <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors mb-8">
+          <h2 className="text-xl font-bold mb-2 flex items-center gap-2 text-slate-900 dark:text-white">
+            <Clock className="text-orange-500" /> Attendance Cut-Off Timers (IST)
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+            Lock attendance automatically so chefs get accurate headcounts before cooking begins.
+          </p>
+
+          <form onSubmit={handleSaveCutoff} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">☀️ Morning Shift Cut-Off</label>
+              <input
+                type="time"
+                value={morningCutoff}
+                onChange={(e) => setMorningCutoff(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">🌙 Night Shift Cut-Off</label>
+              <input
+                type="time"
+                value={nightCutoff}
+                onChange={(e) => setNightCutoff(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+            <div>
+              <button
+                type="submit"
+                disabled={isSavingCutoff}
+                className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-orange-500 dark:hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                {isSavingCutoff ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
+                Save Cut-Off Times
+              </button>
+            </div>
+          </form>
+          {cutoffMsg && <p className="mt-4 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl">{cutoffMsg}</p>}
+        </div>
+
+        {/* UPI CONFIGURATION SECTION */}
+        <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors mb-8">
+          <div className="flex items-center gap-2 mb-2">
+            <IndianRupee className="text-emerald-500" />
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">UPI Payment Configuration (Instant Student Fee Collection)</h2>
+          </div>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+            Configure your mess UPI ID (VPA) so students can make direct 1-tap monthly subscription payments to your bank account via PhonePe, GPay, Paytm, etc.
+          </p>
+
+          <form onSubmit={handleSaveUpi} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Your UPI ID (VPA)</label>
+              <input
+                type="text"
+                value={upiId}
+                onChange={(e) => setUpiId(e.target.value)}
+                placeholder="e.g. messowner@okaxis or 9876543210@paytm"
+                required
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-mono font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <div>
+              <button
+                type="submit"
+                disabled={isSavingUpi}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95"
+              >
+                {isSavingUpi ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
+                Save UPI ID
+              </button>
+            </div>
+          </form>
+          {upiMsg && <p className="mt-4 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl">{upiMsg}</p>}
         </div>
 
         <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
@@ -532,6 +976,223 @@ const OwnerDashboard = () => {
           {locationMsg && <p className="mt-4 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl">{locationMsg}</p>}
         </div>
       </main>
+
+      {/* MEAL PASS VERIFICATION MODAL */}
+      {verifyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative">
+            <button
+              onClick={() => { setVerifyModalOpen(false); setVerifyResult(null); }}
+              className="absolute top-5 right-5 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-2xl">
+                <QrCode size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white">Verify Student Meal Pass</h3>
+                <p className="text-xs text-slate-400 font-bold">Counter Verification Scanner</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 mb-6">
+              Paste or type the student's 15-minute signed Meal Pass Token to verify their attendance and mark meal as served.
+            </p>
+
+            <form onSubmit={handleVerifyQr} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">QR Token Payload</label>
+                <textarea
+                  rows={3}
+                  value={qrTokenInput}
+                  onChange={(e) => setQrTokenInput(e.target.value)}
+                  placeholder="Paste student QR pass token here..."
+                  required
+                  className="w-full p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {verifyResult && (
+                <div
+                  className={`p-4 rounded-xl border text-sm font-bold flex items-start gap-2.5 ${
+                    verifyResult.type === 'success'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                      : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300'
+                  }`}
+                >
+                  {verifyResult.type === 'success' ? (
+                    <CheckCircle2 size={18} className="shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                  ) : (
+                    <AlertCircle size={18} className="shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+                  )}
+                  <div>
+                    <p>{verifyResult.message}</p>
+                    {verifyResult.studentName && (
+                      <p className="text-xs font-normal mt-0.5 opacity-90">Student: <strong>{verifyResult.studentName}</strong></p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isVerifyingQr || !qrTokenInput.trim()}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+              >
+                {isVerifyingQr ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
+                Verify & Claim Meal
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* NOTIFICATIONS DRAWER */}
+      {notifDrawerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl relative max-h-[85vh] flex flex-col">
+            <button
+              onClick={() => setNotifDrawerOpen(false)}
+              className="absolute top-5 right-5 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-3 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-2xl">
+                <Bell size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white">Mess Notifications</h3>
+                <p className="text-xs text-slate-400 font-bold">Activity Feed & Alerts</p>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto space-y-3 flex-grow pr-1">
+              {notifications.length === 0 ? (
+                <div className="text-center py-12 text-slate-400">
+                  <Bell className="mx-auto mb-2 opacity-30" size={32} />
+                  <p className="font-bold text-sm">No notifications yet.</p>
+                </div>
+              ) : (
+                notifications.map((n) => (
+                  <div
+                    key={n._id}
+                    className={`p-4 rounded-2xl border transition-all ${
+                      n.isRead
+                        ? 'bg-slate-50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                        : 'bg-orange-50/50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800/50 text-slate-900 dark:text-white'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start gap-2 mb-1">
+                      <h4 className="font-black text-sm">{n.title}</h4>
+                      <span className="text-[10px] font-bold text-slate-400 shrink-0">
+                        {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{n.body}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RATION CONFIG MODAL */}
+      {rationModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative">
+            <button
+              onClick={() => setRationModalOpen(false)}
+              className="absolute top-5 right-5 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-2xl">
+                <Scale size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white">Per-Plate Ration Norms</h3>
+                <p className="text-xs text-slate-400 font-bold">Configure Kitchen Baselines (in grams)</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 mb-6">
+              Adjust how many grams of raw ingredients your kitchen allocates per student for lunch or dinner thalis.
+            </p>
+
+            <form onSubmit={handleSaveRationConfig} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">🍚 Rice (g)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={customRationConfig.riceGrams}
+                    onChange={(e) => setCustomRationConfig({ ...customRationConfig, riceGrams: Number(e.target.value) })}
+                    required
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">🌾 Atta / Flour (g)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={customRationConfig.flourGrams}
+                    onChange={(e) => setCustomRationConfig({ ...customRationConfig, flourGrams: Number(e.target.value) })}
+                    required
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">🥣 Dal (g)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={customRationConfig.dalGrams}
+                    onChange={(e) => setCustomRationConfig({ ...customRationConfig, dalGrams: Number(e.target.value) })}
+                    required
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">🥕 Veggies (g)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={customRationConfig.veggieGrams}
+                    onChange={(e) => setCustomRationConfig({ ...customRationConfig, veggieGrams: Number(e.target.value) })}
+                    required
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              {rationMsg && (
+                <p className="text-xs font-bold p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                  {rationMsg}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSavingRation}
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 mt-4"
+              >
+                {isSavingRation ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
+                Save Norms
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

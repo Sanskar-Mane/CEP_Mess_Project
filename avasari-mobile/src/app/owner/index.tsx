@@ -4,8 +4,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
-const API_URL = 'http://192.168.0.101:3000'; // ⚠️ IP CONFIGURED
+import { API_URL } from '@/constants/config';
+import { getSocket } from '@/utils/socket';
+import { registerForPushNotificationsAsync } from '@/utils/notifications';
 
 const getLocalDateString = (offsetDays = 0) => {
     const d = new Date(); d.setDate(d.getDate() + offsetDays);
@@ -14,7 +17,7 @@ const getLocalDateString = (offsetDays = 0) => {
 
 export default function OwnerDashboard() {
     const router = useRouter();
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState<any>(null);
     const [isAuthLoading, setIsAuthLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false); // <-- Pull-to-refresh state
 
@@ -27,13 +30,50 @@ export default function OwnerDashboard() {
 
     // Analytics & Members State
     const [analyticsShift, setAnalyticsShift] = useState('morning');
-    const [stats, setStats] = useState({ morning: { coming: 0, notComing: 0 }, night: { coming: 0, notComing: 0 } });
+    const [stats, setStats] = useState({ morning: { coming: 0, notComing: 0, consumed: 0 }, night: { coming: 0, notComing: 0, consumed: 0 } });
     const [historyData, setHistoryData] = useState([]);
-    const [members, setMembers] = useState([]);
+    const [members, setMembers] = useState<any[]>([]);
+
+    // Cut-Off Timers State
+    const [morningCutoff, setMorningCutoff] = useState('09:30');
+    const [nightCutoff, setNightCutoff] = useState('17:30');
+    const [isSavingCutoff, setIsSavingCutoff] = useState(false);
 
     // Location State
     const [isSettingLocation, setIsSettingLocation] = useState(false);
-    const [savedLocation, setSavedLocation] = useState(null);
+    const [savedLocation, setSavedLocation] = useState<any>(null);
+
+    // QR Scanner State
+    const [permission, requestPermission] = useCameraPermissions();
+    const [scannerVisible, setScannerVisible] = useState(false);
+    const [isVerifyingQr, setIsVerifyingQr] = useState(false);
+    const [scanResult, setScanResult] = useState<{ type: 'success' | 'error', message: string, studentName?: string } | null>(null);
+    const [manualQrInput, setManualQrInput] = useState('');
+
+    // UPI ID State
+    const [upiId, setUpiId] = useState('');
+    const [isSavingUpi, setIsSavingUpi] = useState(false);
+
+    // Notifications State
+    const [notifications, setNotifications] = useState<any[]>([]);
+    const [unreadCount, setUnreadCount] = useState<number>(0);
+    const [notifModalVisible, setNotifModalVisible] = useState(false);
+
+    // Kitchen Ration Config State
+    const [rationConfig, setRationConfig] = useState({
+        riceGrams: 120,
+        flourGrams: 110,
+        dalGrams: 45,
+        veggieGrams: 150
+    });
+    const [rationModalVisible, setRationModalVisible] = useState(false);
+    const [isSavingRation, setIsSavingRation] = useState(false);
+    const [tempRationConfig, setTempRationConfig] = useState({
+        riceGrams: '120',
+        flourGrams: '110',
+        dalGrams: '45',
+        veggieGrams: '150'
+    });
 
     // Native Modal State
     const [modalVisible, setModalVisible] = useState(false);
@@ -54,9 +94,22 @@ export default function OwnerDashboard() {
                     if (data.role !== 'owner') router.replace('/');
                     else {
                         setUser(data);
+                        if (data.upiId) setUpiId(data.upiId);
+                        if (data.morningCutoff) setMorningCutoff(data.morningCutoff);
+                        if (data.nightCutoff) setNightCutoff(data.nightCutoff);
+                        if (data.rationConfig) {
+                            setRationConfig(data.rationConfig);
+                            setTempRationConfig({
+                                riceGrams: String(data.rationConfig.riceGrams || 120),
+                                flourGrams: String(data.rationConfig.flourGrams || 110),
+                                dalGrams: String(data.rationConfig.dalGrams || 45),
+                                veggieGrams: String(data.rationConfig.veggieGrams || 150),
+                            });
+                        }
                         if (data.location && data.location.coordinates && data.location.coordinates[0] !== 0) {
                             setSavedLocation({ lng: data.location.coordinates[0], lat: data.location.coordinates[1] });
                         }
+                        registerForPushNotificationsAsync();
                     }
                 } else {
                     await AsyncStorage.removeItem('token'); router.replace('/');
@@ -85,28 +138,106 @@ export default function OwnerDashboard() {
         } catch (e) { console.error(e); }
     };
 
-    // 3. Fetch ONLY Live Stats (Used for background polling so we don't erase your typing)
-    const fetchLiveStats = async (headers) => {
+    // 3. Fetch ONLY Live Stats, Members, & Notifications
+    const fetchLiveStats = async (headers: any) => {
         try {
-            const statsRes = await fetch(`${API_URL}/api/attendance/stats/${encodeURIComponent(user.messName || 'Partner Mess')}/${menuDate}`, { headers });
-            if (statsRes.ok) setStats(await statsRes.json());
+            const statsRes = await fetch(`${API_URL}/api/attendance/stats/${encodeURIComponent(user?.messName || 'Partner Mess')}/${menuDate}`, { headers });
+            if (statsRes.ok) {
+                const statsData = await statsRes.json();
+                setStats(statsData);
+                if (statsData.rationConfig) {
+                    setRationConfig(statsData.rationConfig);
+                    setTempRationConfig({
+                        riceGrams: String(statsData.rationConfig.riceGrams || 120),
+                        flourGrams: String(statsData.rationConfig.flourGrams || 110),
+                        dalGrams: String(statsData.rationConfig.dalGrams || 45),
+                        veggieGrams: String(statsData.rationConfig.veggieGrams || 150),
+                    });
+                }
+            }
 
             const memRes = await fetch(`${API_URL}/api/subscriptions/mess`, { headers });
             if (memRes.ok) setMembers(await memRes.json());
+
+            const notifRes = await fetch(`${API_URL}/api/notifications`, { headers });
+            if (notifRes.ok) {
+                const notifs = await notifRes.json();
+                setNotifications(notifs);
+                setUnreadCount(notifs.filter((n: any) => !n.isRead).length);
+            }
         } catch (e) { console.error(e); }
     };
 
-    // --- REAL-TIME ENGINE ---
+    // --- REAL-TIME ENGINE (Socket.io) ---
     useEffect(() => {
         fetchData(); // Load everything when tab/date changes
 
-        // Polling: Silently fetch live stats every 5 seconds
-        const interval = setInterval(async () => {
-            const token = await AsyncStorage.getItem('token');
-            if (token) fetchLiveStats({ 'Authorization': `Bearer ${token}` });
-        }, 5000);
+        const socket = getSocket();
 
-        return () => clearInterval(interval); // Clean up on unmount
+        const onAttendanceUpdated = (data: any) => {
+            if (!user) return;
+            const currentMess = user.messName || 'Partner Mess';
+            if (data.messName === currentMess && data.targetDate === menuDate) {
+                AsyncStorage.getItem('token').then(token => {
+                    if (token) {
+                        fetchLiveStats({ 'Authorization': `Bearer ${token}` });
+                        fetch(`${API_URL}/api/attendance/history/${encodeURIComponent(currentMess)}`, { headers: { 'Authorization': `Bearer ${token}` } })
+                            .then(res => res.ok ? res.json() : null)
+                            .then(hist => { if (hist) setHistoryData(hist); });
+                    }
+                });
+            }
+        };
+
+        const onAttendanceConsumed = () => {
+            AsyncStorage.getItem('token').then(token => {
+                if (token) {
+                    fetchLiveStats({ 'Authorization': `Bearer ${token}` });
+                }
+            });
+        };
+
+        const onSubscriptionUpdated = () => {
+            AsyncStorage.getItem('token').then(token => {
+                if (token) {
+                    fetchLiveStats({ 'Authorization': `Bearer ${token}` });
+                    fetch(`${API_URL}/api/subscriptions/mess`, { headers: { 'Authorization': `Bearer ${token}` } })
+                        .then(res => res.ok ? res.json() : null)
+                        .then(memList => { if (memList) setMembers(memList); });
+                }
+            });
+        };
+
+        const onNotificationNew = (data: any) => {
+            if (!user) return;
+            if (!data?.userIds || data.userIds.includes(user._id)) {
+                setUnreadCount(prev => prev + 1);
+                AsyncStorage.getItem('token').then(token => {
+                    if (token) {
+                        fetch(`${API_URL}/api/notifications`, { headers: { 'Authorization': `Bearer ${token}` } })
+                            .then(r => r.ok ? r.json() : null)
+                            .then(notifs => {
+                                if (notifs) {
+                                    setNotifications(notifs);
+                                    setUnreadCount(notifs.filter((n: any) => !n.isRead).length);
+                                }
+                            });
+                    }
+                });
+            }
+        };
+
+        socket.on('attendance:updated', onAttendanceUpdated);
+        socket.on('attendance:consumed', onAttendanceConsumed);
+        socket.on('subscription:updated', onSubscriptionUpdated);
+        socket.on('notification:new', onNotificationNew);
+
+        return () => {
+            socket.off('attendance:updated', onAttendanceUpdated);
+            socket.off('attendance:consumed', onAttendanceConsumed);
+            socket.off('subscription:updated', onSubscriptionUpdated);
+            socket.off('notification:new', onNotificationNew);
+        };
     }, [menuDate, menuShift, user]);
 
     // Pull-to-Refresh Handler
@@ -119,6 +250,80 @@ export default function OwnerDashboard() {
     const handleLogout = async () => {
         await AsyncStorage.removeItem('token');
         router.replace('/');
+    };
+
+    const handleOpenNotifications = async () => {
+        setNotifModalVisible(true);
+        setUnreadCount(0);
+        const token = await AsyncStorage.getItem('token');
+        try {
+            await fetch(`${API_URL}/api/notifications/read-all`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+        } catch (e) {}
+    };
+
+    const handleSaveUpi = async () => {
+        if (!upiId.trim()) {
+            Alert.alert("Notice", "Please enter a valid UPI ID (e.g. messowner@okaxis)");
+            return;
+        }
+        setIsSavingUpi(true);
+        const token = await AsyncStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_URL}/api/owner/upi`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ upiId: upiId.trim() })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                Alert.alert("Success", "UPI ID updated successfully!");
+            } else {
+                Alert.alert("Error", data.error || "Failed to update UPI ID");
+            }
+        } catch (e) {
+            Alert.alert("Error", "Network connection failed");
+        } finally {
+            setIsSavingUpi(false);
+        }
+    };
+
+    const handleOpenScanner = async () => {
+        if (!permission?.granted) {
+            const res = await requestPermission();
+            if (!res.granted) {
+                Alert.alert("Camera Permission Required", "Please grant camera permission in your phone settings to scan meal QR passes.");
+                return;
+            }
+        }
+        setScanResult(null);
+        setScannerVisible(true);
+    };
+
+    const handleVerifyQrToken = async (tokenString: string) => {
+        if (!tokenString || isVerifyingQr) return;
+        setIsVerifyingQr(true);
+        const token = await AsyncStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_URL}/api/attendance/verify-qr`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ qrToken: tokenString.trim() })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setScanResult({ type: 'success', message: `Meal Claimed for ${data.shift.toUpperCase()} Shift!`, studentName: data.studentName });
+                if (token) fetchLiveStats({ 'Authorization': `Bearer ${token}` });
+            } else {
+                setScanResult({ type: 'error', message: data.error || "Failed to verify meal pass." });
+            }
+        } catch (e) {
+            setScanResult({ type: 'error', message: "Network error while verifying meal pass." });
+        } finally {
+            setIsVerifyingQr(false);
+        }
     };
 
     const handlePublishMenu = async () => {
@@ -139,7 +344,37 @@ export default function OwnerDashboard() {
         finally { setIsPublishing(false); fetchData(); }
     };
 
-    const updateSubscription = async (subId, payload) => {
+    const handleSaveCutoff = async () => {
+        const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+        if (!timeRegex.test(morningCutoff)) {
+            Alert.alert('Invalid Format', 'Morning cut-off must be in HH:mm format (e.g. 09:30)');
+            return;
+        }
+        if (!timeRegex.test(nightCutoff)) {
+            Alert.alert('Invalid Format', 'Night cut-off must be in HH:mm format (e.g. 17:30)');
+            return;
+        }
+        setIsSavingCutoff(true);
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const res = await fetch(`${API_URL}/api/owner/cutoff`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ morningCutoff, nightCutoff })
+            });
+            if (res.ok) {
+                Alert.alert('Success', 'Cut-off times updated successfully!');
+            } else {
+                Alert.alert('Error', 'Failed to update cut-off times.');
+            }
+        } catch {
+            Alert.alert('Error', 'Network connection failed.');
+        } finally {
+            setIsSavingCutoff(false);
+        }
+    };
+
+    const updateSubscription = async (subId: string, payload: any) => {
         const token = await AsyncStorage.getItem('token');
         try {
             const res = await fetch(`${API_URL}/api/subscriptions/${subId}`, {
@@ -147,13 +382,31 @@ export default function OwnerDashboard() {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(payload)
             });
-            if (res.ok) fetchLiveStats({ 'Authorization': `Bearer ${token}` });
+            if (res.ok) {
+                fetchLiveStats({ 'Authorization': `Bearer ${token}` });
+                const memRes = await fetch(`${API_URL}/api/subscriptions/mess`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (memRes.ok) setMembers(await memRes.json());
+            }
         } catch (e) { Alert.alert("Error", "Failed to update"); }
     };
 
-    const togglePaymentStatus = (subId, currentStatus) => updateSubscription(subId, { status: currentStatus === 'paid' ? 'pending' : 'paid' });
+    const handleRenewMember = (subId: string) => {
+        Alert.alert(
+            'Renew Membership',
+            'Renew this membership for 30 days and reset skips?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Renew (30d)',
+                    onPress: () => updateSubscription(subId, { renew: true, status: 'paid' }),
+                },
+            ]
+        );
+    };
 
-    const openModal = (type, subId, currentValue, title, placeholder) => {
+    const togglePaymentStatus = (subId: string, currentStatus: string) => updateSubscription(subId, { status: currentStatus === 'paid' ? 'pending' : 'paid' });
+
+    const openModal = (type: string, subId: string, currentValue: any, title: string, placeholder: string) => {
         setModalConfig({ type, subId, title, placeholder });
         setModalInput(currentValue ? currentValue.toString() : '');
         setModalVisible(true);
@@ -192,29 +445,91 @@ export default function OwnerDashboard() {
         finally { setIsSettingLocation(false); }
     };
 
+    const handleSaveRationConfig = async () => {
+        const r = Number(tempRationConfig.riceGrams);
+        const f = Number(tempRationConfig.flourGrams);
+        const d = Number(tempRationConfig.dalGrams);
+        const v = Number(tempRationConfig.veggieGrams);
+        if (isNaN(r) || isNaN(f) || isNaN(d) || isNaN(v) || r <= 0 || f <= 0 || d <= 0 || v <= 0) {
+            Alert.alert("Invalid Input", "Please enter positive gram quantities for all ingredients.");
+            return;
+        }
+        setIsSavingRation(true);
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const res = await fetch(`${API_URL}/api/owner/ration-config`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    riceGrams: r,
+                    flourGrams: f,
+                    dalGrams: d,
+                    veggieGrams: v
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setRationConfig(data.rationConfig);
+                setRationModalVisible(false);
+                Alert.alert("Success", "Per-plate kitchen norms updated!");
+                if (token) fetchLiveStats({ 'Authorization': `Bearer ${token}` });
+            } else {
+                Alert.alert("Error", data.error || "Failed to update ration norms.");
+            }
+        } catch {
+            Alert.alert("Error", "Network error updating kitchen norms.");
+        } finally {
+            setIsSavingRation(false);
+        }
+    };
+
     if (isAuthLoading || !user) return <View style={styles.center}><ActivityIndicator size="large" color="#f97316" /></View>;
 
-    const currentStats = stats[analyticsShift] || { coming: 0, notComing: 0 };
+    const currentStats = stats[analyticsShift] || { coming: 0, notComing: 0, consumed: 0 };
+    const currentShiftEstimates = (stats as any)?.estimates?.[analyticsShift]?.requiredKg || {
+        rice: ((currentStats.coming * (rationConfig.riceGrams || 120)) / 1000).toFixed(1),
+        flour: ((currentStats.coming * (rationConfig.flourGrams || 110)) / 1000).toFixed(1),
+        dal: ((currentStats.coming * (rationConfig.dalGrams || 45)) / 1000).toFixed(1),
+        veggies: ((currentStats.coming * (rationConfig.veggieGrams || 150)) / 1000).toFixed(1),
+    };
+    const foodSavedKg = (stats as any)?.estimates?.[analyticsShift]?.foodSavedKg ??
+        (((currentStats.notComing || 0) * ((rationConfig.riceGrams || 120) + (rationConfig.flourGrams || 110) + (rationConfig.dalGrams || 45) + (rationConfig.veggieGrams || 150))) / 1000).toFixed(1);
 
     return (
         <SafeAreaView style={styles.safeArea}>
             <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
 
             <View style={styles.header}>
-                <View>
+                <View style={{ flex: 1 }}>
                     <Text style={styles.greeting}>Chef {user.name.split(' ')[0]} 👨‍🍳</Text>
                     <Text style={styles.subtitle}>{user.messName || 'Owner Dashboard'}</Text>
                 </View>
-                <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-                    <Feather name="log-out" size={18} color="#ef4444" />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <TouchableOpacity onPress={handleOpenScanner} style={styles.scannerHeaderBtn}>
+                        <Feather name="camera" size={15} color="#ffffff" />
+                        <Text style={styles.scannerHeaderBtnText}>Scan QR</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleOpenNotifications} style={styles.bellBtn}>
+                        <Feather name="bell" size={18} color="#4f46e5" />
+                        {unreadCount > 0 && (
+                            <View style={styles.notifBadge}>
+                                <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+                        <Feather name="log-out" size={18} color="#ef4444" />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <ScrollView
                 style={styles.content}
                 contentContainerStyle={{ paddingBottom: 60 }}
                 showsVerticalScrollIndicator={false}
-                // --- PULL TO REFRESH IMPLEMENTED HERE ---
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4f46e5']} tintColor="#4f46e5" />}
             >
 
@@ -227,6 +542,7 @@ export default function OwnerDashboard() {
                     </TouchableOpacity>
                 </View>
 
+                {/* --- ATTENDANCE STATS SECTION (COMING, SERVED, SKIPPED) --- */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Attendance Stats</Text>
@@ -242,18 +558,85 @@ export default function OwnerDashboard() {
 
                     <View style={styles.statsRow}>
                         <View style={[styles.statCard, { backgroundColor: '#10b981' }]}>
-                            <Feather name="users" size={24} color="rgba(255,255,255,0.3)" style={styles.statBgIcon} />
+                            <Feather name="users" size={20} color="rgba(255,255,255,0.3)" style={styles.statBgIcon} />
                             <Text style={styles.statLabel}>Coming</Text>
                             <Text style={styles.statValue}>{currentStats.coming}</Text>
                         </View>
+                        <View style={[styles.statCard, { backgroundColor: '#4f46e5' }]}>
+                            <Feather name="check-circle" size={20} color="rgba(255,255,255,0.3)" style={styles.statBgIcon} />
+                            <Text style={styles.statLabel}>Served</Text>
+                            <Text style={styles.statValue}>{currentStats.consumed || 0}</Text>
+                        </View>
                         <View style={[styles.statCard, { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0' }]}>
-                            <Feather name="user-x" size={24} color="rgba(244,63,94,0.1)" style={styles.statBgIcon} />
+                            <Feather name="user-x" size={20} color="rgba(244,63,94,0.1)" style={styles.statBgIcon} />
                             <Text style={[styles.statLabel, { color: '#64748b' }]}>Skipped</Text>
                             <Text style={[styles.statValue, { color: '#f43f5e' }]}>{currentStats.notComing}</Text>
                         </View>
                     </View>
                 </View>
 
+                {/* --- SMART KITCHEN RATION & FOOD-WASTE ESTIMATOR --- */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                            <Text style={styles.sectionTitle}>Kitchen Ration Estimator</Text>
+                            <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '600' }}>
+                                Raw ingredient quantities for {currentStats.coming} diners ({analyticsShift})
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            onPress={() => setRationModalVisible(true)}
+                            style={styles.customNormsBtn}
+                        >
+                            <Feather name="sliders" size={13} color="#4f46e5" />
+                            <Text style={styles.customNormsBtnText}>Norms</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* 4 Ingredient Cards Grid */}
+                    <View style={styles.rationGrid}>
+                        <View style={styles.rationCard}>
+                            <Text style={styles.rationEmoji}>🍚</Text>
+                            <Text style={styles.rationValue}>{currentShiftEstimates.rice} kg</Text>
+                            <Text style={styles.rationTitle}>Raw Rice</Text>
+                            <Text style={styles.rationNorm}>{rationConfig.riceGrams}g / plate</Text>
+                        </View>
+
+                        <View style={styles.rationCard}>
+                            <Text style={styles.rationEmoji}>🌾</Text>
+                            <Text style={styles.rationValue}>{currentShiftEstimates.flour} kg</Text>
+                            <Text style={styles.rationTitle}>Atta / Flour</Text>
+                            <Text style={styles.rationNorm}>{rationConfig.flourGrams}g / plate</Text>
+                        </View>
+
+                        <View style={styles.rationCard}>
+                            <Text style={styles.rationEmoji}>🥣</Text>
+                            <Text style={styles.rationValue}>{currentShiftEstimates.dal} kg</Text>
+                            <Text style={styles.rationTitle}>Dal / Pulses</Text>
+                            <Text style={styles.rationNorm}>{rationConfig.dalGrams}g / plate</Text>
+                        </View>
+
+                        <View style={styles.rationCard}>
+                            <Text style={styles.rationEmoji}>🥬</Text>
+                            <Text style={styles.rationValue}>{currentShiftEstimates.veggies} kg</Text>
+                            <Text style={styles.rationTitle}>Vegetables</Text>
+                            <Text style={styles.rationNorm}>{rationConfig.veggieGrams}g / plate</Text>
+                        </View>
+                    </View>
+
+                    {/* Food Waste Prevented Banner */}
+                    <View style={styles.wastePreventedBanner}>
+                        <Feather name="award" size={18} color="#059669" />
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.wastePreventedTitle}>🌱 Food Waste Prevented</Text>
+                            <Text style={styles.wastePreventedDesc}>
+                                ~{foodSavedKg} kg raw materials spared thanks to {currentStats.notComing} student advance skips!
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+
+                {/* --- PUBLISH MENU SECTION --- */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Publish Menu</Text>
                     <View style={styles.premiumCard}>
@@ -285,6 +668,81 @@ export default function OwnerDashboard() {
                     </View>
                 </View>
 
+                {/* --- CUT-OFF TIMERS SECTION --- */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Attendance Cut-Off Timers</Text>
+                    <View style={styles.premiumCard}>
+                        <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 16, lineHeight: 20 }}>
+                            Set daily cut-off times (HH:mm in 24-hr IST) after which students cannot change today's bookings.
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>Morning Cut-Off</Text>
+                                <TextInput
+                                    style={[styles.input, { marginBottom: 0 }]}
+                                    placeholder="09:30"
+                                    value={morningCutoff}
+                                    onChangeText={setMorningCutoff}
+                                />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>Night Cut-Off</Text>
+                                <TextInput
+                                    style={[styles.input, { marginBottom: 0 }]}
+                                    placeholder="17:30"
+                                    value={nightCutoff}
+                                    onChangeText={setNightCutoff}
+                                />
+                            </View>
+                        </View>
+                        <TouchableOpacity
+                            style={[styles.publishBtn, { backgroundColor: '#4f46e5' }, isSavingCutoff && { opacity: 0.7 }]}
+                            disabled={isSavingCutoff}
+                            onPress={handleSaveCutoff}>
+                            {isSavingCutoff ? (
+                                <ActivityIndicator color="#fff" size="small" />
+                            ) : (
+                                <>
+                                    <Feather name="clock" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                                    <Text style={styles.publishBtnText}>Save Cut-Off Times</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* --- UPI CONFIGURATION SECTION --- */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>UPI Payment Configuration</Text>
+                    <View style={styles.premiumCard}>
+                        <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 16, lineHeight: 20 }}>
+                            Set your business or personal UPI ID (e.g. messowner@okaxis) to allow students to pay monthly fees directly via native UPI intent links.
+                        </Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="e.g. messname@okhdfcbank"
+                            value={upiId}
+                            onChangeText={setUpiId}
+                            autoCapitalize="none"
+                        />
+                        <TouchableOpacity
+                            style={[styles.publishBtn, { backgroundColor: '#10b981' }, isSavingUpi && { opacity: 0.7 }]}
+                            disabled={isSavingUpi}
+                            onPress={handleSaveUpi}
+                        >
+                            {isSavingUpi ? (
+                                <ActivityIndicator color="#fff" size="small" />
+                            ) : (
+                                <>
+                                    <Feather name="credit-card" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                                    <Text style={styles.publishBtnText}>Save UPI ID</Text>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* --- MEMBERS SECTION --- */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Monthly Members ({members.length})</Text>
                     {members.length === 0 ? (
@@ -294,10 +752,10 @@ export default function OwnerDashboard() {
                         </View>
                     ) : (
                         members.map(member => (
-                            <View key={member._id} style={styles.memberCard}>
+                            <View key={member._id} style={[styles.memberCard, member.status === 'verification_pending' && { borderColor: '#f59e0b', borderWidth: 2 }]}>
                                 <View style={styles.memberHeader}>
                                     <View style={styles.memberAvatar}>
-                                        <Text style={styles.avatarText}>{member.studentName.charAt(0).toUpperCase()}</Text>
+                                        <Text style={styles.avatarText}>{(member.studentName || 'S').charAt(0).toUpperCase()}</Text>
                                     </View>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.memberName}>{member.studentName}</Text>
@@ -323,18 +781,50 @@ export default function OwnerDashboard() {
                                     </TouchableOpacity>
                                 </View>
 
-                                <TouchableOpacity
-                                    onPress={() => togglePaymentStatus(member._id, member.status)}
-                                    style={[styles.payBtn, member.status === 'paid' ? styles.payBtnPaid : styles.payBtnPending]}>
-                                    <Text style={[styles.payBtnText, member.status === 'paid' ? { color: '#059669' } : { color: '#dc2626' }]}>
-                                        {member.status === 'paid' ? 'STATUS: PAID ✓' : 'MARK AS PAID'}
-                                    </Text>
-                                </TouchableOpacity>
+                                {/* Verification Pending Highlighting */}
+                                {member.status === 'verification_pending' ? (
+                                    <View style={styles.pendingVerifyCard}>
+                                        <View style={styles.pendingVerifyHeader}>
+                                            <Feather name="alert-triangle" size={14} color="#ea580c" />
+                                            <Text style={styles.pendingVerifyTitle}>UPI Payment Verification Requested</Text>
+                                        </View>
+                                        <Text style={styles.utrText}>
+                                            UTR: <Text style={{ fontWeight: '900', color: '#0f172a' }}>{member.lastUtrNumber || 'Not provided'}</Text>
+                                        </Text>
+                                        <TouchableOpacity
+                                            style={styles.approvePaymentBtn}
+                                            onPress={() => updateSubscription(member._id, { status: 'paid' })}
+                                        >
+                                            <Feather name="check" size={15} color="#ffffff" />
+                                            <Text style={styles.approvePaymentBtnText}>Approve Payment ✓</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : member.status === 'expired' ? (
+                                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                                        <View style={[styles.payBtn, { flex: 1, backgroundColor: '#fef3c7', borderColor: '#f59e0b' }]}>
+                                            <Text style={[styles.payBtnText, { color: '#b45309' }]}>STATUS: EXPIRED</Text>
+                                        </View>
+                                        <TouchableOpacity
+                                            onPress={() => handleRenewMember(member._id)}
+                                            style={[styles.payBtn, { flex: 1, backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
+                                            <Text style={[styles.payBtnText, { color: '#16a34a' }]}>RENEW (30D) ⟳</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : (
+                                    <TouchableOpacity
+                                        onPress={() => togglePaymentStatus(member._id, member.status)}
+                                        style={[styles.payBtn, member.status === 'paid' ? styles.payBtnPaid : styles.payBtnPending]}>
+                                        <Text style={[styles.payBtnText, member.status === 'paid' ? { color: '#059669' } : { color: '#dc2626' }]}>
+                                            {member.status === 'paid' ? 'STATUS: PAID ✓' : 'MARK AS PAID'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
                         ))
                     )}
                 </View>
 
+                {/* --- LOCATION SECTION --- */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Mess Location Map</Text>
                     <View style={styles.premiumCard}>
@@ -366,6 +856,110 @@ export default function OwnerDashboard() {
 
             </ScrollView>
 
+            {/* SCANNER MODAL */}
+            <Modal visible={scannerVisible} animationType="slide">
+                <SafeAreaView style={{ flex: 1, backgroundColor: '#0f172a' }}>
+                    <View style={styles.scannerHeader}>
+                        <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900' }}>Scan Meal QR Pass 📷</Text>
+                        <TouchableOpacity onPress={() => setScannerVisible(false)} style={{ padding: 6 }}>
+                            <Feather name="x" size={26} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.cameraContainer}>
+                        <CameraView
+                            style={StyleSheet.absoluteFill}
+                            facing="back"
+                            onBarcodeScanned={isVerifyingQr ? undefined : (scanned) => handleVerifyQrToken(scanned.data)}
+                        />
+                        <View style={styles.scanTargetOverlay}>
+                            <View style={styles.scanTargetBox} />
+                        </View>
+                    </View>
+
+                    {/* Scan Result Banner */}
+                    {scanResult && (
+                        <View style={[styles.resultBanner, scanResult.type === 'success' ? styles.resultSuccess : styles.resultError]}>
+                            <Feather name={scanResult.type === 'success' ? "check-circle" : "alert-circle"} size={24} color="#fff" />
+                            <View style={{ flex: 1 }}>
+                                {scanResult.studentName && (
+                                    <Text style={styles.resultStudent}>{scanResult.studentName}</Text>
+                                )}
+                                <Text style={styles.resultMessage}>{scanResult.message}</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setScanResult(null)} style={{ padding: 4 }}>
+                                <Feather name="x" size={18} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {/* Manual token input option for fallback */}
+                    <View style={styles.manualInputWrapper}>
+                        <TextInput
+                            style={styles.manualInput}
+                            placeholder="Or paste QR token manually..."
+                            placeholderTextColor="#94a3b8"
+                            value={manualQrInput}
+                            onChangeText={setManualQrInput}
+                        />
+                        <TouchableOpacity
+                            style={styles.manualVerifyBtn}
+                            onPress={() => {
+                                if (manualQrInput.trim()) {
+                                    handleVerifyQrToken(manualQrInput.trim());
+                                    setManualQrInput('');
+                                }
+                            }}
+                            disabled={isVerifyingQr}
+                        >
+                            {isVerifyingQr ? (
+                                <ActivityIndicator color="#fff" size="small" />
+                            ) : (
+                                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Verify</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </SafeAreaView>
+            </Modal>
+
+            {/* NOTIFICATIONS MODAL */}
+            <Modal visible={notifModalVisible} transparent animationType="slide">
+                <View style={[styles.modalOverlay, { justifyContent: 'flex-end' }]}>
+                    <View style={[styles.modalBox, { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, maxHeight: '80%' }]}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Feather name="bell" size={20} color="#4f46e5" />
+                                <Text style={[styles.modalTitle, { marginBottom: 0 }]}>Notifications</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setNotifModalVisible(false)}>
+                                <Feather name="x-circle" size={26} color="#94a3b8" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {notifications.length === 0 ? (
+                            <View style={{ alignItems: 'center', padding: 32 }}>
+                                <Feather name="bell-off" size={32} color="#cbd5e1" style={{ marginBottom: 12 }} />
+                                <Text style={{ color: '#64748b', fontSize: 15 }}>No notifications yet</Text>
+                            </View>
+                        ) : (
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                {notifications.map(n => (
+                                    <View key={n._id} style={[styles.notifItem, !n.isRead && styles.notifUnread]}>
+                                        <Text style={styles.notifTitle}>{n.title}</Text>
+                                        <Text style={styles.notifBody}>{n.body}</Text>
+                                        <Text style={styles.notifDate}>
+                                            {new Date(n.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        </Text>
+                                    </View>
+                                ))}
+                                <View style={{ height: 20 }} />
+                            </ScrollView>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* EDIT SUBSCRIPTION METRIC MODAL */}
             <Modal visible={modalVisible} transparent animationType="fade">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalBox}>
@@ -385,6 +979,81 @@ export default function OwnerDashboard() {
                     </View>
                 </View>
             </Modal>
+
+            {/* RATION NORMS MODAL */}
+            <Modal visible={rationModalVisible} transparent animationType="fade" onRequestClose={() => setRationModalVisible(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalBox}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Feather name="sliders" size={20} color="#4f46e5" />
+                                <Text style={[styles.modalTitle, { marginBottom: 0, textAlign: 'left' }]}>Per-Plate Norms</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setRationModalVisible(false)}>
+                                <Feather name="x-circle" size={22} color="#94a3b8" />
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
+                            Customize per-student ingredient norms (in grams) for kitchen prep estimates.
+                        </Text>
+
+                        <View style={{ gap: 10, marginBottom: 16 }}>
+                            <View style={styles.rationInputRow}>
+                                <Text style={styles.rationInputLabel}>🍚 Raw Rice (grams):</Text>
+                                <TextInput
+                                    style={styles.rationInputField}
+                                    keyboardType="numeric"
+                                    value={tempRationConfig.riceGrams}
+                                    onChangeText={(v) => setTempRationConfig(p => ({ ...p, riceGrams: v }))}
+                                />
+                            </View>
+
+                            <View style={styles.rationInputRow}>
+                                <Text style={styles.rationInputLabel}>🌾 Atta / Flour (grams):</Text>
+                                <TextInput
+                                    style={styles.rationInputField}
+                                    keyboardType="numeric"
+                                    value={tempRationConfig.flourGrams}
+                                    onChangeText={(v) => setTempRationConfig(p => ({ ...p, flourGrams: v }))}
+                                />
+                            </View>
+
+                            <View style={styles.rationInputRow}>
+                                <Text style={styles.rationInputLabel}>🥣 Dal / Lentils (grams):</Text>
+                                <TextInput
+                                    style={styles.rationInputField}
+                                    keyboardType="numeric"
+                                    value={tempRationConfig.dalGrams}
+                                    onChangeText={(v) => setTempRationConfig(p => ({ ...p, dalGrams: v }))}
+                                />
+                            </View>
+
+                            <View style={styles.rationInputRow}>
+                                <Text style={styles.rationInputLabel}>🥬 Vegetables (grams):</Text>
+                                <TextInput
+                                    style={styles.rationInputField}
+                                    keyboardType="numeric"
+                                    value={tempRationConfig.veggieGrams}
+                                    onChangeText={(v) => setTempRationConfig(p => ({ ...p, veggieGrams: v }))}
+                                />
+                            </View>
+                        </View>
+
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity onPress={() => setRationModalVisible(false)} style={styles.modalBtnCancel}>
+                                <Text style={{ color: '#64748b', fontWeight: '900' }}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleSaveRationConfig} style={styles.modalBtnSave} disabled={isSavingRation}>
+                                {isSavingRation ? (
+                                    <ActivityIndicator color="#fff" size="small" />
+                                ) : (
+                                    <Text style={{ color: '#fff', fontWeight: '900' }}>Save Norms</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -394,9 +1063,16 @@ const styles = StyleSheet.create({
     center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' },
 
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#f8fafc' },
-    greeting: { fontSize: 26, fontWeight: '900', color: '#0f172a' },
-    subtitle: { fontSize: 14, color: '#64748b', marginTop: 4 },
-    logoutBtn: { backgroundColor: '#fee2e2', padding: 12, borderRadius: 12 },
+    greeting: { fontSize: 24, fontWeight: '900', color: '#0f172a' },
+    subtitle: { fontSize: 13, color: '#64748b', marginTop: 2 },
+    logoutBtn: { backgroundColor: '#fee2e2', padding: 10, borderRadius: 12 },
+
+    scannerHeaderBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#4f46e5', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, gap: 6 },
+    scannerHeaderBtnText: { color: '#ffffff', fontWeight: 'bold', fontSize: 12 },
+
+    bellBtn: { padding: 10, borderRadius: 12, backgroundColor: '#e0e7ff', position: 'relative' },
+    notifBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#ef4444', borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
+    notifBadgeText: { color: '#ffffff', fontSize: 10, fontWeight: 'bold' },
 
     content: { flex: 1, paddingHorizontal: 20, paddingTop: 8 },
     sectionTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a', marginBottom: 16 },
@@ -417,11 +1093,11 @@ const styles = StyleSheet.create({
     shiftBtnText: { fontSize: 13, fontWeight: 'bold', color: '#64748b' },
     shiftBtnTextActive: { color: '#4f46e5' },
 
-    statsRow: { flexDirection: 'row', gap: 16 },
-    statCard: { flex: 1, padding: 20, borderRadius: 24, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
-    statBgIcon: { position: 'absolute', right: -10, bottom: -10, transform: [{ scale: 3 }] },
-    statLabel: { color: '#ecfdf5', fontWeight: 'bold', fontSize: 14, marginBottom: 8 },
-    statValue: { color: '#ffffff', fontWeight: '900', fontSize: 40 },
+    statsRow: { flexDirection: 'row', gap: 10 },
+    statCard: { flex: 1, padding: 16, borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
+    statBgIcon: { position: 'absolute', right: -6, bottom: -6, transform: [{ scale: 2.2 }] },
+    statLabel: { color: '#ecfdf5', fontWeight: 'bold', fontSize: 12, marginBottom: 6 },
+    statValue: { color: '#ffffff', fontWeight: '900', fontSize: 28 },
 
     premiumCard: { backgroundColor: '#ffffff', padding: 20, borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 15, shadowOffset: { width: 0, height: 8 }, elevation: 5 },
     input: { backgroundColor: '#f1f5f9', padding: 16, borderRadius: 16, marginBottom: 16, fontSize: 15, color: '#0f172a' },
@@ -449,6 +1125,13 @@ const styles = StyleSheet.create({
     metricLabel: { fontSize: 10, color: '#64748b', marginBottom: 6, textTransform: 'uppercase', fontWeight: '900' },
     metricValue: { fontSize: 13, fontWeight: '900', color: '#0f172a' },
 
+    pendingVerifyCard: { backgroundColor: '#fff7ed', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#fed7aa', marginTop: 10 },
+    pendingVerifyHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+    pendingVerifyTitle: { fontSize: 12, fontWeight: 'bold', color: '#ea580c' },
+    utrText: { fontSize: 13, color: '#475569', marginBottom: 10 },
+    approvePaymentBtn: { backgroundColor: '#10b981', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10, gap: 6 },
+    approvePaymentBtnText: { color: '#ffffff', fontWeight: 'bold', fontSize: 13 },
+
     payBtn: { paddingVertical: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
     payBtnPaid: { backgroundColor: '#ecfdf5' },
     payBtnPending: { backgroundColor: '#fef2f2' },
@@ -457,6 +1140,27 @@ const styles = StyleSheet.create({
     locationActiveBanner: { backgroundColor: '#e0e7ff', padding: 12, borderRadius: 12, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
     locationActiveText: { color: '#4338ca', fontWeight: 'bold', fontSize: 13 },
 
+    // Scanner Styles
+    scannerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#0f172a' },
+    cameraContainer: { flex: 1, position: 'relative', overflow: 'hidden' },
+    scanTargetOverlay: { ...StyleSheet.absoluteFill, justifyContent: 'center', alignItems: 'center' },
+    scanTargetBox: { width: 250, height: 250, borderWidth: 2, borderColor: '#10b981', borderRadius: 24, backgroundColor: 'transparent' },
+    resultBanner: { flexDirection: 'row', alignItems: 'center', padding: 16, margin: 16, borderRadius: 16, gap: 12 },
+    resultSuccess: { backgroundColor: '#10b981' },
+    resultError: { backgroundColor: '#ef4444' },
+    resultStudent: { color: '#fff', fontWeight: '900', fontSize: 16 },
+    resultMessage: { color: '#fff', fontSize: 13, marginTop: 2 },
+    manualInputWrapper: { flexDirection: 'row', padding: 16, backgroundColor: '#1e293b', gap: 10, alignItems: 'center' },
+    manualInput: { flex: 1, backgroundColor: '#334155', color: '#fff', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14 },
+    manualVerifyBtn: { backgroundColor: '#4f46e5', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
+
+    // Notification Styles
+    notifItem: { backgroundColor: '#f8fafc', padding: 14, borderRadius: 14, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' },
+    notifUnread: { backgroundColor: '#eef2ff', borderColor: '#c7d2fe' },
+    notifTitle: { fontSize: 14, fontWeight: 'bold', color: '#0f172a', marginBottom: 4 },
+    notifBody: { fontSize: 13, color: '#475569', marginBottom: 6 },
+    notifDate: { fontSize: 11, color: '#94a3b8' },
+
     modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
     modalBox: { width: '100%', backgroundColor: '#fff', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 },
     modalTitle: { fontSize: 18, fontWeight: '900', marginBottom: 20, color: '#0f172a', textAlign: 'center' },
@@ -464,4 +1168,20 @@ const styles = StyleSheet.create({
     modalActions: { flexDirection: 'row', gap: 12 },
     modalBtnCancel: { flex: 1, padding: 16, alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 16 },
     modalBtnSave: { flex: 1, padding: 16, alignItems: 'center', backgroundColor: '#4f46e5', borderRadius: 16 },
+
+    // Kitchen Ration Estimator Styles
+    customNormsBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e0e7ff', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, gap: 5 },
+    customNormsBtnText: { color: '#4f46e5', fontWeight: '800', fontSize: 12 },
+    rationGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
+    rationCard: { flex: 1, minWidth: '45%', backgroundColor: '#ffffff', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' },
+    rationEmoji: { fontSize: 24, marginBottom: 4 },
+    rationValue: { fontSize: 18, fontWeight: '900', color: '#0f172a' },
+    rationTitle: { fontSize: 12, fontWeight: '700', color: '#475569', marginTop: 2 },
+    rationNorm: { fontSize: 10, fontWeight: '600', color: '#94a3b8', marginTop: 2 },
+    wastePreventedBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#ecfdf5', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#a7f3d0' },
+    wastePreventedTitle: { fontSize: 13, fontWeight: '800', color: '#065f46', marginBottom: 2 },
+    wastePreventedDesc: { fontSize: 12, color: '#047857', lineHeight: 18, fontWeight: '500' },
+    rationInputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    rationInputLabel: { fontSize: 13, fontWeight: '700', color: '#334155' },
+    rationInputField: { backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, fontWeight: '800', color: '#0f172a', width: 90, textAlign: 'center' },
 });

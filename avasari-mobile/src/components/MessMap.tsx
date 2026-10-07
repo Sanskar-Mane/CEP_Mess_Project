@@ -53,10 +53,14 @@ export default function MessMap({ messes = [] }) {
             var lng = mess.location.coordinates[0];
             var lat = mess.location.coordinates[1];
             var rating = mess.rating ? Number(mess.rating).toFixed(1) : 'New';
+            var distBadge = (mess.distanceKm !== undefined && mess.distanceKm !== null)
+              ? '<div style="background-color: #ecfdf5; color: #065f46; font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 999px; display: inline-block; margin: 4px 0;">📍 ' + mess.distanceKm + ' km away</div><br/>'
+              : '';
 
             // We added the button to the popup content here
             var popupContent = '<div class="custom-popup">' +
               '<b>' + mess.messName + '</b><br/>' +
+              distBadge +
               '⭐ ' + rating + ' (' + (mess.ratingCount || 0) + ' reviews)<br/>' +
               '<small>' + (mess.messAddress || 'Avasari') + '</small><br/>' +
               '<button class="dir-btn" onclick="getDirections(' + lat + ', ' + lng + ')">Get Directions 📍</button>' +

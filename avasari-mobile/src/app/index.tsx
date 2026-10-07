@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 
-const API_URL = 'http://192.168.0.101:3000'; // ⚠️ IP CONFIGURED
+import { API_URL } from '@/constants/config';
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -50,7 +50,6 @@ export default function AuthScreen() {
     setIsLoading(true);
     setError('');
 
-    // STRICT PHONE VALIDATION (10 digits, starts with 6,7,8,9)
     const phoneRegex = /^[6-9]\d{9}$/;
     if (!phoneRegex.test(formData.phone)) {
       setError("Please enter a valid 10-digit Indian mobile number.");
@@ -70,7 +69,6 @@ export default function AuthScreen() {
       const data = await response.json();
 
       if (response.ok) {
-        // Save JWT to AsyncStorage for Mobile
         await AsyncStorage.setItem('token', data.token);
 
         if (data.user.role === 'admin') router.replace('/admin');
@@ -140,7 +138,6 @@ export default function AuthScreen() {
             </View>
           ) : (
             <View style={styles.formGroup}>
-              {/* ROLE SELECTOR */}
               <View style={styles.roleToggleRow}>
                 <TouchableOpacity style={[styles.roleBtn, role === 'student' && styles.roleBtnActive]} onPress={() => setRole('student')}>
                   <Text style={[styles.roleBtnText, role === 'student' && styles.roleBtnTextActive]}>Student</Text>
@@ -178,7 +175,6 @@ export default function AuthScreen() {
                 </View>
               ) : (
                 <View>
-                  {/* STEPPER INDICATOR */}
                   <View style={styles.stepperRow}>
                     {[1, 2, 3].map((num) => (
                       <View key={num} style={[styles.stepCircle, step >= num && styles.stepCircleActive]}>

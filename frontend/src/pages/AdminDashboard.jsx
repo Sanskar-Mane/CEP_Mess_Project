@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Shield, CheckCircle, Trash2, Users, Store, Clock, LogOut, Phone, User, BookOpen, Plus } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { API_URL } from '../utils/config';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -14,7 +14,17 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('pending');
   
   // Form state for new directory item
-  const [dirForm, setDirForm] = useState({ category: 'rickshaws', name: '', phone: '', area: '', tag: '' });
+  const [dirForm, setDirForm] = useState({
+    category: 'rickshaws',
+    name: '',
+    phone: '',
+    area: '',
+    tag: '',
+    rentPerMonth: '',
+    vacancies: 1,
+    genderPreference: 'any',
+    amenities: ''
+  });
 
   useEffect(() => {
     if (adminData && adminData.role === 'admin') {
@@ -69,15 +79,32 @@ const AdminDashboard = () => {
     e.preventDefault();
     const token = localStorage.getItem('token');
     try {
+      const payload = {
+        ...dirForm,
+        rentPerMonth: dirForm.rentPerMonth ? Number(dirForm.rentPerMonth) : 0,
+        vacancies: dirForm.vacancies ? Number(dirForm.vacancies) : 1
+      };
       const response = await fetch(`${API_URL}/api/admin/directory`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(dirForm)
+        body: JSON.stringify(payload)
       });
       if (response.ok) {
-        setDirForm({ category: 'rickshaws', name: '', phone: '', area: '', tag: '' });
+        setDirForm({ category: 'rickshaws', name: '', phone: '', area: '', tag: '', rentPerMonth: '', vacancies: 1, genderPreference: 'any', amenities: '' });
         fetchDirectory();
       }
+    } catch (error) { console.error(error); }
+  };
+
+  const updateDirectoryItem = async (id, updateData) => {
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_URL}/api/admin/directory/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(updateData)
+      });
+      if (response.ok) fetchDirectory();
     } catch (error) { console.error(error); }
   };
 
@@ -176,43 +203,129 @@ const AdminDashboard = () => {
              <h2 className="text-2xl font-extrabold mb-8 text-slate-800 flex items-center gap-3"><div className="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl"><BookOpen size={24}/></div> Service Directory Manager</h2>
              
              {/* Form to Add Service */}
-             <form onSubmit={addDirectoryItem} className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 mb-8 grid md:grid-cols-5 gap-4 items-end">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">Category</label>
-                  <select value={dirForm.category} onChange={e => setDirForm({...dirForm, category: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200">
-                    <option value="rickshaws">Auto Rickshaws</option>
-                    <option value="rooms">PGs & Rooms</option>
-                    <option value="emergency">Emergency</option>
-                  </select>
+             <form onSubmit={addDirectoryItem} className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 mb-8 space-y-4">
+                <div className="grid md:grid-cols-4 gap-4 items-end">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Category</label>
+                    <select value={dirForm.category} onChange={e => setDirForm({...dirForm, category: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 bg-white font-bold text-sm">
+                      <option value="rickshaws">🛺 Auto Rickshaws</option>
+                      <option value="rooms">🏠 PGs & Rooms</option>
+                      <option value="emergency">🚨 Emergency</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Service / Property Name</label>
+                    <input required value={dirForm.name} onChange={e => setDirForm({...dirForm, name: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 bg-white text-sm" placeholder="e.g. Omkar PG / Ramesh Auto"/>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Phone Number</label>
+                    <input required value={dirForm.phone} onChange={e => setDirForm({...dirForm, phone: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 bg-white text-sm" placeholder="e.g. 9876543210"/>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Area / Landmark</label>
+                    <input value={dirForm.area} onChange={e => setDirForm({...dirForm, area: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 bg-white text-sm" placeholder="e.g. Near College Gate / Main Road"/>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">Service Name</label>
-                  <input required value={dirForm.name} onChange={e => setDirForm({...dirForm, name: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200" placeholder="e.g. Ramesh Auto"/>
+
+                {dirForm.category === 'rooms' && (
+                  <div className="grid sm:grid-cols-4 gap-4 pt-2 border-t border-indigo-100/80 items-end">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">Monthly Rent (₹)</label>
+                      <input type="number" min="0" value={dirForm.rentPerMonth} onChange={e => setDirForm({...dirForm, rentPerMonth: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 bg-white text-sm font-bold" placeholder="e.g. 2500"/>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">Vacancies Count</label>
+                      <input type="number" min="0" value={dirForm.vacancies} onChange={e => setDirForm({...dirForm, vacancies: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 bg-white text-sm font-bold" placeholder="1"/>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">Gender Preference</label>
+                      <select value={dirForm.genderPreference} onChange={e => setDirForm({...dirForm, genderPreference: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 bg-white text-sm font-bold">
+                        <option value="any">Any / Co-ed</option>
+                        <option value="boys">Boys Only</option>
+                        <option value="girls">Girls Only</option>
+                        <option value="co-ed">Co-Ed</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">Amenities (comma-separated)</label>
+                      <input value={dirForm.amenities} onChange={e => setDirForm({...dirForm, amenities: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 bg-white text-sm" placeholder="WiFi, Hot Water, RO Water, Parking"/>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-2">
+                  <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-95">
+                    <Plus size={18} /> Add Service / Listing
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">Phone Number</label>
-                  <input required value={dirForm.phone} onChange={e => setDirForm({...dirForm, phone: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200" placeholder="e.g. 9876543210"/>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">Area / Details</label>
-                  <input value={dirForm.area} onChange={e => setDirForm({...dirForm, area: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200" placeholder="e.g. College Stand"/>
-                </div>
-                <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
-                  <Plus size={18} /> Add Service
-                </button>
              </form>
 
              {/* List Directory */}
              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                {directory.map(item => (
-                 <div key={item._id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-start">
+                 <div key={item._id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between">
                    <div>
-                     <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase mb-2 inline-block ${item.category === 'emergency' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>{item.category}</span>
-                     <h4 className="font-extrabold text-slate-800">{item.name}</h4>
-                     <p className="text-sm font-bold text-slate-500 flex items-center gap-1 mt-1"><Phone size={14}/> {item.phone}</p>
-                     <p className="text-xs text-slate-400 mt-1">{item.area}</p>
+                     <div className="flex justify-between items-start mb-2">
+                       <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${item.category === 'emergency' ? 'bg-rose-100 text-rose-700' : item.category === 'rooms' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{item.category}</span>
+                       <button onClick={() => deleteDirectoryItem(item._id)} className="text-slate-300 hover:text-rose-500 p-1" title="Delete listing"><Trash2 size={16}/></button>
+                     </div>
+                     <h4 className="font-extrabold text-slate-900 text-base">{item.name}</h4>
+                     <p className="text-sm font-bold text-slate-600 flex items-center gap-1 mt-1"><Phone size={14}/> {item.phone}</p>
+                     <p className="text-xs text-slate-400 mt-0.5">{item.area}</p>
+
+                     {item.category === 'rooms' && (
+                       <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                         <div className="flex items-center justify-between text-xs font-bold">
+                           <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                             ₹{item.rentPerMonth || 0}/mo
+                           </span>
+                           <span className="text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md capitalize">
+                             {item.genderPreference || 'any'}
+                           </span>
+                           <span className={`px-2 py-0.5 rounded-md ${item.isAvailable !== false && (item.vacancies || 0) > 0 ? 'bg-teal-50 text-teal-700' : 'bg-rose-50 text-rose-700'}`}>
+                             {item.isAvailable !== false && (item.vacancies || 0) > 0 ? `${item.vacancies || 0} vacant` : 'Full'}
+                           </span>
+                         </div>
+
+                         {item.amenities && item.amenities.length > 0 && (
+                           <div className="flex flex-wrap gap-1 mt-1.5">
+                             {item.amenities.map((amenity, aIdx) => (
+                               <span key={aIdx} className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                                 {amenity}
+                               </span>
+                             ))}
+                           </div>
+                         )}
+
+                         {/* Quick Vacancy & Availability Controls */}
+                         <div className="flex items-center gap-2 pt-2">
+                           <button
+                             type="button"
+                             onClick={() => updateDirectoryItem(item._id, { vacancies: Math.max(0, (item.vacancies || 1) - 1) })}
+                             className="text-xs font-bold px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
+                             title="Decrease vacancies"
+                           >
+                             - Vacancy
+                           </button>
+                           <button
+                             type="button"
+                             onClick={() => updateDirectoryItem(item._id, { vacancies: (item.vacancies || 0) + 1 })}
+                             className="text-xs font-bold px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700"
+                             title="Increase vacancies"
+                           >
+                             + Vacancy
+                           </button>
+                           <button
+                             type="button"
+                             onClick={() => updateDirectoryItem(item._id, { isAvailable: item.isAvailable === false ? true : false })}
+                             className={`text-xs font-bold px-2.5 py-1 rounded-lg transition-colors ml-auto ${item.isAvailable === false ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-rose-100 text-rose-700 hover:bg-rose-200'}`}
+                           >
+                             {item.isAvailable === false ? 'Set Available' : 'Set Full'}
+                           </button>
+                         </div>
+                       </div>
+                     )}
                    </div>
-                   <button onClick={() => deleteDirectoryItem(item._id)} className="text-slate-300 hover:text-rose-500 p-2"><Trash2 size={18}/></button>
                  </div>
                ))}
              </div>

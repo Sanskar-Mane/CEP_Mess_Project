@@ -103,10 +103,15 @@ const MessMap = ({ messes }) => {
                     <p className="text-slate-500 text-xs mb-2 flex items-center gap-1">
                       <span>📍</span> {mess.messAddress || 'No address'}
                     </p>
-                    <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center gap-2 mb-3 flex-wrap">
                       <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
                         ⭐ {mess.ratingCount > 0 ? Number(mess.rating).toFixed(1) : 'New'}
                       </span>
+                      {mess.distanceKm !== undefined && (
+                        <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                          📍 {mess.distanceKm} km away
+                        </span>
+                      )}
                       <span className="text-slate-400 text-xs">{mess.ratingCount} reviews</span>
                     </div>
                     <a
@@ -135,7 +140,14 @@ const MessMap = ({ messes }) => {
             return (
               <div key={mess._id} className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-xl p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex justify-between items-center shadow-sm">
                 <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white">{mess.messName}</h4>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-bold text-slate-900 dark:text-white">{mess.messName}</h4>
+                    {mess.distanceKm !== undefined && (
+                      <span className="bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                        📍 {mess.distanceKm} km away
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-slate-500 dark:text-slate-400">{mess.messAddress || 'No address provided'}</p>
                 </div>
                 <a
