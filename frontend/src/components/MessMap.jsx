@@ -99,7 +99,23 @@ const MessMap = ({ messes }) => {
               <Marker key={mess._id} position={[lat, lng]} icon={messIcon}>
                 <Popup>
                   <div className="font-sans min-w-[200px]">
+                    {mess.isTopChef && (
+                      <div className="mb-1.5">
+                        <span className="bg-gradient-to-r from-amber-100 to-yellow-300 text-amber-900 border border-amber-400 font-black text-[10px] px-2 py-0.5 rounded-full inline-flex items-center gap-1 shadow-sm">
+                          👑 Campus Top Chef
+                        </span>
+                      </div>
+                    )}
                     <h3 className="font-extrabold text-slate-900 text-base mb-1">{mess.messName}</h3>
+                    {mess.topTags && mess.topTags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-1.5">
+                        {mess.topTags.map((t, idx) => (
+                          <span key={idx} className="bg-indigo-50 text-indigo-700 font-bold text-[10px] px-1.5 py-0.5 rounded">
+                            🏷️ {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <p className="text-slate-500 text-xs mb-2 flex items-center gap-1">
                       <span>📍</span> {mess.messAddress || 'No address'}
                     </p>
@@ -142,12 +158,26 @@ const MessMap = ({ messes }) => {
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <h4 className="font-bold text-slate-900 dark:text-white">{mess.messName}</h4>
+                    {mess.isTopChef && (
+                      <span className="bg-gradient-to-r from-amber-100 to-yellow-300 text-amber-900 border border-amber-400 font-black text-[10px] px-2 py-0.5 rounded-full inline-flex items-center gap-1 shadow-sm">
+                        👑 Campus Top Chef
+                      </span>
+                    )}
                     {mess.distanceKm !== undefined && (
                       <span className="bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
                         📍 {mess.distanceKm} km away
                       </span>
                     )}
                   </div>
+                  {mess.topTags && mess.topTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {mess.topTags.map((t, idx) => (
+                        <span key={idx} className="bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded">
+                          🏷️ {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <p className="text-sm text-slate-500 dark:text-slate-400">{mess.messAddress || 'No address provided'}</p>
                 </div>
                 <a

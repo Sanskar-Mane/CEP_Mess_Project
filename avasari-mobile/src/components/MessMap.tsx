@@ -55,11 +55,18 @@ export default function MessMap({ messes = [] }) {
             var rating = mess.rating ? Number(mess.rating).toFixed(1) : 'New';
             var distBadge = (mess.distanceKm !== undefined && mess.distanceKm !== null)
               ? '<div style="background-color: #ecfdf5; color: #065f46; font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 999px; display: inline-block; margin: 4px 0;">📍 ' + mess.distanceKm + ' km away</div><br/>'
+            var topChefBadge = mess.isTopChef
+              ? '<div style="background: linear-gradient(135deg, #fef3c7, #fde68a); color: #92400e; font-size: 11px; font-weight: 900; padding: 3px 8px; border-radius: 999px; display: inline-block; margin: 4px 0; border: 1px solid #f59e0b; box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);">👑 Campus Top Chef</div><br/>'
+              : '';
+            var tagsHtml = (mess.topTags && mess.topTags.length > 0)
+              ? '<div style="margin: 4px 0;">' + mess.topTags.map(function(t) { return '<span style="background: #e0e7ff; color: #3730a3; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin: 1px 2px; display: inline-block;">🏷️ ' + t + '</span>'; }).join('') + '</div>'
               : '';
 
             // We added the button to the popup content here
             var popupContent = '<div class="custom-popup">' +
+              topChefBadge +
               '<b>' + mess.messName + '</b><br/>' +
+              tagsHtml +
               distBadge +
               '⭐ ' + rating + ' (' + (mess.ratingCount || 0) + ' reviews)<br/>' +
               '<small>' + (mess.messAddress || 'Avasari') + '</small><br/>' +

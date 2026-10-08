@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, ScrollView, Alert, Linking, SafeAreaView, Platform, StatusBar, Modal, TextInput, RefreshControl } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, ScrollView, Alert, Linking, SafeAreaView, Platform, StatusBar, Modal, TextInput, RefreshControl, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import MessMap from '../../components/MessMap';
+import * as ImagePicker from 'expo-image-picker';
 
 import { API_URL } from '@/constants/config';
 import { getSocket } from '@/utils/socket';
@@ -51,6 +52,7 @@ const MessCard = ({ mess, initialAttendance, initialAttendanceRecord, targetDate
     const [reviewModalVisible, setReviewModalVisible] = useState(false);
     const [rating, setRating] = useState(0);
     const [comment, setComment] = useState('');
+    const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
     // View Reviews State
     const [readReviewsModalVisible, setReadReviewsModalVisible] = useState(false);
@@ -158,7 +160,7 @@ const MessCard = ({ mess, initialAttendance, initialAttendanceRecord, targetDate
             const response = await fetch(`${API_URL}/api/messes/${messId}/rate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ rating, comment })
+                body: JSON.stringify({ rating, comment, tags: selectedTags })
             });
 
             if (response.ok) {
@@ -166,6 +168,7 @@ const MessCard = ({ mess, initialAttendance, initialAttendanceRecord, targetDate
                 setReviewModalVisible(false);
                 setRating(0);
                 setComment('');
+                setSelectedTags([]);
                 onRefresh(); // Refresh dashboard to update average stars
             } else {
                 const text = await response.text();
@@ -210,11 +213,19 @@ const MessCard = ({ mess, initialAttendance, initialAttendanceRecord, targetDate
     const disableComing = isSubmitting || attendance === 'coming' || isCutoffPassed;
     const disableSkip = isSubmitting || attendance === 'not_coming' || isCutoffPassed;
 
+    const isTopChef = Boolean(mess.ownerId?.isTopChef || mess.isTopChef);
+    const topTags: string[] = (mess.ownerId?.topTags || mess.topTags || []);
+
     return (
         <View style={[styles.card, attendance === 'coming' ? styles.cardComing : attendance === 'not_coming' ? styles.cardSkip : null]}>
             <View style={styles.cardHeader}>
                 <View style={{ flex: 1 }}>
                     <View style={styles.badgeRow}>
+                        {isTopChef && (
+                            <View style={styles.topChefBadgeHeader}>
+                                <Text style={styles.topChefBadgeHeaderText}>👑 Campus Top Chef</Text>
+                            </View>
+                        )}
                         <View style={styles.priceBadge}><Text style={styles.priceText}>₹{mess.price || 60} Thali</Text></View>
                         <View style={[styles.shiftBadge, mess.shift === 'morning' ? styles.shiftMorning : styles.shiftNight]}>
                             <Feather name={mess.shift === 'morning' ? "sun" : "moon"} size={12} color={mess.shift === 'morning' ? "#d97706" : "#4338ca"} style={{ marginRight: 4 }} />
@@ -233,6 +244,15 @@ const MessCard = ({ mess, initialAttendance, initialAttendanceRecord, targetDate
                         </View>
                     </View>
                     <Text style={styles.messName}>{mess.messName}</Text>
+                    {topTags.length > 0 && (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                            {topTags.map((tag: string, idx: number) => (
+                                <View key={idx} style={styles.tagBadge}>
+                                    <Text style={styles.tagBadgeText}>🏷️ {tag}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    )}
                 </View>
             </View>
 
@@ -292,7 +312,7 @@ const MessCard = ({ mess, initialAttendance, initialAttendanceRecord, targetDate
                 </TouchableOpacity>
             </View>
 
-            {targetDate === todayIST && attendance === 'coming' && (
+            {targetDate === todayIST && (attendance === 'coming' || (mySub?.status === 'paid' && attendance !== 'not_coming')) && (
                 <View style={{ marginTop: 12 }}>
                     {isClaimed ? (
                         <View style={styles.mealClaimedBadge}>
@@ -371,6 +391,28 @@ const MessCard = ({ mess, initialAttendance, initialAttendanceRecord, targetDate
                             ))}
                         </View>
 
+                        <Text style={styles.ratingTagPrompt}>Select quality tags (tap to choose):</Text>
+                        <View style={styles.ratingTagsContainer}>
+                            {['Hygiene', 'Taste', 'Portion Size', 'Speed', 'Value for Money', 'Friendly Staff'].map(tag => {
+                                const isSelected = selectedTags.includes(tag);
+                                return (
+                                    <TouchableOpacity
+                                        key={tag}
+                                        style={[styles.ratingTagChip, isSelected && styles.ratingTagChipActive]}
+                                        onPress={() => {
+                                            setSelectedTags(prev =>
+                                                prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                                            );
+                                        }}
+                                    >
+                                        <Text style={[styles.ratingTagChipText, isSelected && styles.ratingTagChipTextActive]}>
+                                            {isSelected ? '✓ ' : '+ '}{tag}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+
                         <TextInput
                             style={[styles.input, { height: 90, textAlignVertical: 'top' }]}
                             placeholder="Write a review (optional)..."
@@ -420,6 +462,15 @@ const MessCard = ({ mess, initialAttendance, initialAttendanceRecord, targetDate
                                             </Text>
                                         </View>
                                         {rev.comment ? <Text style={styles.reviewComment}>{rev.comment}</Text> : null}
+                                        {rev.tags && rev.tags.length > 0 && (
+                                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                                                {rev.tags.map((t: string, tIdx: number) => (
+                                                    <View key={tIdx} style={styles.reviewTagBadge}>
+                                                        <Text style={styles.reviewTagText}>🏷️ {t}</Text>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        )}
                                     </View>
                                 ))}
                                 <View style={{ height: 40 }} />
@@ -553,6 +604,155 @@ export default function StudentDashboard() {
     const [utrInput, setUtrInput] = useState<string>('');
     const [isSubmittingPayment, setIsSubmittingPayment] = useState<boolean>(false);
 
+    // 24H Mess Stories State
+    const [storiesGroups, setStoriesGroups] = useState<any[]>([]);
+    const [selectedStoryGroup, setSelectedStoryGroup] = useState<any | null>(null);
+    const [storyModalVisible, setStoryModalVisible] = useState<boolean>(false);
+    const [currentStoryIndex, setCurrentStoryIndex] = useState<number>(0);
+
+    // Dedicated Top-Level Digital Meal Pass State
+    const [topMealPassShift, setTopMealPassShift] = useState<'morning' | 'night'>(new Date().getHours() < 15 ? 'morning' : 'night');
+    const [topMealModalVisible, setTopMealModalVisible] = useState<boolean>(false);
+    const [topMealQrToken, setTopMealQrToken] = useState<string>('');
+    const [topMealQrLoading, setTopMealQrLoading] = useState<boolean>(false);
+    const [topMealQrExpirySeconds, setTopMealQrExpirySeconds] = useState<number>(900);
+    const [topMealCelebration, setTopMealCelebration] = useState<boolean>(false);
+    const [topMealMessData, setTopMealMessData] = useState<{ messName: string; shift: string }>({ messName: '', shift: '' });
+
+    // Student ID OCR Verification State
+    const [verifyIdModalOpen, setVerifyIdModalOpen] = useState<boolean>(false);
+    const [idImageUri, setIdImageUri] = useState<string | null>(null);
+    const [idBase64, setIdBase64] = useState<string | null>(null);
+    const [isVerifyingId, setIsVerifyingId] = useState<boolean>(false);
+    const [ocrErrorMsg, setOcrErrorMsg] = useState<string | null>(null);
+
+    const fetchStories = async () => {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) return;
+        try {
+            const res = await fetch(`${API_URL}/api/stories`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setStoriesGroups(data);
+            }
+        } catch (e) {
+            console.warn("Failed to fetch stories", e);
+        }
+    };
+
+    const promptPickIdCard = async (useCamera: boolean) => {
+        try {
+            let result;
+            if (useCamera) {
+                const { status } = await ImagePicker.requestCameraPermissionsAsync();
+                if (status !== 'granted') {
+                    Alert.alert("Permission Required", "Camera access is needed to capture your student ID card.");
+                    return;
+                }
+                result = await ImagePicker.launchCameraAsync({
+                    mediaTypes: ['images'],
+                    allowsEditing: true,
+                    aspect: [16, 10],
+                    quality: 0.85,
+                    base64: true,
+                });
+            } else {
+                const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                if (status !== 'granted') {
+                    Alert.alert("Permission Required", "Gallery access is needed to select your student ID card photo.");
+                    return;
+                }
+                result = await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ['images'],
+                    allowsEditing: true,
+                    aspect: [16, 10],
+                    quality: 0.85,
+                    base64: true,
+                });
+            }
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                const asset = result.assets[0];
+                setIdImageUri(asset.uri);
+                const b64 = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+                setIdBase64(b64);
+                setVerifyIdModalOpen(true);
+            }
+        } catch (e: any) {
+            Alert.alert("Error", `Could not select photo: ${e.message}`);
+        }
+    };
+
+    const handleVerifyStudentId = async () => {
+        if (!idBase64) {
+            Alert.alert("Missing Photo", "Please snap or select your college ID card first.");
+            return;
+        }
+        setIsVerifyingId(true);
+        setOcrErrorMsg(null);
+        const token = await AsyncStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_URL}/api/users/verify-id`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ base64Image: idBase64 })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                Alert.alert("🎉 Verification Success!", "Verified GCOEARA Student ✓! Your identity has been verified with AI OCR. Your profile and ride pool listings now display the verified trust badge.");
+                setUser((prev: any) => ({ ...prev, isStudentVerified: true }));
+                setVerifyIdModalOpen(false);
+                setIdImageUri(null);
+                setIdBase64(null);
+                setOcrErrorMsg(null);
+                fetchRides();
+            } else {
+                setOcrErrorMsg(data.error || "ID verification failed. Make sure the college name 'Government College of Engineering, Avasari' is visible in the frame.");
+            }
+        } catch (e: any) {
+            setOcrErrorMsg("Network error contacting OCR server. Try again or submit for manual approval.");
+        } finally {
+            setIsVerifyingId(false);
+        }
+    };
+
+    const handleManualApproveStudentId = async () => {
+        setIsVerifyingId(true);
+        setOcrErrorMsg(null);
+        const token = await AsyncStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_URL}/api/users/verify-id`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ manualApproval: true })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                Alert.alert("🎉 Approved!", "Verified GCOEARA Student ✓! Your student identity has been approved.");
+                setUser((prev: any) => ({ ...prev, isStudentVerified: true }));
+                setVerifyIdModalOpen(false);
+                setIdImageUri(null);
+                setIdBase64(null);
+                setOcrErrorMsg(null);
+                fetchRides();
+            } else {
+                Alert.alert("Error", data.error || "Manual approval failed.");
+            }
+        } catch {
+            Alert.alert("Error", "Network error submitting manual approval.");
+        } finally {
+            setIsVerifyingId(false);
+        }
+    };
+
     useEffect(() => {
         const fetchUser = async () => {
             const token = await AsyncStorage.getItem('token');
@@ -577,6 +777,7 @@ export default function StudentDashboard() {
         const headers = { 'Authorization': `Bearer ${token}` };
         try {
             if (activeTab === 'menus') {
+                fetchStories();
                 const [menuRes, attRes, subRes, notifRes] = await Promise.all([
                     fetch(`${API_URL}/api/menus/${targetDate}`, { headers }),
                     fetch(`${API_URL}/api/attendance/me/${targetDate}`, { headers }),
@@ -775,11 +976,16 @@ export default function StudentDashboard() {
             fetchRides();
         };
 
+        const onStoryNew = () => {
+            fetchStories();
+        };
+
         socket.on('menu:updated', onMenuUpdated);
         socket.on('attendance:updated', onAttendanceUpdated);
         socket.on('subscription:updated', onSubscriptionUpdated);
         socket.on('notification:new', onNotificationNew);
         socket.on('ride:updated', onRideUpdated);
+        socket.on('story:new', onStoryNew);
 
         return () => {
             socket.off('menu:updated', onMenuUpdated);
@@ -787,12 +993,13 @@ export default function StudentDashboard() {
             socket.off('subscription:updated', onSubscriptionUpdated);
             socket.off('notification:new', onNotificationNew);
             socket.off('ride:updated', onRideUpdated);
+            socket.off('story:new', onStoryNew);
         };
     }, [targetDate, activeTab, user]);
 
     const onRefresh = React.useCallback(async () => {
         setRefreshing(true);
-        await fetchData();
+        await Promise.all([fetchData(), fetchStories()]);
         setRefreshing(false);
     }, [targetDate, activeTab, user]);
 
@@ -873,6 +1080,90 @@ export default function StudentDashboard() {
         return myAttendance.find(a => a.messName === messName && a.shift === shift);
     };
 
+    // Dedicated Top-Level Digital Meal Pass Computations
+    const todayStr = getLocalDateString(0);
+    const activePaidSub = mySubscriptions.find((s: any) => s.status === 'paid' && (s.shift === 'both' || s.shift === topMealPassShift)) || mySubscriptions.find((s: any) => s.status === 'paid');
+    const todayAtt = myAttendance.find((a: any) => a.shift === topMealPassShift && (!a.targetDate || a.targetDate === todayStr));
+    const hasTopMealPass = Boolean(
+        (activePaidSub && (!todayAtt || todayAtt.status !== 'not_coming')) ||
+        (todayAtt && todayAtt.status === 'coming')
+    );
+    const topMealPassMessId = todayAtt?.messId || (activePaidSub?.messId?._id || activePaidSub?.messId);
+    const topMealPassMessName = todayAtt?.messName || activePaidSub?.messName || 'Your Mess';
+    const topMealPassIsConsumed = Boolean(todayAtt?.isConsumed);
+
+    // Live timer effect for QR pass expiry
+    useEffect(() => {
+        if (!topMealModalVisible) return;
+        const timer = setInterval(() => {
+            setTopMealQrExpirySeconds(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [topMealModalVisible]);
+
+    // Socket.io listener for counter QR scan verification
+    useEffect(() => {
+        const socket = getSocket();
+        const onAttendanceConsumed = (data: any) => {
+            if (data?.studentId === user?._id && data?.shift === topMealPassShift) {
+                setTopMealCelebration(true);
+                fetchData();
+                setTimeout(() => {
+                    setTopMealCelebration(false);
+                    setTopMealModalVisible(false);
+                }, 3200);
+            }
+        };
+        socket.on('attendance:consumed', onAttendanceConsumed);
+        return () => {
+            socket.off('attendance:consumed', onAttendanceConsumed);
+        };
+    }, [user, topMealPassShift]);
+
+    const handleOpenTopMealQr = async (shift: 'morning' | 'night') => {
+        if (!topMealPassMessId) {
+            Alert.alert("Notice", "No active mess subscription found.");
+            return;
+        }
+        setTopMealQrLoading(true);
+        setTopMealQrToken('');
+        setTopMealModalVisible(true);
+        setTopMealQrExpirySeconds(900);
+        setTopMealCelebration(false);
+        const token = await AsyncStorage.getItem('token');
+        try {
+            const res = await fetch(`${API_URL}/api/attendance/qr/${topMealPassMessId}/${todayStr}/${shift}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok && data.qrToken) {
+                setTopMealQrToken(data.qrToken);
+                setTopMealMessData({
+                    messName: data.messName || topMealPassMessName,
+                    shift: data.shift || shift
+                });
+            } else {
+                Alert.alert("Notice", data.error || "Could not generate meal pass.");
+                setTopMealModalVisible(false);
+            }
+        } catch {
+            Alert.alert("Error", "Network connection failed.");
+            setTopMealModalVisible(false);
+        } finally {
+            setTopMealQrLoading(false);
+        }
+    };
+
+    const handleRefreshTopMealQr = () => {
+        handleOpenTopMealQr(topMealPassShift);
+    };
+
     if (!user) return <View style={styles.center}><ActivityIndicator size="large" color="#4f46e5" /></View>;
 
     return (
@@ -880,8 +1171,35 @@ export default function StudentDashboard() {
             <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
 
             <View style={styles.header}>
-                <View>
-                    <Text style={styles.greeting}>Hi, {user.name.split(' ')[0]} 👋</Text>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Text style={styles.greeting}>Hi, {user.name.split(' ')[0]} 👋</Text>
+                        {user.isStudentVerified ? (
+                            <View style={styles.verifiedHeaderBadge}>
+                                <Feather name="check-circle" size={11} color="#2563eb" />
+                                <Text style={styles.verifiedHeaderText}>Verified GCOEARA Student ✓</Text>
+                            </View>
+                        ) : null}
+                    </View>
+                    {!user.isStudentVerified ? (
+                        <TouchableOpacity
+                            style={styles.verifyPromptBanner}
+                            onPress={() => {
+                                Alert.alert(
+                                    "Verify College ID 🪪",
+                                    "Scan your GCOEARA student ID card using AI OCR to earn the verified student trust badge for auto pooling.",
+                                    [
+                                        { text: "Take Photo 📷", onPress: () => promptPickIdCard(true) },
+                                        { text: "Choose from Gallery 🖼️", onPress: () => promptPickIdCard(false) },
+                                        { text: "Cancel", style: "cancel" }
+                                    ]
+                                );
+                            }}
+                        >
+                            <Feather name="shield" size={12} color="#ea580c" />
+                            <Text style={styles.verifyPromptText}>Verify College ID 🪪 (Tap to scan)</Text>
+                        </TouchableOpacity>
+                    ) : null}
                     <Text style={styles.subtitle}>What are you craving today?</Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
@@ -915,6 +1233,53 @@ export default function StudentDashboard() {
 
                 {activeTab === 'menus' && (
                     <>
+                        {/* --- 24-HOUR LIVE MESS STORIES FEED --- */}
+                        {storiesGroups.length > 0 && (
+                            <View style={styles.storiesContainer}>
+                                <View style={styles.storiesSectionHeader}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Feather name="camera" size={15} color="#ea580c" />
+                                        <Text style={styles.storiesSectionTitle}>Live Mess Stories</Text>
+                                    </View>
+                                    <View style={styles.liveIndicatorPill}>
+                                        <View style={styles.liveDot} />
+                                        <Text style={styles.liveIndicatorText}>24H LIVE</Text>
+                                    </View>
+                                </View>
+
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
+                                    {storiesGroups.map((group, gIdx) => {
+                                        const latest = group.latestStory || (group.stories && group.stories[0]);
+                                        const imageUrl = latest?.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200';
+                                        return (
+                                            <TouchableOpacity
+                                                key={group.ownerId || gIdx}
+                                                style={styles.storyBubbleItem}
+                                                onPress={() => {
+                                                    setSelectedStoryGroup(group);
+                                                    setCurrentStoryIndex(0);
+                                                    setStoryModalVisible(true);
+                                                }}
+                                                activeOpacity={0.8}
+                                            >
+                                                <View style={styles.storyGradientRing}>
+                                                    <View style={styles.storyImageWrapper}>
+                                                        <Image source={{ uri: imageUrl }} style={styles.storyAvatarImage} resizeMode="cover" />
+                                                    </View>
+                                                </View>
+                                                <Text style={styles.storyBubbleLabel} numberOfLines={1}>
+                                                    {group.messName || 'Mess'}
+                                                </Text>
+                                                <View style={styles.storyLiveBadge}>
+                                                    <Text style={styles.storyLiveBadgeText}>LIVE</Text>
+                                                </View>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </ScrollView>
+                            </View>
+                        )}
+
                         <View style={styles.dateSelector}>
                             <TouchableOpacity style={[styles.dateBtn, targetDate === getLocalDateString(0) && styles.dateBtnActive]} onPress={() => setTargetDate(getLocalDateString(0))}>
                                 <Text style={[styles.dateBtnText, targetDate === getLocalDateString(0) && styles.dateBtnTextActive]}>Today</Text>
@@ -979,6 +1344,61 @@ export default function StudentDashboard() {
                                         </View>
                                     );
                                 })}
+                            </View>
+                        )}
+
+                        {/* DEDICATED TOP-LEVEL DIGITAL MEAL PASS SECTION (ALWAYS ACCESSIBLE EVEN WHEN NO MENU PUBLISHED) */}
+                        {hasTopMealPass && (
+                            <View style={styles.topMealPassCard}>
+                                <View style={styles.topMealPassHeader}>
+                                    <View style={styles.topMealPassBadge}>
+                                        <Feather name="maximize" size={13} color="#a5b4fc" />
+                                        <Text style={styles.topMealPassBadgeText}>🎟️ Digital Meal Pass</Text>
+                                    </View>
+                                    <Text style={styles.topMealPassDateText}>Today ({todayStr})</Text>
+                                </View>
+
+                                <Text style={styles.topMealPassTitle}>{topMealPassMessName}</Text>
+                                <Text style={styles.topMealPassSub}>Instant student counter pass for dining service</Text>
+
+                                <View style={styles.topMealPassActionRow}>
+                                    {/* Shift Toggle */}
+                                    <View style={styles.topMealPassShiftToggle}>
+                                        <TouchableOpacity
+                                            style={[styles.topMealPassShiftBtn, topMealPassShift === 'morning' && styles.topMealPassShiftBtnActive]}
+                                            onPress={() => setTopMealPassShift('morning')}
+                                        >
+                                            <Text style={[styles.topMealPassShiftBtnText, topMealPassShift === 'morning' && styles.topMealPassShiftBtnTextActive]}>
+                                                ☀️ Morning
+                                            </Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.topMealPassShiftBtn, topMealPassShift === 'night' && styles.topMealPassShiftBtnActive]}
+                                            onPress={() => setTopMealPassShift('night')}
+                                        >
+                                            <Text style={[styles.topMealPassShiftBtnText, topMealPassShift === 'night' && styles.topMealPassShiftBtnTextActive]}>
+                                                🌙 Night
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* Pass Action Button */}
+                                    {topMealPassIsConsumed ? (
+                                        <View style={styles.topMealPassClaimedBadge}>
+                                            <Feather name="check-circle" size={15} color="#34d399" />
+                                            <Text style={styles.topMealPassClaimedText}>Meal Claimed ✓</Text>
+                                        </View>
+                                    ) : (
+                                        <TouchableOpacity
+                                            style={styles.topMealPassShowBtn}
+                                            onPress={() => handleOpenTopMealQr(topMealPassShift)}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Feather name="maximize" size={15} color="#ffffff" />
+                                            <Text style={styles.topMealPassShowBtnText}>Show Meal Pass QR 🎟️</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
                             </View>
                         )}
 
@@ -1187,15 +1607,23 @@ export default function StudentDashboard() {
                                                     <Text style={styles.rideLocationText}>{ride.to}</Text>
                                                 </View>
                                             </View>
-                                            {isCreator ? (
-                                                <View style={styles.hostBadge}>
-                                                    <Text style={styles.hostBadgeText}>HOST</Text>
-                                                </View>
-                                            ) : hasJoined ? (
-                                                <View style={styles.joinedBadge}>
-                                                    <Text style={styles.joinedBadgeText}>JOINED</Text>
-                                                </View>
-                                            ) : null}
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                                {ride.creatorIsVerified && (
+                                                    <View style={styles.verifiedStudentChip}>
+                                                        <Feather name="check-circle" size={11} color="#2563eb" />
+                                                        <Text style={styles.verifiedStudentChipText}>Verified ✓</Text>
+                                                    </View>
+                                                )}
+                                                {isCreator ? (
+                                                    <View style={styles.hostBadge}>
+                                                        <Text style={styles.hostBadgeText}>HOST</Text>
+                                                    </View>
+                                                ) : hasJoined ? (
+                                                    <View style={styles.joinedBadge}>
+                                                        <Text style={styles.joinedBadgeText}>JOINED</Text>
+                                                    </View>
+                                                ) : null}
+                                            </View>
                                         </View>
 
                                         {/* Date & Time Row */}
@@ -1233,12 +1661,17 @@ export default function StudentDashboard() {
                                                 {ride.passengers.map((p: any, pIdx: number) => (
                                                     <View key={pIdx} style={styles.passengerChip}>
                                                         <Text style={styles.passengerName}>
-                                                            {p.studentName?.split(' ')[0]} {p.studentId === user?._id ? '(You)' : ''}
+                                                            {p.studentName?.split(' ')[0] || p.name?.split(' ')[0] || 'Student'} {p.studentId === user?._id || p.userId === user?._id ? '(You)' : ''}
                                                         </Text>
+                                                        {p.isStudentVerified ? (
+                                                            <View style={{ marginLeft: 3, flexDirection: 'row', alignItems: 'center' }}>
+                                                                <Feather name="check-circle" size={11} color="#2563eb" />
+                                                            </View>
+                                                        ) : null}
                                                         {hasJoined && p.phone && p.studentId !== user?._id && (
                                                             <TouchableOpacity
                                                                 onPress={() => Linking.openURL(`tel:${p.phone}`)}
-                                                                style={{ padding: 2 }}
+                                                                style={{ padding: 2, marginLeft: 2 }}
                                                             >
                                                                 <Feather name="phone" size={11} color="#059669" />
                                                             </TouchableOpacity>
@@ -1541,6 +1974,272 @@ export default function StudentDashboard() {
                 </View>
             </Modal>
 
+            {/* 24H STORY VIEWER MODAL */}
+            <Modal visible={storyModalVisible} transparent animationType="fade" onRequestClose={() => setStoryModalVisible(false)}>
+                <SafeAreaView style={styles.storyViewerContainer}>
+                    <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+                    {selectedStoryGroup && (() => {
+                        const stories = selectedStoryGroup.stories && selectedStoryGroup.stories.length > 0
+                            ? selectedStoryGroup.stories
+                            : [selectedStoryGroup.latestStory];
+                        const currentStory = stories[currentStoryIndex] || stories[0];
+                        const totalStories = stories.length;
+
+                        return (
+                            <View style={styles.storyViewerInner}>
+                                {/* Segmented Progress Bars */}
+                                <View style={styles.storyProgressRow}>
+                                    {stories.map((_: any, idx: number) => (
+                                        <View
+                                            key={idx}
+                                            style={[
+                                                styles.storyProgressSegment,
+                                                idx === currentStoryIndex && styles.storyProgressSegmentActive,
+                                                idx < currentStoryIndex && styles.storyProgressSegmentPassed
+                                            ]}
+                                        />
+                                    ))}
+                                </View>
+
+                                {/* Top Header */}
+                                <View style={styles.storyTopBar}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                        <View style={styles.storyTopAvatarRing}>
+                                            <Feather name="coffee" size={14} color="#ffffff" />
+                                        </View>
+                                        <View>
+                                            <Text style={styles.storyTopMessName}>{selectedStoryGroup.messName}</Text>
+                                            <Text style={styles.storyTopTimeText}>
+                                                {currentStory?.createdAt ? new Date(currentStory.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Live'} • 24h Story
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <TouchableOpacity onPress={() => setStoryModalVisible(false)} style={styles.storyCloseBtn}>
+                                        <Feather name="x" size={24} color="#ffffff" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Image with Navigation Tap Zones */}
+                                <View style={styles.storyImageContainer}>
+                                    {currentStory?.imageUrl && (
+                                        <Image
+                                            source={{ uri: currentStory.imageUrl }}
+                                            style={styles.storyFullImage}
+                                            resizeMode="contain"
+                                        />
+                                    )}
+
+                                    <TouchableOpacity
+                                        style={styles.storyTouchLeft}
+                                        onPress={() => {
+                                            if (currentStoryIndex > 0) setCurrentStoryIndex(prev => prev - 1);
+                                        }}
+                                    />
+                                    <TouchableOpacity
+                                        style={styles.storyTouchRight}
+                                        onPress={() => {
+                                            if (currentStoryIndex < totalStories - 1) setCurrentStoryIndex(prev => prev + 1);
+                                            else setStoryModalVisible(false);
+                                        }}
+                                    />
+                                </View>
+
+                                {/* Bottom Caption & Control Overlay */}
+                                <View style={styles.storyCaptionOverlay}>
+                                    {currentStory?.caption ? (
+                                        <View style={styles.storyCaptionCard}>
+                                            <Text style={styles.storyCaptionText}>
+                                                {currentStory.caption}
+                                            </Text>
+                                        </View>
+                                    ) : null}
+
+                                    <View style={styles.storyBottomNavRow}>
+                                        <Text style={styles.storyCountText}>{currentStoryIndex + 1} of {totalStories}</Text>
+                                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                                            {currentStoryIndex > 0 && (
+                                                <TouchableOpacity
+                                                    style={styles.storyNavBtn}
+                                                    onPress={() => setCurrentStoryIndex(prev => prev - 1)}
+                                                >
+                                                    <Feather name="chevron-left" size={18} color="#ffffff" />
+                                                </TouchableOpacity>
+                                            )}
+                                            {currentStoryIndex < totalStories - 1 ? (
+                                                <TouchableOpacity
+                                                    style={styles.storyNavBtn}
+                                                    onPress={() => setCurrentStoryIndex(prev => prev + 1)}
+                                                >
+                                                    <Feather name="chevron-right" size={18} color="#ffffff" />
+                                                </TouchableOpacity>
+                                            ) : (
+                                                <TouchableOpacity
+                                                    style={[styles.storyNavBtn, { backgroundColor: '#ea580c' }]}
+                                                    onPress={() => setStoryModalVisible(false)}
+                                                >
+                                                    <Feather name="check" size={18} color="#ffffff" />
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
+                        );
+                    })()}
+                </SafeAreaView>
+            </Modal>
+
+            {/* VERIFY COLLEGE ID MODAL */}
+            <Modal visible={verifyIdModalOpen} transparent animationType="slide" onRequestClose={() => setVerifyIdModalOpen(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.verifyModalBox}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Feather name="shield" size={20} color="#2563eb" />
+                                <Text style={styles.modalTitle}>Verify College ID 🪪</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setVerifyIdModalOpen(false)}>
+                                <Feather name="x" size={24} color="#64748b" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={{ fontSize: 12, color: '#64748b', marginBottom: 12, lineHeight: 18 }}>
+                            Scan your GCOEARA identity card using instant AI OCR. Verified students get trusted status for ride-pooling and community services.
+                        </Text>
+
+                        {idImageUri ? (
+                            <View style={styles.idPreviewBox}>
+                                <Image source={{ uri: idImageUri }} style={styles.idPreviewImage} resizeMode="contain" />
+                            </View>
+                        ) : null}
+
+                        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+                            <TouchableOpacity style={styles.pickPhotoBtn} onPress={() => promptPickIdCard(true)}>
+                                <Feather name="camera" size={16} color="#2563eb" />
+                                <Text style={styles.pickPhotoBtnText}>Snap Camera</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.pickPhotoBtn} onPress={() => promptPickIdCard(false)}>
+                                <Feather name="image" size={16} color="#2563eb" />
+                                <Text style={styles.pickPhotoBtnText}>From Gallery</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.ocrTipsBox}>
+                            <Feather name="info" size={14} color="#0369a1" />
+                            <Text style={styles.ocrTipsText}>
+                                Ensure "GCOEARA" or "Government College of Engineering" is clearly visible in good lighting.
+                            </Text>
+                        </View>
+
+                        {ocrErrorMsg && (
+                            <View style={{ marginBottom: 14 }}>
+                                <View style={{ backgroundColor: '#fee2e2', borderRadius: 12, padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, borderWidth: 1, borderColor: '#fca5a5' }}>
+                                    <Feather name="alert-triangle" size={15} color="#dc2626" />
+                                    <Text style={{ flex: 1, fontSize: 11, color: '#dc2626', fontWeight: 'bold' }}>
+                                        {ocrErrorMsg}
+                                    </Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={{ backgroundColor: '#0f172a', paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
+                                    onPress={handleManualApproveStudentId}
+                                    disabled={isVerifyingId}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <Feather name="check-circle" size={14} color="#ffffff" />
+                                        <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '800' }}>
+                                            Submit for Manual Approval
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        <TouchableOpacity
+                            style={[styles.verifySubmitBtn, (!idBase64 || isVerifyingId) && { opacity: 0.6 }]}
+                            onPress={handleVerifyStudentId}
+                            disabled={!idBase64 || isVerifyingId}
+                        >
+                            {isVerifyingId ? (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <ActivityIndicator color="#fff" size="small" />
+                                    <Text style={styles.verifySubmitBtnText}>Scanning ID with AI OCR...</Text>
+                                </View>
+                            ) : (
+                                <Text style={styles.verifySubmitBtnText}>Verify ID with OCR 🔍</Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* TOP-LEVEL DEDICATED MEAL QR PASS MODAL */}
+            <Modal visible={topMealModalVisible} transparent animationType="fade" onRequestClose={() => setTopMealModalVisible(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalBox, { alignItems: 'center' }]}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: 12 }}>
+                            <Text style={styles.modalTitle}>Digital Meal Pass 🎟️</Text>
+                            <TouchableOpacity onPress={() => setTopMealModalVisible(false)}>
+                                <Feather name="x" size={24} color="#64748b" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={{ fontSize: 13, color: '#64748b', fontWeight: 'bold', marginBottom: 2 }}>
+                            {topMealMessData.messName || topMealPassMessName}
+                        </Text>
+                        <Text style={{ fontSize: 17, fontWeight: '900', color: '#0f172a', marginBottom: 16 }}>
+                            {user?.name || 'Student'} • {topMealPassShift === 'morning' ? '☀️ Morning' : '🌙 Night'}
+                        </Text>
+
+                        {topMealCelebration ? (
+                            <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+                                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#dcfce7', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                                    <Feather name="check" size={36} color="#16a34a" />
+                                </View>
+                                <Text style={{ fontSize: 20, fontWeight: '900', color: '#16a34a', marginBottom: 4 }}>
+                                    ✅ Meal Claimed!
+                                </Text>
+                                <Text style={{ fontSize: 14, color: '#475569', fontWeight: '600' }}>
+                                    Enjoy your meal.
+                                </Text>
+                            </View>
+                        ) : topMealQrLoading ? (
+                            <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                                <ActivityIndicator size="large" color="#4f46e5" />
+                                <Text style={{ marginTop: 12, fontSize: 13, color: '#64748b', fontWeight: 'bold' }}>
+                                    Generating secure pass...
+                                </Text>
+                            </View>
+                        ) : topMealQrToken ? (
+                            <>
+                                <View style={styles.qrContainer}>
+                                    <QRCode value={topMealQrToken} size={200} />
+                                </View>
+
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14, marginBottom: 8 }}>
+                                    <View style={styles.timerBadge}>
+                                        <Feather name="clock" size={14} color="#d97706" />
+                                        <Text style={styles.timerText}>
+                                            Expires in {Math.floor(topMealQrExpirySeconds / 60)}:
+                                            {topMealQrExpirySeconds % 60 < 10 ? `0${topMealQrExpirySeconds % 60}` : topMealQrExpirySeconds % 60}
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.refreshQrBtn}
+                                        onPress={handleRefreshTopMealQr}
+                                    >
+                                        <Feather name="rotate-cw" size={14} color="#4f46e5" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <Text style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', marginTop: 12 }}>
+                                    Show this QR code to the mess owner at the counter to verify your meal.
+                                </Text>
+                            </>
+                        ) : null}
+                    </View>
+                </View>
+            </Modal>
+
         </SafeAreaView>
     );
 }
@@ -1832,5 +2531,562 @@ const styles = StyleSheet.create({
         color: '#ffffff',
         fontSize: 12,
         fontWeight: '700',
+    },
+
+    // --- TOP CHEF & QUALITY TAGS STYLES ---
+    topChefBadgeHeader: {
+        backgroundColor: '#fef3c7',
+        borderWidth: 1.5,
+        borderColor: '#f59e0b',
+        paddingHorizontal: 9,
+        paddingVertical: 3,
+        borderRadius: 12,
+        shadowColor: '#f59e0b',
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    topChefBadgeHeaderText: {
+        color: '#b45309',
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    tagBadge: {
+        backgroundColor: '#e0e7ff',
+        paddingHorizontal: 8,
+        paddingVertical: 2.5,
+        borderRadius: 8,
+    },
+    tagBadgeText: {
+        color: '#3730a3',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    ratingTagPrompt: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#475569',
+        marginBottom: 8,
+    },
+    ratingTagsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginBottom: 14,
+    },
+    ratingTagChip: {
+        backgroundColor: '#f1f5f9',
+        borderWidth: 1,
+        borderColor: '#cbd5e1',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    ratingTagChipActive: {
+        backgroundColor: '#4f46e5',
+        borderColor: '#4338ca',
+    },
+    ratingTagChipText: {
+        color: '#475569',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    ratingTagChipTextActive: {
+        color: '#ffffff',
+        fontWeight: '800',
+    },
+    reviewTagBadge: {
+        backgroundColor: '#eef2ff',
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    reviewTagText: {
+        color: '#4338ca',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+
+    // --- VERIFIED STUDENT STYLES ---
+    verifiedHeaderBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#eff6ff',
+        borderWidth: 1,
+        borderColor: '#bfdbfe',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 12,
+    },
+    verifiedHeaderText: {
+        color: '#1d4ed8',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    verifyPromptBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#fff7ed',
+        borderWidth: 1,
+        borderColor: '#fed7aa',
+        paddingHorizontal: 9,
+        paddingVertical: 4,
+        borderRadius: 10,
+        marginTop: 4,
+        marginBottom: 2,
+        alignSelf: 'flex-start',
+    },
+    verifyPromptText: {
+        color: '#c2410c',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    verifiedStudentChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#eff6ff',
+        borderWidth: 1,
+        borderColor: '#bfdbfe',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
+    },
+    verifiedStudentChipText: {
+        color: '#1d4ed8',
+        fontSize: 10,
+        fontWeight: '800',
+    },
+    verifyModalBox: {
+        width: '100%',
+        backgroundColor: '#ffffff',
+        borderRadius: 28,
+        padding: 22,
+        shadowColor: '#000',
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        elevation: 12,
+    },
+    idPreviewBox: {
+        width: '100%',
+        height: 180,
+        borderRadius: 16,
+        backgroundColor: '#0f172a',
+        overflow: 'hidden',
+        marginBottom: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    idPreviewImage: {
+        width: '100%',
+        height: '100%',
+    },
+    pickPhotoBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        backgroundColor: '#eff6ff',
+        borderWidth: 1,
+        borderColor: '#bfdbfe',
+        paddingVertical: 10,
+        borderRadius: 12,
+    },
+    pickPhotoBtnText: {
+        color: '#1d4ed8',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    ocrTipsBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#f0f9ff',
+        borderWidth: 1,
+        borderColor: '#bae6fd',
+        padding: 10,
+        borderRadius: 12,
+        marginBottom: 16,
+    },
+    ocrTipsText: {
+        flex: 1,
+        fontSize: 11,
+        color: '#0369a1',
+        fontWeight: '600',
+        lineHeight: 16,
+    },
+    verifySubmitBtn: {
+        backgroundColor: '#2563eb',
+        paddingVertical: 14,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#2563eb',
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    verifySubmitBtnText: {
+        color: '#ffffff',
+        fontSize: 14,
+        fontWeight: '900',
+    },
+
+    // --- 24-HOUR MESS STORIES FEED STYLES ---
+    storiesContainer: {
+        backgroundColor: '#ffffff',
+        borderRadius: 24,
+        paddingVertical: 14,
+        paddingHorizontal: 14,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
+        shadowColor: '#000',
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 1,
+    },
+    storiesSectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+        paddingHorizontal: 4,
+    },
+    storiesSectionTitle: {
+        fontSize: 14,
+        fontWeight: '900',
+        color: '#0f172a',
+    },
+    liveIndicatorPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#fff1f2',
+        borderWidth: 1,
+        borderColor: '#fecdd3',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 999,
+    },
+    liveDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#e11d48',
+    },
+    liveIndicatorText: {
+        fontSize: 10,
+        fontWeight: '900',
+        color: '#e11d48',
+    },
+    storiesScroll: {
+        paddingRight: 10,
+        gap: 14,
+    },
+    storyBubbleItem: {
+        alignItems: 'center',
+        width: 72,
+    },
+    storyGradientRing: {
+        width: 66,
+        height: 66,
+        borderRadius: 33,
+        padding: 3,
+        backgroundColor: '#ea580c',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#ea580c',
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    storyImageWrapper: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 30,
+        borderWidth: 2,
+        borderColor: '#ffffff',
+        overflow: 'hidden',
+        backgroundColor: '#f1f5f9',
+    },
+    storyAvatarImage: {
+        width: '100%',
+        height: '100%',
+    },
+    storyBubbleLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#334155',
+        marginTop: 6,
+        textAlign: 'center',
+        width: '100%',
+    },
+    storyLiveBadge: {
+        position: 'absolute',
+        top: 48,
+        backgroundColor: '#ea580c',
+        paddingHorizontal: 5,
+        paddingVertical: 1,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: '#ffffff',
+    },
+    storyLiveBadgeText: {
+        color: '#ffffff',
+        fontSize: 8,
+        fontWeight: '900',
+    },
+
+    // --- FULL-SCREEN STORY VIEWER STYLES ---
+    storyViewerContainer: {
+        flex: 1,
+        backgroundColor: '#090d16',
+    },
+    storyViewerInner: {
+        flex: 1,
+        backgroundColor: '#090d16',
+        justifyContent: 'space-between',
+    },
+    storyProgressRow: {
+        flexDirection: 'row',
+        paddingHorizontal: 12,
+        paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 10 : 10,
+        gap: 4,
+        marginBottom: 10,
+    },
+    storyProgressSegment: {
+        flex: 1,
+        height: 3,
+        borderRadius: 2,
+        backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    },
+    storyProgressSegmentPassed: {
+        backgroundColor: '#ffffff',
+    },
+    storyProgressSegmentActive: {
+        backgroundColor: '#ea580c',
+    },
+    storyTopBar: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        marginBottom: 10,
+    },
+    storyTopAvatarRing: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#ea580c',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    storyTopMessName: {
+        color: '#ffffff',
+        fontSize: 15,
+        fontWeight: '900',
+    },
+    storyTopTimeText: {
+        color: 'rgba(255, 255, 255, 0.7)',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    storyCloseBtn: {
+        padding: 6,
+    },
+    storyImageContainer: {
+        flex: 1,
+        position: 'relative',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#000000',
+    },
+    storyFullImage: {
+        width: '100%',
+        height: '100%',
+    },
+    storyTouchLeft: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        width: '35%',
+    },
+    storyTouchRight: {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        right: 0,
+        width: '65%',
+    },
+    storyCaptionOverlay: {
+        paddingHorizontal: 16,
+        paddingBottom: 24,
+        paddingTop: 12,
+        backgroundColor: 'rgba(9, 13, 22, 0.85)',
+    },
+    storyCaptionCard: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        padding: 14,
+        borderRadius: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+    },
+    storyCaptionText: {
+        color: '#ffffff',
+        fontSize: 14,
+        fontWeight: '700',
+        lineHeight: 20,
+    },
+    storyBottomNavRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    storyCountText: {
+        color: 'rgba(255, 255, 255, 0.7)',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    storyNavBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    // --- TOP-LEVEL DIGITAL MEAL PASS STYLES ---
+    topMealPassCard: {
+        backgroundColor: '#0f172a',
+        borderRadius: 24,
+        padding: 20,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#312e81',
+        shadowColor: '#4338ca',
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
+        elevation: 6,
+    },
+    topMealPassHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    topMealPassBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(79, 70, 229, 0.2)',
+        borderColor: 'rgba(99, 102, 241, 0.4)',
+        borderWidth: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 999,
+    },
+    topMealPassBadgeText: {
+        color: '#a5b4fc',
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    topMealPassDateText: {
+        color: '#94a3b8',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    topMealPassTitle: {
+        fontSize: 22,
+        fontWeight: '900',
+        color: '#ffffff',
+        marginBottom: 4,
+    },
+    topMealPassSub: {
+        fontSize: 12,
+        color: '#cbd5e1',
+        fontWeight: '500',
+        marginBottom: 16,
+    },
+    topMealPassActionRow: {
+        flexDirection: 'column',
+        gap: 12,
+    },
+    topMealPassShiftToggle: {
+        flexDirection: 'row',
+        backgroundColor: '#1e293b',
+        borderRadius: 14,
+        padding: 4,
+    },
+    topMealPassShiftBtn: {
+        flex: 1,
+        paddingVertical: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 10,
+    },
+    topMealPassShiftBtnActive: {
+        backgroundColor: '#4f46e5',
+        shadowColor: '#4f46e5',
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    topMealPassShiftBtnText: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#94a3b8',
+    },
+    topMealPassShiftBtnTextActive: {
+        color: '#ffffff',
+    },
+    topMealPassShowBtn: {
+        backgroundColor: '#4f46e5',
+        borderRadius: 14,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: 8,
+        shadowColor: '#4f46e5',
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    topMealPassShowBtnText: {
+        color: '#ffffff',
+        fontSize: 14,
+        fontWeight: '900',
+    },
+    topMealPassClaimedBadge: {
+        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+        borderColor: '#10b981',
+        borderWidth: 1,
+        borderRadius: 14,
+        paddingVertical: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: 6,
+    },
+    topMealPassClaimedText: {
+        color: '#34d399',
+        fontSize: 13,
+        fontWeight: '900',
+    },
+    refreshQrBtn: {
+        backgroundColor: '#eef2ff',
+        padding: 8,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#c7d2fe',
     },
 });
