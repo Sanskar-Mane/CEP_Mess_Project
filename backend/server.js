@@ -12,6 +12,23 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
+const Tesseract = require('tesseract.js');
+const cloudinary = require('cloudinary').v2;
+
+const isCloudinaryConfigured = Boolean(
+  process.env.CLOUDINARY_CLOUD_NAME &&
+  process.env.CLOUDINARY_API_KEY &&
+  process.env.CLOUDINARY_API_SECRET
+);
+if (isCloudinaryConfigured) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true
+  });
+  console.log('☁️ Cloudinary CDN configured and active!');
+}
 
 const app = express();
 app.set('trust proxy', 1);
@@ -51,7 +68,8 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 const io = new Server(server, {
   cors: corsOptions
@@ -103,8 +121,13 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('✅ Successfully connected to MongoDB Atlas!');
+    Story.collection.dropIndex('createdAt_1').catch(() => {});
     expireOutdatedSubscriptions();
+    calculateTopChef();
+    cleanupExpiredStories();
     setInterval(expireOutdatedSubscriptions, 60 * 60 * 1000);
+    setInterval(calculateTopChef, 24 * 60 * 60 * 1000);
+    setInterval(cleanupExpiredStories, 30 * 60 * 1000);
   })
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
@@ -137,10 +160,46 @@ const UserSchema = new mongoose.Schema({
   },
   rating: { type: Number, default: 0 },
   ratingCount: { type: Number, default: 0 },
-  ratingTotal: { type: Number, default: 0 }
+  ratingTotal: { type: Number, default: 0 },
+  topTags: [{ type: String }],
+  isTopChef: { type: Boolean, default: false },
+  isStudentVerified: { type: Boolean, default: false }
 });
 UserSchema.index({ location: '2dsphere' });
 const User = mongoose.model('User', UserSchema);
+
+const StorySchema = new mongoose.Schema({
+  ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  messName: { type: String, required: true },
+  imageUrl: { type: String, required: true },
+  cloudinaryPublicId: { type: String, default: '' },
+  caption: { type: String, maxlength: 120, default: '' },
+  createdAt: { type: Date, default: Date.now }
+});
+StorySchema.index({ createdAt: -1 });
+const Story = mongoose.model('Story', StorySchema);
+
+const cleanupExpiredStories = async () => {
+  try {
+    const expiredCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const expiredStories = await Story.find({ createdAt: { $lt: expiredCutoff } });
+    if (!expiredStories || expiredStories.length === 0) return;
+
+    for (const story of expiredStories) {
+      if (story.cloudinaryPublicId && isCloudinaryConfigured) {
+        try {
+          await cloudinary.uploader.destroy(story.cloudinaryPublicId);
+        } catch (cErr) {
+          console.warn(`Failed to destroy Cloudinary image for story ${story._id}:`, cErr.message);
+        }
+      }
+      await Story.findByIdAndDelete(story._id);
+    }
+    console.log(`🧹 Cleaned up ${expiredStories.length} expired 24h stories.`);
+  } catch (err) {
+    console.error('Error in cleanupExpiredStories:', err);
+  }
+};
 
 const MenuSchema = new mongoose.Schema({
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -191,6 +250,7 @@ const ReviewSchema = new mongoose.Schema({
   studentName: { type: String, required: true },
   rating: { type: Number, required: true },
   comment: { type: String },
+  tags: [{ type: String }],
   date: { type: Date, default: Date.now }
 });
 const Review = mongoose.model('Review', ReviewSchema);
@@ -273,6 +333,7 @@ const RidePoolSchema = new mongoose.Schema({
   creatorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   creatorName: { type: String, required: true },
   creatorPhone: { type: String, required: true },
+  creatorIsVerified: { type: Boolean, default: false },
   from: { type: String, required: true }, // e.g., "GCOEARA Campus Gate"
   to: { type: String, required: true },   // e.g., "Manchar Bus Stand"
   date: { type: String, required: true }, // YYYY-MM-DD
@@ -282,7 +343,8 @@ const RidePoolSchema = new mongoose.Schema({
   passengers: [{
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     name: String,
-    phone: String
+    phone: String,
+    isStudentVerified: { type: Boolean, default: false }
   }],
   status: { type: String, enum: ['open', 'full', 'cancelled'], default: 'open' },
   createdAt: { type: Date, default: Date.now }
@@ -312,6 +374,70 @@ const expireOutdatedSubscriptions = async () => {
     }
   } catch (error) {
     console.error('Failed to expire subscriptions:', error);
+  }
+};
+
+// Calculates Top Chef (highest avg rating, min 5 reviews in past 7 days) and updates topTags for owners
+const calculateTopChef = async () => {
+  try {
+    const owners = await User.find({ role: 'owner' });
+    if (owners.length === 0) return;
+
+    // 1. Calculate top tags from all reviews for each owner
+    for (const owner of owners) {
+      const allReviews = await Review.find({ messId: owner._id });
+      const tagCounts = {};
+      for (const rev of allReviews) {
+        if (Array.isArray(rev.tags)) {
+          for (const t of rev.tags) {
+            const trimmed = String(t).trim();
+            if (trimmed) tagCounts[trimmed] = (tagCounts[trimmed] || 0) + 1;
+          }
+        }
+      }
+      const topTags = Object.entries(tagCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4)
+        .map(([tag]) => tag);
+
+      owner.topTags = topTags;
+      owner.isTopChef = false; // Reset first
+    }
+
+    // 2. Determine Campus Top Chef in past 7 days (min 5 reviews)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentReviews = await Review.find({ date: { $gte: sevenDaysAgo } });
+
+    const ownerStats = {};
+    for (const rev of recentReviews) {
+      const mId = rev.messId.toString();
+      if (!ownerStats[mId]) ownerStats[mId] = { count: 0, total: 0 };
+      ownerStats[mId].count += 1;
+      ownerStats[mId].total += Number(rev.rating) || 0;
+    }
+
+    let winnerId = null;
+    let highestAvg = -1;
+
+    for (const [mId, stat] of Object.entries(ownerStats)) {
+      if (stat.count >= 5) {
+        const avg = stat.total / stat.count;
+        if (avg > highestAvg) {
+          highestAvg = avg;
+          winnerId = mId;
+        }
+      }
+    }
+
+    if (winnerId) {
+      const winner = owners.find(o => o._id.toString() === winnerId);
+      if (winner) winner.isTopChef = true;
+    }
+
+    await Promise.all(owners.map(o => o.save()));
+    console.log(`🏆 calculateTopChef completed. Top Chef: ${winnerId ? `Owner ID ${winnerId}` : 'None (none with >=5 reviews in 7d)'}`);
+  } catch (error) {
+    console.error('Error calculating Top Chef:', error);
   }
 };
 
@@ -521,7 +647,7 @@ app.post('/api/menus', authenticateToken, validateMenu, async (req, res) => {
 
 app.get('/api/menus/:date', authenticateToken, async (req, res) => {
   try {
-    const menus = await Menu.find({ date: req.params.date }).populate('ownerId', 'rating ratingCount morningCutoff nightCutoff');
+    const menus = await Menu.find({ date: req.params.date }).populate('ownerId', 'rating ratingCount morningCutoff nightCutoff isTopChef topTags');
     res.status(200).json(menus);
   } catch (error) { res.status(500).json({ error: 'Failed to fetch menus' }); }
 });
@@ -749,14 +875,17 @@ app.get('/api/attendance/history/:messName', authenticateToken, async (req, res)
 // --- LEADERBOARD & RATING ROUTES ---
 app.get('/api/messes/leaderboard', authenticateToken, async (req, res) => {
   try {
-    const topMesses = await User.find({ role: 'owner', ratingCount: { $gt: 0 } }).sort({ rating: -1 }).limit(3).select('messName rating ratingCount');
+    const topMesses = await User.find({ role: 'owner', ratingCount: { $gt: 0 } })
+      .sort({ rating: -1 })
+      .limit(3)
+      .select('messName rating ratingCount isTopChef topTags');
     res.status(200).json(topMesses);
   } catch (error) { res.status(500).json({ error: 'Failed to fetch leaderboard' }); }
 });
 
 app.post('/api/messes/:ownerId/rate', authenticateToken, validateRating, async (req, res) => {
   try {
-    const { rating, comment } = req.body;
+    const { rating, comment, tags } = req.body;
     const numRating = Number(rating);
     const owner = await User.findById(req.params.ownerId);
     const student = await User.findById(req.user.id);
@@ -770,16 +899,229 @@ app.post('/api/messes/:ownerId/rate', authenticateToken, validateRating, async (
     await owner.save();
 
     const safeStudentName = student.name || 'Anonymous Student';
-    if (comment) {
-      const review = new Review({ messId: owner._id, studentName: safeStudentName, rating, comment });
+    const validTags = Array.isArray(tags) ? tags.map(t => String(t).trim()).filter(Boolean) : [];
+    if (comment || validTags.length > 0) {
+      const review = new Review({
+        messId: owner._id,
+        studentName: safeStudentName,
+        rating: numRating,
+        comment: comment ? String(comment).trim() : '',
+        tags: validTags
+      });
       await review.save();
     }
+
+    // Recalculate Top Chef and top tags
+    await calculateTopChef();
+
     res.status(200).json({ message: 'Rating submitted successfully!' });
-  } catch (error) { res.status(500).json({ error: 'Server crashed' }); }
+  } catch (error) {
+    console.error('Rating error:', error);
+    res.status(500).json({ error: 'Server crashed' });
+  }
 });
 
 app.get('/api/messes/:ownerId/reviews', authenticateToken, async (req, res) => {
-  try { res.status(200).json(await Review.find({ messId: req.params.ownerId }).sort({ date: -1 }).limit(5)); } catch (error) { res.status(500).json({ error: 'Failed' }); }
+  try {
+    res.status(200).json(await Review.find({ messId: req.params.ownerId }).sort({ date: -1 }).limit(10));
+  } catch (error) {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// --- MESS STORIES / LIVE PHOTO FEED ROUTES ---
+app.post('/api/stories', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'owner') {
+      return res.status(403).json({ error: 'Only mess owners can post stories.' });
+    }
+
+    const { image, imageUrl, caption } = req.body;
+    const rawImage = image || imageUrl;
+    if (!rawImage || typeof rawImage !== 'string' || !rawImage.trim()) {
+      return res.status(400).json({ error: 'Image URL or base64 data is required.' });
+    }
+
+    const owner = await User.findById(req.user.id);
+    if (!owner) return res.status(404).json({ error: 'Owner not found.' });
+
+    let finalImageUrl = rawImage.trim();
+    let cloudinaryPublicId = '';
+
+    if (isCloudinaryConfigured && rawImage.startsWith('data:image/')) {
+      try {
+        const uploadRes = await cloudinary.uploader.upload(rawImage, {
+          folder: 'avasari_connect/stories',
+          resource_type: 'image',
+          transformation: [
+            { width: 1080, height: 1920, crop: 'limit' },
+            { quality: 'auto:good', fetch_format: 'auto' }
+          ]
+        });
+        finalImageUrl = uploadRes.secure_url;
+        cloudinaryPublicId = uploadRes.public_id;
+      } catch (cErr) {
+        console.error('Cloudinary story upload failed, falling back to raw data:', cErr);
+      }
+    }
+
+    const newStory = new Story({
+      ownerId: owner._id,
+      messName: owner.messName || 'Mess',
+      imageUrl: finalImageUrl,
+      cloudinaryPublicId,
+      caption: caption ? String(caption).trim().slice(0, 120) : '',
+      createdAt: new Date()
+    });
+
+    await newStory.save();
+    io.emit('story:new', newStory);
+
+    res.status(201).json({ message: 'Live story posted successfully!', story: newStory });
+  } catch (error) {
+    console.error('Story post error:', error);
+    res.status(500).json({ error: 'Failed to post story.' });
+  }
+});
+
+app.get('/api/stories', authenticateToken, async (req, res) => {
+  try {
+    const stories = await Story.find().sort({ createdAt: -1 });
+    // Group by ownerId, sorted newest first
+    const groupedMap = new Map();
+    for (const s of stories) {
+      const key = s.ownerId.toString();
+      if (!groupedMap.has(key)) {
+        groupedMap.set(key, {
+          ownerId: s.ownerId,
+          messName: s.messName || 'Mess',
+          latestStory: s,
+          stories: []
+        });
+      }
+      groupedMap.get(key).stories.push(s);
+    }
+    res.status(200).json(Array.from(groupedMap.values()));
+  } catch (error) {
+    console.error('Fetch stories error:', error);
+    res.status(500).json({ error: 'Failed to fetch stories.' });
+  }
+});
+
+app.delete('/api/stories/:id', authenticateToken, async (req, res) => {
+  try {
+    const story = await Story.findById(req.params.id);
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found.' });
+    }
+
+    const isOwner = req.user.role === 'owner' && story.ownerId.toString() === req.user.id;
+    const isAdmin = req.user.role === 'admin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'You are not authorized to delete this story.' });
+    }
+
+    if (story.cloudinaryPublicId && isCloudinaryConfigured) {
+      try {
+        await cloudinary.uploader.destroy(story.cloudinaryPublicId);
+      } catch (cErr) {
+        console.warn('Failed to delete story image from Cloudinary:', cErr.message);
+      }
+    }
+
+    await Story.findByIdAndDelete(req.params.id);
+    io.emit('story:deleted', { storyId: req.params.id });
+
+    res.status(200).json({ success: true, message: 'Story deleted successfully!' });
+  } catch (error) {
+    console.error('Story delete error:', error);
+    res.status(500).json({ error: 'Failed to delete story.' });
+  }
+});
+
+// --- STUDENT ID OCR VERIFICATION ROUTE ---
+app.post('/api/users/verify-id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ error: 'Only students can verify their student ID.' });
+    }
+
+    // Support manual approval directly
+    if (req.body.manualApproval) {
+      await User.findByIdAndUpdate(req.user.id, { isStudentVerified: true });
+      await RidePool.updateMany(
+        { creatorId: req.user.id },
+        { $set: { creatorIsVerified: true } }
+      );
+      await RidePool.updateMany(
+        { 'passengers.userId': req.user.id },
+        { $set: { 'passengers.$[elem].isStudentVerified': true } },
+        { arrayFilters: [{ 'elem.userId': req.user.id }] }
+      );
+      return res.status(200).json({
+        success: true,
+        isStudentVerified: true,
+        message: 'Verified GCOEARA Student ✓! Your identity has been approved.'
+      });
+    }
+
+    const rawImg = req.body.base64Image || req.body.image;
+    if (!rawImg || typeof rawImg !== 'string' || !rawImg.trim()) {
+      return res.status(400).json({ error: 'College ID image is required.' });
+    }
+
+    let imageInput;
+    if (rawImg.startsWith('data:')) {
+      const base64Data = rawImg.split(',')[1];
+      imageInput = Buffer.from(base64Data, 'base64');
+    } else {
+      imageInput = Buffer.from(rawImg, 'base64');
+    }
+
+    const { data: { text } } = await Tesseract.recognize(imageInput, 'eng');
+    console.log(`[OCR Result for Student ${req.user.id}]:`, text ? text.replace(/\n+/g, ' ') : '(empty)');
+
+    // Weighted fuzzy scoring keyword matcher
+    const normalizedText = (text || '').toLowerCase().replace(/[^a-z0-9]/g, ' ');
+
+    // Campus identifier tokens
+    const highPriorityTokens = ['avasari', 'avsari', 'gcoeara', 'gcoea'];
+    const supportingTokens = ['government', 'engineering', 'research', 'ambegaon', 'khurd', 'dtemaharashtra', 'maharashtra', 'pune', 'college'];
+
+    const hasHighPriority = highPriorityTokens.some(token => normalizedText.includes(token));
+    const supportingCount = supportingTokens.filter(token => normalizedText.includes(token)).length;
+
+    // Verification passes if it contains 'avasari'/'gcoeara' OR at least 2 supporting college tokens
+    const isVerified = hasHighPriority || supportingCount >= 2;
+
+    if (isVerified) {
+      await User.findByIdAndUpdate(req.user.id, { isStudentVerified: true });
+
+      // Update active ride pools where user is creator or passenger
+      await RidePool.updateMany(
+        { creatorId: req.user.id },
+        { $set: { creatorIsVerified: true } }
+      );
+      await RidePool.updateMany(
+        { 'passengers.userId': req.user.id },
+        { $set: { 'passengers.$[elem].isStudentVerified': true } },
+        { arrayFilters: [{ 'elem.userId': req.user.id }] }
+      );
+
+      return res.status(200).json({
+        success: true,
+        isStudentVerified: true,
+        message: 'Verified GCOEARA Student ✓! Your profile and ride listings now display the verified trust badge.'
+      });
+    } else {
+      return res.status(400).json({
+        error: "ID verification failed. Ensure the text is clear. Make sure the college name 'Government College of Engineering, Avasari' is visible in the frame."
+      });
+    }
+  } catch (error) {
+    console.error('OCR verification error:', error);
+    res.status(500).json({ error: 'Failed to process ID card image. Ensure the photo is clear and try again.' });
+  }
 });
 
 // --- DIRECTORY ROUTES ---
@@ -986,10 +1328,13 @@ app.get('/api/attendance/qr/:messId/:targetDate/:shift', authenticateToken, asyn
     }
 
     if (att && att.isConsumed) {
-      return res.status(400).json({ error: 'Meal already claimed for this shift.' });
+      return res.status(400).json({ error: 'Meal already claimed for this shift.', isConsumed: true });
     }
 
     const student = await User.findById(req.user.id);
+    const owner = await User.findById(messId).select('messName name');
+    const messName = sub?.messName || owner?.messName || 'Mess';
+
     const qrToken = jwt.sign(
       {
         type: 'meal_pass',
@@ -1003,7 +1348,14 @@ app.get('/api/attendance/qr/:messId/:targetDate/:shift', authenticateToken, asyn
       { expiresIn: '15m' }
     );
 
-    res.status(200).json({ qrToken });
+    res.status(200).json({
+      qrToken,
+      studentName: student?.name || 'Student',
+      messName,
+      shift,
+      targetDate,
+      isConsumed: Boolean(att?.isConsumed)
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to generate meal pass' });
   }
@@ -1180,7 +1532,7 @@ app.get('/api/messes/nearby', authenticateToken, async (req, res) => {
       role: 'owner',
       isVerified: true,
       'location.coordinates': { $ne: [0, 0] }
-    }).select('messName messAddress location rating ratingCount fssaiNumber phone');
+    }).select('messName messAddress location rating ratingCount fssaiNumber phone isTopChef topTags');
 
     // If valid coordinates are provided, compute distanceKm and sort ascending
     if (!isNaN(latNum) && !isNaN(lngNum)) {
@@ -1228,8 +1580,37 @@ app.get('/api/rides', authenticateToken, async (req, res) => {
     const rides = await RidePool.find({
       date: queryDate,
       status: { $ne: 'cancelled' }
-    }).sort({ departureTime: 1 });
-    res.status(200).json(rides);
+    })
+      .populate('creatorId', 'name phone isStudentVerified')
+      .populate('passengers.userId', 'name phone isStudentVerified')
+      .sort({ departureTime: 1 });
+
+    const formatted = rides.map(r => {
+      const rObj = r.toObject();
+      if (rObj.creatorId && typeof rObj.creatorId === 'object') {
+        rObj.creatorIsVerified = Boolean(rObj.creatorId.isStudentVerified);
+        rObj.creatorName = rObj.creatorId.name || rObj.creatorName;
+        rObj.creatorPhone = rObj.creatorId.phone || rObj.creatorPhone;
+        rObj.creatorId = rObj.creatorId._id;
+      }
+      if (Array.isArray(rObj.passengers)) {
+        rObj.passengers = rObj.passengers.map(p => {
+          const userObj = p.userId && typeof p.userId === 'object' ? p.userId : null;
+          return {
+            ...p,
+            userId: userObj ? userObj._id : p.userId,
+            studentId: userObj ? userObj._id : p.userId,
+            name: userObj ? userObj.name : p.name,
+            studentName: userObj ? userObj.name : p.name,
+            phone: userObj ? userObj.phone : p.phone,
+            isStudentVerified: userObj ? Boolean(userObj.isStudentVerified) : Boolean(p.isStudentVerified)
+          };
+        });
+      }
+      return rObj;
+    });
+
+    res.status(200).json(formatted);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch rides' });
   }
@@ -1254,6 +1635,7 @@ app.post('/api/rides', authenticateToken, async (req, res) => {
       creatorId: user._id,
       creatorName: user.name,
       creatorPhone: user.phone,
+      creatorIsVerified: Boolean(user.isStudentVerified),
       from: from.trim(),
       to: to.trim(),
       date,
@@ -1263,7 +1645,8 @@ app.post('/api/rides', authenticateToken, async (req, res) => {
       passengers: [{
         userId: user._id,
         name: user.name,
-        phone: user.phone
+        phone: user.phone,
+        isStudentVerified: Boolean(user.isStudentVerified)
       }],
       status: 'open'
     });
@@ -1304,7 +1687,8 @@ app.post('/api/rides/:id/toggle-join', authenticateToken, async (req, res) => {
       ride.passengers.push({
         userId: user._id,
         name: user.name,
-        phone: user.phone
+        phone: user.phone,
+        isStudentVerified: Boolean(user.isStudentVerified)
       });
       if (ride.passengers.length >= ride.totalSeats) {
         ride.status = 'full';

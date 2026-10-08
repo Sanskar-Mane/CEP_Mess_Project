@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Utensils, MapPin, Navigation, Home, Phone, CheckCircle2, XCircle, LogOut, Loader2, IndianRupee, Star, AlertTriangle, Sparkles, CalendarDays, Trophy, MessageSquareQuote, Map, Award, Clock, Lock, Bell, QrCode, X, ExternalLink, Search, Plus, Users as UsersIcon, Car, ArrowRight } from 'lucide-react';
+import { Utensils, MapPin, Navigation, Home, Phone, CheckCircle2, XCircle, LogOut, Loader2, IndianRupee, Star, AlertTriangle, Sparkles, CalendarDays, Trophy, MessageSquareQuote, Map, Award, Clock, Lock, Bell, QrCode, X, ExternalLink, Search, Plus, Users as UsersIcon, Car, ArrowRight, Camera, ShieldCheck, ChevronLeft, ChevronRight, Upload, RefreshCw } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import MessMap from '../components/MessMap';
 import ThemeToggle from '../components/ThemeToggle';
@@ -47,9 +47,16 @@ const MessCard = ({ messData, user, targetDate, globalCommitted, onAttendanceUpd
   // --- REVIEW STATE ---
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
+  const [selectedTags, setSelectedTags] = useState([]);
   const [hasRated, setHasRated] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [showReviews, setShowReviews] = useState(false);
+
+  const AVAILABLE_TAGS = ['Hygiene', 'Taste', 'Portion Size', 'Speed', 'Best Hygiene', 'Spicy Food'];
+
+  const toggleTag = (tg) => {
+    setSelectedTags(prev => prev.includes(tg) ? prev.filter(t => t !== tg) : [...prev, tg]);
+  };
 
   // --- MEAL QR PASS STATE ---
   const [qrModalOpen, setQrModalOpen] = useState(false);
@@ -151,7 +158,7 @@ const MessCard = ({ messData, user, targetDate, globalCommitted, onAttendanceUpd
       const response = await fetch(`${API_URL}/api/messes/${ownerId}/rate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ rating, comment, studentName: user?.name || 'Student' })
+        body: JSON.stringify({ rating, comment, tags: selectedTags, studentName: user?.name || 'Student' })
       });
       const data = await response.json();
       if (response.ok) { setHasRated(true); fetchReviews(); }
@@ -214,6 +221,8 @@ const MessCard = ({ messData, user, targetDate, globalCommitted, onAttendanceUpd
   };
 
   const currentRating = messData.ownerId?.rating ? Number(messData.ownerId.rating).toFixed(1) : 'New';
+  const isTopChef = Boolean(messData.ownerId?.isTopChef || messData.isTopChef);
+  const topTags = messData.ownerId?.topTags || messData.topTags || [];
 
   const renderShiftBlock = (shiftLabel, shiftKey, menuData, currentAtt, isSubmitting) => {
     const isCommittedToOther = globalCommitted[shiftKey] && currentAtt !== 'coming';
@@ -273,7 +282,7 @@ const MessCard = ({ messData, user, targetDate, globalCommitted, onAttendanceUpd
           </div>
 
           {/* MEAL PASS QR BUTTON / CLAIMED BADGE */}
-          {currentAtt === 'coming' && targetDate === getLocalDateString(0) && (
+          {((currentAtt === 'coming') || (mySub?.status === 'paid' && currentAtt !== 'not_coming')) && targetDate === getLocalDateString(0) && (
             <div>
               {isClaimed ? (
                 <div className="mt-3 py-2 px-3 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 border border-emerald-300 dark:border-emerald-700 shadow-sm">
@@ -306,8 +315,22 @@ const MessCard = ({ messData, user, targetDate, globalCommitted, onAttendanceUpd
         {/* MESS HEADER & SUBSCRIPTION */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
           <div>
-            <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">{messData.messName}</h3>
-            <span className="inline-flex bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] font-black px-3 py-1 rounded-full uppercase items-center gap-1 shadow-sm"><Star size={10} className="fill-amber-400 text-amber-400" /> {currentRating} Rating</span>
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{messData.messName}</h3>
+              {isTopChef && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 text-white font-black text-xs shadow-md shadow-amber-500/30 animate-pulse">
+                  👑 Campus Top Chef
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] font-black px-3 py-1 rounded-full uppercase items-center gap-1 shadow-sm"><Star size={10} className="fill-amber-400 text-amber-400" /> {currentRating} Rating</span>
+              {topTags.map((tag, tIdx) => (
+                <span key={tIdx} className="bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-2.5 py-0.5 rounded-lg text-[10px] font-black border border-amber-200/50 dark:border-amber-800/40">
+                  #{tag}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div>
@@ -363,6 +386,31 @@ const MessCard = ({ messData, user, targetDate, globalCommitted, onAttendanceUpd
                   </button>
                 ))}
               </div>
+
+              {/* Tag Selection Chips */}
+              <div className="mb-3">
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Select Highlights (Tags):</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {AVAILABLE_TAGS.map(tag => {
+                    const isSelected = selectedTags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(tag)}
+                        className={`text-xs font-bold px-2.5 py-1 rounded-xl transition-all ${
+                          isSelected
+                            ? 'bg-orange-500 text-white shadow-sm scale-105'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-orange-400'
+                        }`}
+                      >
+                        {isSelected ? '✓ ' : '+ '}{tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <textarea rows="2" placeholder="How was the food?" value={comment} onChange={e => setComment(e.target.value)} className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:ring-2 focus:ring-orange-500 outline-none mb-3 dark:text-white" />
               <button type="submit" className="w-full bg-slate-900 dark:bg-orange-500 hover:bg-slate-800 dark:hover:bg-orange-600 transition-colors text-white font-bold py-2.5 rounded-xl">Submit Review</button>
             </form>
@@ -384,6 +432,15 @@ const MessCard = ({ messData, user, targetDate, globalCommitted, onAttendanceUpd
                   <span className="flex text-amber-400"><Star size={12} className="fill-amber-400" /> {r.rating}</span>
                 </div>
                 <p className="text-slate-500 dark:text-slate-400 text-xs italic">"{r.comment || 'No comment provided'}"</p>
+                {r.tags && r.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {r.tags.map((tg, idx) => (
+                      <span key={idx} className="bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                        #{tg}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -551,6 +608,28 @@ const StudentDashboard = () => {
   const [utrInput, setUtrInput] = useState('');
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
+  // Mess Stories State (24h Live Feed)
+  const [storiesGroups, setStoriesGroups] = useState([]);
+  const [selectedStoryGroup, setSelectedStoryGroup] = useState(null);
+  const [activeStoryIdx, setActiveStoryIdx] = useState(0);
+  const [storyViewerOpen, setStoryViewerOpen] = useState(false);
+
+  // Dedicated Top-Level Digital Meal Pass State
+  const [topMealPassShift, setTopMealPassShift] = useState(new Date().getHours() < 15 ? 'morning' : 'night');
+  const [topMealModalOpen, setTopMealModalOpen] = useState(false);
+  const [topMealQrToken, setTopMealQrToken] = useState('');
+  const [topMealQrLoading, setTopMealQrLoading] = useState(false);
+  const [topMealQrTimeLeft, setTopMealQrTimeLeft] = useState(900);
+  const [topMealQrCelebration, setTopMealQrCelebration] = useState(false);
+  const [topMealMessData, setTopMealMessData] = useState({ messName: '', shift: '' });
+
+  // Student OCR ID Verification State
+  const [ocrModalOpen, setOcrModalOpen] = useState(false);
+  const [idImagePreview, setIdImagePreview] = useState(null);
+  const [isVerifyingId, setIsVerifyingId] = useState(false);
+  const [ocrError, setOcrError] = useState('');
+  const [ocrSuccess, setOcrSuccess] = useState('');
+
   useEffect(() => {
     const verifyToken = async () => {
       const token = localStorage.getItem('token');
@@ -621,9 +700,18 @@ const StudentDashboard = () => {
       } catch (e) { console.error(e); }
     };
 
+    const fetchStories = async () => {
+      const token = localStorage.getItem('token');
+      try {
+        const res = await fetch(`${API_URL}/api/stories`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (res.ok) setStoriesGroups(await res.json());
+      } catch (e) { console.error('Failed to fetch stories', e); }
+    };
+
     fetchData(false);
     fetchLeaderboard();
     fetchRides();
+    fetchStories();
 
     const socket = getSocket();
 
@@ -667,11 +755,16 @@ const StudentDashboard = () => {
       fetchRides();
     };
 
+    const onStoryNew = () => {
+      fetchStories();
+    };
+
     socket.on('menu:updated', onMenuUpdated);
     socket.on('attendance:updated', onAttendanceUpdated);
     socket.on('subscription:updated', onSubscriptionUpdated);
     socket.on('notification:new', onNotificationNew);
     socket.on('ride:updated', onRideUpdated);
+    socket.on('story:new', onStoryNew);
 
     return () => {
       socket.off('menu:updated', onMenuUpdated);
@@ -679,8 +772,168 @@ const StudentDashboard = () => {
       socket.off('subscription:updated', onSubscriptionUpdated);
       socket.off('notification:new', onNotificationNew);
       socket.off('ride:updated', onRideUpdated);
+      socket.off('story:new', onStoryNew);
     };
   }, [targetDate, user]);
+
+  // Auto-advance stories every 5 seconds
+  useEffect(() => {
+    if (!storyViewerOpen || !selectedStoryGroup) return;
+    const stories = selectedStoryGroup.stories || [];
+    if (stories.length === 0) return;
+
+    const timer = setTimeout(() => {
+      if (activeStoryIdx < stories.length - 1) {
+        setActiveStoryIdx(prev => prev + 1);
+      } else {
+        setStoryViewerOpen(false);
+      }
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [storyViewerOpen, selectedStoryGroup, activeStoryIdx]);
+
+  const handleOpenStoryViewer = (group) => {
+    setSelectedStoryGroup(group);
+    setActiveStoryIdx(0);
+    setStoryViewerOpen(true);
+  };
+
+  const handlePrevStory = (e) => {
+    e?.stopPropagation();
+    if (activeStoryIdx > 0) {
+      setActiveStoryIdx(prev => prev - 1);
+    }
+  };
+
+  const handleNextStory = (e) => {
+    e?.stopPropagation();
+    const stories = selectedStoryGroup?.stories || [];
+    if (activeStoryIdx < stories.length - 1) {
+      setActiveStoryIdx(prev => prev + 1);
+    } else {
+      setStoryViewerOpen(false);
+    }
+  };
+
+  const handleIdImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setOcrError('');
+    setOcrSuccess('');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const rawDataUrl = event.target?.result;
+      if (!rawDataUrl) return;
+
+      // Canvas pre-processing: auto-scale >= 1600px width, grayscale & +25% contrast boost
+      const img = new window.Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const targetWidth = Math.max(1600, img.width);
+          const scale = targetWidth / img.width;
+          canvas.width = targetWidth;
+          canvas.height = Math.round(img.height * scale);
+
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imgData.data;
+            const factor = 1.25; // +25% contrast boost
+
+            for (let i = 0; i < data.length; i += 4) {
+              const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+              const contrasted = Math.min(255, Math.max(0, ((gray - 128) * factor) + 128));
+              data[i] = contrasted;
+              data[i + 1] = contrasted;
+              data[i + 2] = contrasted;
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+            const processedUrl = canvas.toDataURL('image/jpeg', 0.92);
+            setIdImagePreview(processedUrl);
+            return;
+          }
+        } catch (canvasErr) {
+          console.warn("Canvas pre-processing fallback:", canvasErr);
+        }
+        setIdImagePreview(rawDataUrl);
+      };
+      img.src = rawDataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleVerifyId = async () => {
+    if (!idImagePreview) {
+      setOcrError('Please upload a clear photo of your student ID card.');
+      return;
+    }
+    setIsVerifyingId(true);
+    setOcrError('');
+    setOcrSuccess('');
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/users/verify-id`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ base64Image: idImagePreview })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setOcrSuccess(data.message || 'Verified GCOEARA Student ✓!');
+        setUser(prev => ({ ...prev, isStudentVerified: true }));
+        fetchRides();
+        setTimeout(() => {
+          setOcrModalOpen(false);
+        }, 2200);
+      } else {
+        setOcrError(data.error || "ID verification failed. Make sure the college name 'Government College of Engineering, Avasari' is visible in the frame.");
+      }
+    } catch (err) {
+      setOcrError('Failed to verify ID card. Please try again or submit for manual approval.');
+    } finally {
+      setIsVerifyingId(false);
+    }
+  };
+
+  const handleManualApproveId = async () => {
+    setIsVerifyingId(true);
+    setOcrError('');
+    setOcrSuccess('');
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/users/verify-id`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ manualApproval: true })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setOcrSuccess('Verified GCOEARA Student ✓! Identity approved.');
+        setUser(prev => ({ ...prev, isStudentVerified: true }));
+        fetchRides();
+        setTimeout(() => {
+          setOcrModalOpen(false);
+        }, 2000);
+      } else {
+        setOcrError(data.error || 'Failed to submit manual approval.');
+      }
+    } catch {
+      setOcrError('Network error submitting manual approval.');
+    } finally {
+      setIsVerifyingId(false);
+    }
+  };
 
   if (isAuthLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-900"><Loader2 className="animate-spin text-indigo-500" size={48} /></div>;
@@ -870,6 +1123,87 @@ const StudentDashboard = () => {
     };
   };
 
+  // Top-Level Digital Meal Pass Computations
+  const todayStr = getLocalDateString(0);
+  const activePaidSub = mySubscriptions.find(s => s.status === 'paid' && (s.shift === 'both' || s.shift === topMealPassShift)) || mySubscriptions.find(s => s.status === 'paid');
+  const todayAtt = myAttendance.find(a => a.shift === topMealPassShift && (!a.targetDate || a.targetDate === todayStr));
+  const hasTopMealPass = Boolean(
+    (activePaidSub && (!todayAtt || todayAtt.status !== 'not_coming')) ||
+    (todayAtt && todayAtt.status === 'coming')
+  );
+  const topMealPassMessId = todayAtt?.messId || (activePaidSub?.messId?._id || activePaidSub?.messId);
+  const topMealPassMessName = todayAtt?.messName || activePaidSub?.messName || 'Your Mess';
+  const topMealPassIsConsumed = Boolean(todayAtt?.isConsumed);
+
+  // Live timer & real-time socket listener for top meal pass modal
+  useEffect(() => {
+    if (!topMealModalOpen || !topMealQrToken) return;
+    const timer = setInterval(() => {
+      setTopMealQrTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    const socket = getSocket();
+    const onConsumed = (data) => {
+      if (data?.studentId === user?._id && data?.shift === topMealPassShift) {
+        setTopMealQrCelebration(true);
+        forceDataRefresh();
+        setTimeout(() => {
+          setTopMealQrCelebration(false);
+        }, 3200);
+      }
+    };
+    socket.on('attendance:consumed', onConsumed);
+
+    return () => {
+      clearInterval(timer);
+      socket.off('attendance:consumed', onConsumed);
+    };
+  }, [topMealModalOpen, topMealQrToken, topMealPassShift, user]);
+
+  const handleOpenTopMealQr = async (shift) => {
+    if (!topMealPassMessId) {
+      alert("No active mess subscription found.");
+      return;
+    }
+    setTopMealQrLoading(true);
+    setTopMealQrToken('');
+    setTopMealModalOpen(true);
+    setTopMealQrTimeLeft(900);
+    setTopMealQrCelebration(false);
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/attendance/qr/${topMealPassMessId}/${todayStr}/${shift}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok && data.qrToken) {
+        setTopMealQrToken(data.qrToken);
+        setTopMealMessData({
+          messName: data.messName || topMealPassMessName,
+          shift: data.shift || shift
+        });
+      } else {
+        alert(data.error || "Could not generate meal pass");
+        setTopMealModalOpen(false);
+      }
+    } catch (e) {
+      alert("Network error fetching meal pass.");
+      setTopMealModalOpen(false);
+    } finally {
+      setTopMealQrLoading(false);
+    }
+  };
+
+  const handleRefreshTopMealQr = () => {
+    handleOpenTopMealQr(topMealPassShift);
+  };
+
   const forceDataRefresh = async () => {
     const token = localStorage.getItem('token');
     const headers = { 'Authorization': `Bearer ${token}` };
@@ -925,9 +1259,30 @@ const StudentDashboard = () => {
       <main className="max-w-6xl mx-auto px-4 pt-8 pb-24 grid grid-cols-1 lg:grid-cols-4 gap-8">
 
         <div className="lg:col-span-3">
-          <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-2">{t.greeting}, {studentName} 👋</h2>
-            <p className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-2">{t.subtitle} <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span> Live</p>
+          <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-2">{t.greeting}, {studentName} 👋</h2>
+              <div className="flex items-center gap-3 flex-wrap">
+                <p className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-2">{t.subtitle} <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span></span> Live</p>
+                {user?.isStudentVerified ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs font-black shadow-sm">
+                    <CheckCircle2 size={13} className="text-blue-500" /> Verified GCOEARA Student ✓
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setOcrError('');
+                      setOcrSuccess('');
+                      setIdImagePreview(null);
+                      setOcrModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black shadow-md shadow-blue-500/20 transition-all active:scale-95"
+                  >
+                    Verify College ID 🪪
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="bg-slate-200/50 dark:bg-slate-800/80 backdrop-blur-md p-1.5 rounded-full shadow-inner mb-6 flex flex-wrap gap-1 relative z-20 w-fit">
@@ -939,6 +1294,51 @@ const StudentDashboard = () => {
 
           {activeTab === 'menus' && (
             <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+
+              {/* 24-HOUR MESS STORIES FEED */}
+              {storiesGroups.length > 0 && (
+                <div className="mb-8">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-orange-500" /> Live Campus Stories (24h)
+                    </h3>
+                    <span className="text-[11px] font-bold text-slate-400">Tap to view live kitchen updates</span>
+                  </div>
+                  <div className="flex items-center gap-4 overflow-x-auto pb-3 scrollbar-none">
+                    {storiesGroups.map((group) => (
+                      <div
+                        key={group.ownerId}
+                        onClick={() => handleOpenStoryViewer(group)}
+                        className="flex flex-col items-center gap-1.5 cursor-pointer shrink-0 group/bubble select-none"
+                      >
+                        <div className="p-0.5 rounded-full bg-gradient-to-tr from-amber-400 via-rose-500 to-indigo-600 shadow-md group-hover/bubble:scale-105 transition-all">
+                          <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full border-2 border-white dark:border-slate-900 overflow-hidden bg-slate-900 relative flex items-center justify-center">
+                            {group.latestStory?.imageUrl ? (
+                              <img
+                                src={group.latestStory.imageUrl}
+                                alt={group.messName}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-indigo-600 text-white font-black text-lg">
+                                {group.messName?.charAt(0) || 'M'}
+                              </div>
+                            )}
+                            {group.stories?.length > 1 && (
+                              <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full border border-white/40">
+                                {group.stories.length}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate max-w-[76px] text-center">
+                          {group.messName}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex mb-8 bg-white dark:bg-slate-800 p-4 rounded-3xl border border-slate-100 dark:border-slate-700 shadow-sm w-fit">
                 <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl">
@@ -993,6 +1393,64 @@ const StudentDashboard = () => {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* DEDICATED TOP-LEVEL DIGITAL MEAL PASS SECTION (ALWAYS ACCESSIBLE EVEN WHEN NO MENU PUBLISHED) */}
+              {hasTopMealPass && (
+                <div className="mb-8 p-6 sm:p-7 bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 text-white rounded-[2rem] border border-indigo-500/30 shadow-2xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="px-3 py-1 bg-indigo-500/30 border border-indigo-400/40 text-indigo-300 rounded-full text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
+                          <QrCode size={13} /> 🎟️ Digital Meal Pass
+                        </span>
+                        <span className="text-xs font-bold text-slate-400">
+                          • Today ({todayStr})
+                        </span>
+                      </div>
+                      <h3 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
+                        {topMealPassMessName}
+                      </h3>
+                      <p className="text-xs text-slate-300 font-medium mt-1">
+                        Instant counter pass valid for today's dining service. Scan at the mess counter.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      {/* Morning / Night Shift Toggle */}
+                      <div className="flex bg-slate-900/80 p-1 rounded-2xl border border-indigo-500/20 shadow-inner">
+                        <button
+                          onClick={() => setTopMealPassShift('morning')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${topMealPassShift === 'morning' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          ☀️ Morning
+                        </button>
+                        <button
+                          onClick={() => setTopMealPassShift('night')}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${topMealPassShift === 'night' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          🌙 Night
+                        </button>
+                      </div>
+
+                      {topMealPassIsConsumed ? (
+                        <div className="py-3 px-5 bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10">
+                          <CheckCircle2 size={16} className="text-emerald-400" />
+                          <span>Meal Claimed ✓</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleOpenTopMealQr(topMealPassShift)}
+                          className="py-3 px-6 bg-gradient-to-r from-indigo-500 via-indigo-600 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white font-black rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xl shadow-indigo-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                          <QrCode size={17} />
+                          <span>Show Meal Pass QR 🎟️</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1174,8 +1632,13 @@ const StudentDashboard = () => {
                             <span>{ride.to}</span>
                           </div>
                           {isCreator && (
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 shrink-0">
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 shrink-0 flex items-center gap-1">
                               Host
+                              {ride.creatorIsVerified && (
+                                <span className="text-blue-600 dark:text-blue-400 font-black text-xs" title="Verified GCOEARA Student">
+                                  ✓
+                                </span>
+                              )}
                             </span>
                           )}
                           {!isCreator && hasJoined && (
@@ -1223,6 +1686,11 @@ const StudentDashboard = () => {
                                 className="flex items-center gap-1.5 text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-xl text-slate-700 dark:text-slate-300"
                               >
                                 <span>{p.studentName?.split(' ')[0]}</span>
+                                {p.isStudentVerified && (
+                                  <span className="inline-flex items-center justify-center w-3.5 h-3.5 bg-blue-500 text-white rounded-full text-[9px] font-black" title="Verified GCOEARA Student">
+                                    ✓
+                                  </span>
+                                )}
                                 {p.studentId === user?._id && <span className="text-[10px] text-indigo-500 font-bold">(You)</span>}
                                 {hasJoined && p.phone && p.studentId !== user?._id && (
                                   <a href={`tel:${p.phone}`} className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 p-0.5" title={`Call ${p.studentName}`}>
@@ -1300,7 +1768,12 @@ const StudentDashboard = () => {
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${i === 0 ? 'bg-amber-400 text-white shadow-lg shadow-amber-400/40' : i === 1 ? 'bg-slate-300 text-slate-700' : 'bg-orange-300 text-orange-900'}`}>{i + 1}</div>
                     <div>
-                      <p className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-[120px]">{mess.messName}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-[110px]">{mess.messName}</p>
+                        {(mess.isTopChef || i === 0) && (
+                          <span className="text-xs" title="Campus Top Chef">👑</span>
+                        )}
+                      </div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase">{mess.ratingCount} {t.reviews}</p>
                     </div>
                   </div>
@@ -1561,6 +2034,260 @@ const StudentDashboard = () => {
                 {isSubmittingRide ? <Loader2 size={16} className="animate-spin" /> : "Publish Ride Pool 🛺"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 24-HOUR STORY VIEWER MODAL */}
+      {storyViewerOpen && selectedStoryGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in select-none">
+          <div className="relative max-w-sm w-full h-[620px] rounded-3xl overflow-hidden bg-slate-900 border border-white/10 shadow-2xl flex flex-col justify-between">
+            {/* Top Bar with Segments & Header */}
+            <div className="absolute top-0 inset-x-0 z-30 p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+              {/* Progress Segments */}
+              <div className="flex gap-1.5 mb-3">
+                {selectedStoryGroup.stories.map((st, idx) => (
+                  <div key={st._id || idx} className="h-1 flex-1 bg-white/30 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full bg-white transition-all duration-300 ${
+                        idx < activeStoryIdx ? 'w-full' : idx === activeStoryIdx ? 'w-full animate-[progress_5s_linear]' : 'w-0'
+                      }`}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Mess Details Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-400 via-rose-500 to-indigo-600 p-0.5">
+                    <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center text-white font-black text-xs overflow-hidden">
+                      {selectedStoryGroup.latestStory?.imageUrl ? (
+                        <img src={selectedStoryGroup.latestStory.imageUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        selectedStoryGroup.messName?.charAt(0) || 'M'
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-white font-black text-sm tracking-tight">{selectedStoryGroup.messName}</h4>
+                    <p className="text-[10px] font-bold text-white/70">
+                      {selectedStoryGroup.stories[activeStoryIdx]?.createdAt
+                        ? new Date(selectedStoryGroup.stories[activeStoryIdx].createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : 'Live Update'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setStoryViewerOpen(false)}
+                  className="p-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Story Image */}
+            <div className="relative w-full h-full flex items-center justify-center bg-black">
+              {selectedStoryGroup.stories[activeStoryIdx]?.imageUrl ? (
+                <img
+                  src={selectedStoryGroup.stories[activeStoryIdx].imageUrl}
+                  alt={selectedStoryGroup.stories[activeStoryIdx].caption || "Live story"}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="text-white/40 font-bold">No image</div>
+              )}
+
+              {/* Navigation Click Zones */}
+              <div
+                onClick={handlePrevStory}
+                className="absolute inset-y-0 left-0 w-1/3 cursor-pointer z-10 flex items-center justify-start pl-2 opacity-0 hover:opacity-100 transition-opacity"
+              >
+                <div className="p-2 rounded-full bg-black/40 text-white">
+                  <ChevronLeft size={20} />
+                </div>
+              </div>
+              <div
+                onClick={handleNextStory}
+                className="absolute inset-y-0 right-0 w-1/3 cursor-pointer z-10 flex items-center justify-end pr-2 opacity-0 hover:opacity-100 transition-opacity"
+              >
+                <div className="p-2 rounded-full bg-black/40 text-white">
+                  <ChevronRight size={20} />
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Caption Overlay */}
+            {selectedStoryGroup.stories[activeStoryIdx]?.caption && (
+              <div className="absolute bottom-0 inset-x-0 z-30 p-4 bg-gradient-to-t from-black/90 via-black/60 to-transparent">
+                <div className="bg-black/40 backdrop-blur-md rounded-2xl p-3 border border-white/10 text-white text-xs font-semibold leading-relaxed">
+                  {selectedStoryGroup.stories[activeStoryIdx].caption}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* STUDENT OCR ID VERIFICATION MODAL */}
+      {ocrModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl relative">
+            <button
+              onClick={() => setOcrModalOpen(false)}
+              className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl">
+                <ShieldCheck size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white">Verify College ID 🪪</h3>
+                <p className="text-xs font-bold text-slate-400">GCOEARA Attendance & Ride Pool Trust</p>
+              </div>
+            </div>
+
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-4 leading-relaxed">
+              Upload a clear photo of your GCOEARA College ID card. Our on-device OCR engine scans for college accreditation credentials to grant your blue verified trust badge.
+            </p>
+
+            {/* ID Image Upload Box */}
+            <div className="mb-4">
+              {idImagePreview ? (
+                <div className="relative rounded-2xl overflow-hidden border-2 border-indigo-500/40 bg-slate-950">
+                  <img src={idImagePreview} alt="ID Preview" className="w-full h-48 object-contain" />
+                  <button
+                    onClick={() => setIdImagePreview(null)}
+                    className="absolute top-2 right-2 p-1.5 rounded-xl bg-black/60 text-white hover:bg-black/80 transition-colors text-xs font-bold flex items-center gap-1"
+                  >
+                    <X size={14} /> Change
+                  </button>
+                </div>
+              ) : (
+                <label className="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer bg-slate-50 dark:bg-slate-800/40 transition-colors group">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                    <Upload size={22} />
+                  </div>
+                  <span className="text-xs font-black text-slate-700 dark:text-slate-200 mb-0.5">Upload or Snap College ID</span>
+                  <span className="text-[10px] font-bold text-slate-400">PNG, JPG, or JPEG (Ensure text is sharp)</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleIdImageSelect}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
+
+            {/* Error or Success Feedback */}
+            {ocrError && (
+              <div className="mb-4 space-y-3">
+                <div className="p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 flex items-center gap-2">
+                  <AlertTriangle size={15} className="shrink-0" />
+                  <span>{ocrError}</span>
+                </div>
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-xs text-blue-700 dark:text-blue-300">
+                  <p className="font-bold mb-1">💡 Tips for instant verification:</p>
+                  <p className="leading-relaxed">Make sure the college name 'Government College of Engineering, Avasari' is visible in the frame.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleManualApproveId}
+                  disabled={isVerifyingId}
+                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <ShieldCheck size={14} /> Submit for Manual Approval
+                </button>
+              </div>
+            )}
+
+            {ocrSuccess && (
+              <div className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2 animate-in zoom-in-95">
+                <CheckCircle2 size={16} className="shrink-0 text-emerald-500" />
+                <span>{ocrSuccess}</span>
+              </div>
+            )}
+
+            <button
+              onClick={handleVerifyId}
+              disabled={isVerifyingId || !idImagePreview || Boolean(ocrSuccess)}
+              className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white font-black rounded-xl text-sm transition-all shadow-md shadow-blue-500/20 flex items-center justify-center gap-2"
+            >
+              {isVerifyingId ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Scanning ID with OCR...</span>
+                </>
+              ) : ocrSuccess ? (
+                "Verified Successfully ✓"
+              ) : (
+                "Scan & Verify ID 🪪"
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* TOP-LEVEL DEDICATED DIGITAL MEAL PASS MODAL */}
+      {topMealModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 max-w-sm w-full border border-slate-200 dark:border-slate-800 shadow-2xl relative text-center">
+            <button
+              onClick={() => setTopMealModalOpen(false)}
+              className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <X size={20} />
+            </button>
+
+            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight mb-1">Digital Meal Pass 🎟️</h3>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
+              {topMealMessData.messName || topMealPassMessName} • {topMealPassShift.toUpperCase()} SHIFT
+            </p>
+
+            {topMealQrCelebration ? (
+              <div className="py-8 animate-in zoom-in-95">
+                <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg animate-bounce">
+                  <CheckCircle2 size={48} />
+                </div>
+                <h4 className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mb-1">✅ Meal Claimed!</h4>
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Enjoy your meal.</p>
+              </div>
+            ) : topMealQrLoading ? (
+              <div className="py-16 flex flex-col items-center justify-center">
+                <Loader2 className="animate-spin text-indigo-600 dark:text-indigo-400 mb-3" size={40} />
+                <p className="text-xs font-bold text-slate-400">Generating Secure Pass...</p>
+              </div>
+            ) : topMealQrToken ? (
+              <div>
+                <div className="mb-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+                  Student: <span className="font-black text-slate-900 dark:text-white">{user?.name}</span>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-800 inline-block shadow-sm mb-4">
+                  <QRCodeSVG value={topMealQrToken} size={200} level="H" />
+                </div>
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-xl text-xs font-black border border-amber-200 dark:border-amber-800/50">
+                    <Clock size={13} /> Expires in {Math.floor(topMealQrTimeLeft / 60)}:{('0' + (topMealQrTimeLeft % 60)).slice(-2)}
+                  </div>
+                  <button
+                    onClick={handleRefreshTopMealQr}
+                    className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 border border-slate-200 dark:border-slate-700 transition-colors"
+                    title="Refresh QR"
+                  >
+                    <RefreshCw size={14} />
+                  </button>
+                </div>
+                <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500 leading-relaxed">
+                  Show this QR code to the mess owner at the counter to verify your meal.
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

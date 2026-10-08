@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChefHat, Users, CheckCircle2, XCircle, LogOut, Loader2, PlusCircle, TrendingUp, CalendarDays, LineChart, Calculator, MapPin, Navigation, IndianRupee, CalendarPlus, Edit3, Phone, Clock, Bell, QrCode, AlertCircle, X, Scale, Leaf, Settings2 } from 'lucide-react';
+import { ChefHat, Users, CheckCircle2, XCircle, LogOut, Loader2, PlusCircle, TrendingUp, CalendarDays, LineChart, Calculator, MapPin, Navigation, IndianRupee, CalendarPlus, Edit3, Phone, Clock, Bell, QrCode, AlertCircle, X, Scale, Leaf, Settings2, Camera, Trophy, Sparkles, Upload, Trash2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import ThemeToggle from '../components/ThemeToggle';
 import LanguageToggle from '../components/LanguageToggle';
@@ -82,6 +82,152 @@ const OwnerDashboard = () => {
   const [nightCutoff, setNightCutoff] = useState(user?.nightCutoff || '17:30');
   const [isSavingCutoff, setIsSavingCutoff] = useState(false);
   const [cutoffMsg, setCutoffMsg] = useState('');
+
+  // 24H Live Story State
+  const [storyModalOpen, setStoryModalOpen] = useState(false);
+  const [storyImage, setStoryImage] = useState('');
+  const [storyCaption, setStoryCaption] = useState('');
+  const [isPostingStory, setIsPostingStory] = useState(false);
+  const [storyMsg, setStoryMsg] = useState('');
+  const [myActiveStories, setMyActiveStories] = useState([]);
+  const [isDeletingStory, setIsDeletingStory] = useState(null);
+
+  // Compress image via Canvas (max width 1080px, JPEG 0.75 quality)
+  const compressImage = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxWidth = 1080;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Compress to JPEG with 0.75 quality
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          resolve(compressedDataUrl);
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImage(file);
+      setStoryImage(compressed);
+    } catch (err) {
+      console.warn('Canvas image compression failed, falling back to raw data:', err);
+      const reader = new FileReader();
+      reader.onload = () => setStoryImage(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const fetchMyStories = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/stories`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const groups = await res.json();
+        const myGroup = groups.find(g =>
+          g.ownerId === user?._id ||
+          g.ownerId?._id === user?._id ||
+          String(g.ownerId) === String(user?._id)
+        );
+        setMyActiveStories(myGroup ? myGroup.stories : []);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch stories:", err);
+    }
+  };
+
+  const handleDeleteStory = async (storyId) => {
+    if (!window.confirm("Are you sure you want to delete this live story? It will be removed immediately from Cloudinary and students' feeds.")) {
+      return;
+    }
+    setIsDeletingStory(storyId);
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/stories/${storyId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        setMyActiveStories(prev => prev.filter(s => s._id !== storyId));
+      } else {
+        const d = await res.json();
+        alert(d.error || "Failed to delete story");
+      }
+    } catch (err) {
+      alert("Network error deleting story");
+    } finally {
+      setIsDeletingStory(null);
+    }
+  };
+
+  const handlePostStory = async (e) => {
+    e.preventDefault();
+    if (!storyImage) {
+      alert("Please select or upload a live photo for your story!");
+      return;
+    }
+    setIsPostingStory(true);
+    setStoryMsg('');
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/stories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          imageUrl: storyImage,
+          caption: storyCaption.trim()
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setStoryMsg("🎉 Live story published! It will appear on campus student feeds for 24 hours.");
+        fetchMyStories();
+        setTimeout(() => {
+          setStoryModalOpen(false);
+          setStoryImage('');
+          setStoryCaption('');
+          setStoryMsg('');
+        }, 1800);
+      } else {
+        alert(data.error || "Failed to post story");
+      }
+    } catch (err) {
+      alert("Network error posting story");
+    } finally {
+      setIsPostingStory(false);
+    }
+  };
 
   const displayDate = new Date(menuDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 
@@ -193,6 +339,7 @@ const OwnerDashboard = () => {
     fetchStats();
     fetchHistory();
     fetchMembers();
+    fetchMyStories();
 
     const socket = getSocket();
     const onAttendanceUpdated = (data) => {
@@ -227,17 +374,24 @@ const OwnerDashboard = () => {
         }
       }
     };
+    const onStoryEvent = () => {
+      fetchMyStories();
+    };
 
     socket.on('attendance:updated', onAttendanceUpdated);
     socket.on('attendance:consumed', onAttendanceConsumed);
     socket.on('subscription:updated', onSubscriptionUpdated);
     socket.on('notification:new', onNotificationNew);
+    socket.on('story:new', onStoryEvent);
+    socket.on('story:deleted', onStoryEvent);
 
     return () => {
       socket.off('attendance:updated', onAttendanceUpdated);
       socket.off('attendance:consumed', onAttendanceConsumed);
       socket.off('subscription:updated', onSubscriptionUpdated);
       socket.off('notification:new', onNotificationNew);
+      socket.off('story:new', onStoryEvent);
+      socket.off('story:deleted', onStoryEvent);
     };
   }, [menuDate, user]);
 
@@ -490,6 +644,18 @@ const OwnerDashboard = () => {
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button
+              onClick={() => { setStoryModalOpen(true); setStoryMsg(''); }}
+              className="flex items-center gap-2 text-xs sm:text-sm font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-100 dark:hover:bg-orange-500/20 px-3 py-2 rounded-xl transition-all border border-orange-200 dark:border-orange-500/20 shadow-sm"
+              title="Post 24-Hour Live Food Story"
+            >
+              <Camera size={16} /> <span className="hidden md:inline">Post Live Story 📸</span>
+              {myActiveStories.length > 0 && (
+                <span className="bg-orange-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                  {myActiveStories.length}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => { setVerifyModalOpen(true); setVerifyResult(null); }}
               className="flex items-center gap-2 text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 px-3 py-2 rounded-xl transition-all border border-emerald-200 dark:border-emerald-500/20"
             >
@@ -520,7 +686,26 @@ const OwnerDashboard = () => {
 
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
           <div>
-            <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">{t.dashboardOverview} <span className="relative flex h-2 w-2 mb-4"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span></span></h2>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                {t.dashboardOverview}
+                <span className="relative flex h-2 w-2 mb-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+                </span>
+              </h2>
+              {user?.isTopChef && (
+                <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-100 via-yellow-200 to-amber-300 text-amber-950 px-3 py-1 rounded-full border border-amber-400 shadow-md">
+                  <Trophy size={14} className="text-amber-700" />
+                  <span className="text-xs font-black uppercase tracking-wider">👑 Campus Top Chef</span>
+                  {user.topTags && user.topTags.length > 0 && (
+                    <span className="text-[10px] font-bold text-amber-800 hidden sm:inline">
+                      ({user.topTags.join(' • ')})
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-2 mt-3 bg-white dark:bg-slate-800 p-1 w-fit rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
               <button onClick={() => setMenuDate(getLocalDateString(0))} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${menuDate === getLocalDateString(0) ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>{t.todaysData}</button>
               <button onClick={() => setMenuDate(getLocalDateString(1))} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${menuDate === getLocalDateString(1) ? 'bg-orange-500 text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>{t.tomorrowsPreBookings}</button>
@@ -1190,6 +1375,141 @@ const OwnerDashboard = () => {
                 Save Norms
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* POST 24H LIVE STORY MODAL */}
+      {storyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative">
+            <button
+              onClick={() => setStoryModalOpen(false)}
+              className="absolute top-5 right-5 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-2xl">
+                <Camera size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white">Post Live Update 📸</h3>
+                <p className="text-xs text-orange-500 font-bold uppercase tracking-wider">24-Hour Campus Story</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-5">
+              Show students what's cooking right now! Live photos disappear automatically after 24 hours.
+            </p>
+
+            <form onSubmit={handlePostStory} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-2">Food / Kitchen Photo</label>
+                {storyImage ? (
+                  <div className="relative rounded-2xl overflow-hidden h-48 bg-slate-950 mb-3 border border-slate-200 dark:border-slate-700">
+                    <img src={storyImage} alt="Story Preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setStoryImage('')}
+                      className="absolute top-2 right-2 bg-slate-900/80 text-white p-1.5 rounded-full hover:bg-rose-600 transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:border-orange-500 transition-colors bg-slate-50 dark:bg-slate-950">
+                    <Upload size={28} className="text-orange-500 mb-2" />
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Click to upload photo</span>
+                    <span className="text-[10px] text-slate-400">JPG, PNG, WebP up to 10MB</span>
+                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                  </label>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
+                  Caption (e.g. "Piping hot jalebis ready!")
+                </label>
+                <input
+                  type="text"
+                  maxLength={100}
+                  value={storyCaption}
+                  onChange={(e) => setStoryCaption(e.target.value)}
+                  placeholder="Short live announcement..."
+                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500"
+                />
+                <span className="text-[10px] text-slate-400 font-bold block text-right mt-1">
+                  {storyCaption.length}/100
+                </span>
+              </div>
+
+              {storyMsg && (
+                <p className="text-xs font-bold p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                  {storyMsg}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isPostingStory || !storyImage}
+                className="w-full bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
+              >
+                {isPostingStory ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
+                Publish Live 🚀
+              </button>
+            </form>
+
+            {/* Active Stories List & Immediate Delete */}
+            {myActiveStories && myActiveStories.length > 0 && (
+              <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                    Active Live Stories ({myActiveStories.length})
+                  </h4>
+                  <span className="text-[10px] text-slate-400 font-bold">Auto-deletes in 24h</span>
+                </div>
+                <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
+                  {myActiveStories.map((story) => (
+                    <div
+                      key={story._id}
+                      className="flex items-center justify-between gap-3 p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={story.imageUrl}
+                          alt="Story"
+                          className="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-200 dark:border-slate-700 shadow-sm"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                            {story.caption || 'No caption'}
+                          </p>
+                          <p className="text-[10px] text-slate-400 font-medium">
+                            {new Date(story.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(story.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteStory(story._id)}
+                        disabled={isDeletingStory === story._id}
+                        className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-colors shrink-0 disabled:opacity-50"
+                        title="Delete Story (from Cloudinary & Student Feeds)"
+                      >
+                        {isDeletingStory === story._id ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={16} />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
