@@ -67,7 +67,22 @@ Directory structure:
             ├── components/
             │   ├── LanguageToggle.jsx
             │   ├── MessMap.jsx
-            │   └── ThemeToggle.jsx
+            │   ├── ThemeToggle.jsx
+            │   └── owner/
+            │       ├── CutoffPopup.jsx
+            │       ├── HeadcountReviewsCard.jsx
+            │       ├── LiveStoriesPanel.jsx
+            │       ├── MenuHeroCard.jsx
+            │       ├── MessSettingsPanel.jsx
+            │       ├── NavIconButton.jsx
+            │       ├── NotificationsPanel.jsx
+            │       ├── OwnerHome.jsx
+            │       ├── OwnerNavbar.jsx
+            │       ├── QrScannerPanel.jsx
+            │       ├── RationEstimatorPanel.jsx
+            │       ├── SectionPanel.jsx
+            │       ├── SectionTile.jsx
+            │       └── SubscribersPanel.jsx
             ├── pages/
             │   ├── AdminDashboard.jsx
             │   ├── AuthPage.jsx
@@ -81,166 +96,7 @@ Directory structure:
 ================================================
 FILE: README.md
 ================================================
-# 🎓 Avasari Connect (`CEP_Mess_Project`)
-
-A unified campus dining, living, and transit ecosystem designed for engineering students and local vendors around **GCOEARA (Avasari Khurd)**.
-
----
-
-## 🏗️ Monorepo Architecture
-
-```
-CEP_Mess_Project/
-├── backend/          # Express 5 + Node.js + Mongoose (MongoDB Atlas) + Socket.io
-├── frontend/         # React 19 + Vite + Tailwind CSS v4 + VitePWA (Web Application)
-├── avasari-mobile/   # Expo SDK 57 + React Native 0.86 + Expo Router (Mobile App)
-├── render.yaml       # Cloud deployment blueprint for Backend
-└── README.md         # Production documentation & setup guide
-```
-
----
-
-## ⚡ Core Features & Capabilities
-
-- **🍽️ Mess Dining & Live Menus**: Today's menus, meal cut-off lock timers (morning & evening), advance skip notifications, and student subscriptions.
-- **🛡️ QR Meal Pass & Anti-Theft Dining**: Cryptographically signed single-use meal passes; mess owner counter scanner with duplicate claim prevention.
-- **💳 FinTech UPI Payments**: In-app merchant UPI launcher, 12-digit UTR submission, and owner verification dashboard.
-- **🍲 Smart Kitchen Ration Estimator**: Headcount-to-ingredient translator (Rice, Atta, Dal, Veggies) and food waste prevented quantifier.
-- **🏠 PG/Hostel Vacancy Portal**: Filterable accommodation directory with live vacancies, rent, amenities, gender preferences, and one-tap calling.
-- **🛺 Campus Auto-Pooling (Ride-Sharing)**: Real-time ride board for campus-to-town transit with live seat reservations and dynamic fare splitting.
-- **📍 Geospatial Distance Engine**: MongoDB `2dsphere` and Haversine distance calculation rendering `"📍 X.X km away"` distance badges on maps.
-- **⚡ Offline Resilience**: Workbox caching (`NetworkFirst` menus, `StaleWhileRevalidate` directory) on Web PWA, plus automatic `AsyncStorage` fallback on Mobile.
-- **🔒 Security Hardened**: Helmet security headers, Gzip compression, multi-tier rate limiting, CORS origin isolation, and graceful container shutdown.
-
----
-
-## 🚀 Quick Start & Local Setup
-
-### 1. Prerequisites
-- **Node.js** (v18.x or v20.x recommended)
-- **MongoDB Atlas** database cluster (or local MongoDB URI)
-- **Expo Go** app on your physical mobile phone (for testing `avasari-mobile`)
-
----
-
-### 2. Environment Variables Configuration
-
-#### Backend (`backend/.env`)
-Copy `backend/.env.example` to `backend/.env`:
-```env
-PORT=3000
-MONGO_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/mess_connect?retryWrites=true&w=majority
-JWT_SECRET=your_super_secret_jwt_key_here
-NODE_ENV=development
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
-```
-
-#### Frontend (`frontend/.env`)
-Copy `frontend/.env.example` to `frontend/.env`:
-```env
-VITE_API_URL=http://localhost:3000
-```
-
-#### Mobile (`avasari-mobile/.env`)
-Copy `avasari-mobile/.env.example` to `avasari-mobile/.env`:
-```env
-# Set to your computer's local Wi-Fi IP so physical phones can reach the backend
-EXPO_PUBLIC_API_URL=http://192.168.0.101:3000
-```
-
----
-
-### 3. Install Dependencies & Run Concurrently
-
-Open 3 terminal windows to run all services:
-
-#### Terminal 1 — Backend API & WebSockets
-```bash
-cd backend
-npm install
-npm run dev
-# Server running at http://localhost:3000 (Health Check: http://localhost:3000/api/health)
-```
-
-#### Terminal 2 — Frontend Web PWA
-```bash
-cd frontend
-npm install
-npm run dev
-# Web app running at http://localhost:5173
-```
-
-#### Terminal 3 — Mobile App (Expo)
-```bash
-cd avasari-mobile
-npm install
-npx expo start
-# Scan the QR code using Expo Go on Android / iOS
-```
-
----
-
-## 🧪 Verification & Health Checks
-
-Run verification tests across the monorepo:
-
-```bash
-# 1. Backend syntax check
-node --check backend/server.js
-
-# 2. Backend health endpoint check
-curl http://localhost:3000/api/health
-
-# 3. Frontend production PWA build
-cd frontend && npm run build
-
-# 4. Mobile TypeScript strict check
-cd avasari-mobile && npx tsc --noEmit
-```
-
----
-
-## 🌐 Production Deployment Guide
-
-### 1. Backend Web Service (Render / Railway)
-- Use the included [render.yaml](file:///d:/CEP_Mess_Project/render.yaml) blueprint or configure manually:
-  - **Build Command**: `npm install`
-  - **Start Command**: `npm start`
-  - **Health Check Path**: `/api/health`
-  - **Environment Variables**:
-    - `NODE_ENV`: `production`
-    - `PORT`: `3000`
-    - `MONGO_URI`: `<Atlas Connection String>`
-    - `JWT_SECRET`: `<High-entropy 32+ character key>`
-    - `ALLOWED_ORIGINS`: `https://your-frontend-domain.vercel.app`
-
-### 2. Frontend Web PWA (Vercel)
-- Root Directory: `frontend`
-- Build Command: `npm run build`
-- Output Directory: `dist`
-- The included [vercel.json](file:///d:/CEP_Mess_Project/frontend/vercel.json) handles client-side SPA routing (`/*` ➔ `/index.html`).
-
-### 3. Mobile App (Expo Application Services / EAS)
-- Configuration is pre-wired in [eas.json](file:///d:/CEP_Mess_Project/avasari-mobile/eas.json) and [app.json](file:///d:/CEP_Mess_Project/avasari-mobile/app.json):
-  ```bash
-  cd avasari-mobile
-
-  # Install EAS CLI globally
-  npm install -g eas-cli
-  eas login
-
-  # Build standalone Android APK for campus distribution:
-  eas build --platform android --profile preview
-
-  # Build Google Play production app bundle:
-  eas build --platform android --profile production
-  ```
-
----
-
-## 📄 License
-ISC © 2026 Avasari Connect Team
-
+[Binary file]
 
 
 ================================================
@@ -248,7 +104,7 @@ FILE: render.yaml
 ================================================
 services:
   - type: web
-    name: avasari-connect-backend
+    name: avasariconnectbackend
     runtime: node
     rootDir: backend
     buildCommand: npm install
@@ -367,7 +223,9 @@ FILE: avasari-mobile/app.json
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "CAMERA"
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -397,6 +255,12 @@ FILE: avasari-mobile/app.json
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0a1c53bf-5ecc-4b36-9f59-b8b781bb8962"
+      }
     }
   }
 }
@@ -425,11 +289,17 @@ FILE: avasari-mobile/eas.json
     "preview": {
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://avasariconnectbackend.onrender.com"
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://YOUR-BACKEND-NAME.onrender.com"
       }
     }
   },
@@ -437,7 +307,6 @@ FILE: avasari-mobile/eas.json
     "production": {}
   }
 }
-
 
 
 ================================================
@@ -555,7 +424,7 @@ FILE: avasari-mobile/tsconfig.json
 ================================================
 FILE: avasari-mobile/.env.example
 ================================================
-EXPO_PUBLIC_API_URL=http://192.168.0.101:3000
+EXPO_PUBLIC_API_URL=https://avasariconnectbackend.onrender.com
 
 
 
@@ -607,7 +476,7 @@ FILE: avasari-mobile/assets/expo.icon/icon.json
 ================================================
 FILE: avasari-mobile/scripts/reset-project.js
 ================================================
-Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x81 in position 1501: character maps to <undefined>
+Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x81 in position 1447: character maps to <undefined>
 
 
 ================================================
@@ -640,7 +509,7 @@ export default function RootLayout() {
 ================================================
 FILE: avasari-mobile/src/app/index.tsx
 ================================================
-Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8d in position 11673: character maps to <undefined>
+Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8d in position 11453: character maps to <undefined>
 
 
 ================================================
@@ -2356,8 +2225,8 @@ const getApiUrl = (): string => {
         }
     }
 
-    // 3. Fallback to env variable or localhost
-    return envUrl || 'http://localhost:3000';
+    // 3. Fallback to env variable or production deployed server
+    return envUrl || 'https://avasariconnectbackend.onrender.com';
 };
 
 export const API_URL = getApiUrl();
@@ -4587,8 +4456,7 @@ export default defineConfig({
 ================================================
 FILE: frontend/.env.example
 ================================================
-VITE_API_URL=http://localhost:3000
-
+VITE_API_URL=https://avasariconnectbackend.onrender.com
 
 
 ================================================
@@ -4675,11 +4543,13 @@ const LanguageToggle = ({ lang, setLang }) => {
 
     return (
         <button
+            type="button"
             onClick={toggleLanguage}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all text-xs font-black shadow-sm"
+            className="flex items-center gap-1.5 px-3 h-11 min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-sm font-medium shadow-2xs cursor-pointer"
             title={'Change Language / \u092d\u093e\u0937\u093e \u092c\u0926\u0932\u093e'}
+            aria-label={'Change Language / \u092d\u093e\u0937\u093e \u092c\u0926\u0932\u093e'}
         >
-            <Languages size={16} className="text-orange-500" />
+            <Languages size={18} className="text-orange-500 shrink-0" />
             <span>{lang === 'en' ? '\u092e\u0930\u093e\u0920\u0940' : 'English'}</span>
         </button>
     );
@@ -4725,17 +4595,2282 @@ const ThemeToggle = () => {
   };
 
   return (
-    <button 
-      onClick={toggleTheme} 
-      className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shadow-sm"
+    <button
+      type="button"
+      onClick={toggleTheme}
+      className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shadow-2xs flex items-center justify-center cursor-pointer"
+      title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
       aria-label="Toggle Dark Mode"
     >
-      {isDark ? <Sun size={18} /> : <Moon size={18} />}
+      {isDark ? <Sun size={20} /> : <Moon size={20} />}
     </button>
   );
 };
 
 export default ThemeToggle;
+
+
+================================================
+FILE: frontend/src/components/owner/CutoffPopup.jsx
+================================================
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Clock, Sunrise, Moon, CheckCircle2, Loader2, X } from 'lucide-react';
+
+const CutoffPopup = ({
+  isOpen,
+  onClose,
+  shift = 'morning',
+  initialMorningCutoff = '09:30',
+  initialNightCutoff = '17:30',
+  onConfirm,
+  t
+}) => {
+  const [morningTime, setMorningTime] = useState(initialMorningCutoff);
+  const [nightTime, setNightTime] = useState(initialNightCutoff);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Sync internal state when popup opens or initial props change
+  useEffect(() => {
+    if (isOpen) {
+      setMorningTime(initialMorningCutoff || '09:30');
+      setNightTime(initialNightCutoff || '17:30');
+      setErrorMsg('');
+      setIsSubmitting(false);
+    }
+  }, [isOpen, initialMorningCutoff, initialNightCutoff]);
+
+  // Escape key handler
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen && !isSubmitting) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isSubmitting, onClose]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setIsSubmitting(true);
+
+    try {
+      await onConfirm({
+        morningCutoff: morningTime,
+        nightCutoff: nightTime
+      });
+      onClose();
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to update cut-off time.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const isMorning = shift === 'morning';
+  const isNight = shift === 'night';
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => !isSubmitting && onClose()}
+            className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-xs"
+            aria-hidden="true"
+          />
+
+          {/* Modal / Bottom Sheet */}
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cutoff-popup-title"
+            initial={{ y: '100%', opacity: 0.6 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: '100%', opacity: 0 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full sm:max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 z-10 overflow-hidden"
+          >
+            {/* Top orange accent bar */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-orange-500" />
+
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+                  <Clock size={22} />
+                </div>
+                <div>
+                  <h3
+                    id="cutoff-popup-title"
+                    className="text-lg font-black text-slate-900 dark:text-white tracking-tight leading-tight"
+                  >
+                    {t?.cutoffPopupTitle || 'Set Attendance Cut-Off'}
+                  </h3>
+                  <p className="text-sm font-normal text-slate-500 dark:text-slate-400 mt-1">
+                    {t?.cutoffPopupHelper || "Students cannot change attendance or skip after this time."}
+                  </p>
+                </div>
+              </div>
+
+              {/* Close Button (44x44px target) */}
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-center cursor-pointer shrink-0"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="pt-4 space-y-4">
+              {/* Morning Shift Time Picker */}
+              {(isMorning || !isNight) && (
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <label
+                      htmlFor="morning-cutoff-input"
+                      className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                    >
+                      <Sunrise size={18} className="text-amber-500" />
+                      <span>{t?.morningCutoffLabel || 'Morning Cut-Off (Lunch)'}</span>
+                    </label>
+                    <span className="text-sm font-medium text-amber-700 dark:text-amber-400 bg-amber-100/60 dark:bg-amber-950/40 px-2 py-0.5 rounded-md">
+                      Lunch Meal
+                    </span>
+                  </div>
+                  <input
+                    id="morning-cutoff-input"
+                    type="time"
+                    required
+                    value={morningTime}
+                    onChange={(e) => setMorningTime(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-medium text-base outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+                  />
+                </div>
+              )}
+
+              {/* Evening Shift Time Picker */}
+              {(isNight || !isMorning) && (
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <label
+                      htmlFor="evening-cutoff-input"
+                      className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                    >
+                      <Moon size={18} className="text-indigo-500" />
+                      <span>{t?.nightCutoffLabel || 'Evening Cut-Off (Dinner)'}</span>
+                    </label>
+                    <span className="text-sm font-medium text-indigo-700 dark:text-indigo-400 bg-indigo-100/60 dark:bg-indigo-950/40 px-2 py-0.5 rounded-md">
+                      Dinner Meal
+                    </span>
+                  </div>
+                  <input
+                    id="evening-cutoff-input"
+                    type="time"
+                    required
+                    value={nightTime}
+                    onChange={(e) => setNightTime(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-medium text-base outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+                  />
+                </div>
+              )}
+
+              {/* Error Message */}
+              {errorMsg && (
+                <p className="text-sm font-medium text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 p-3 rounded-xl border border-rose-200 dark:border-rose-900">
+                  {errorMsg}
+                </p>
+              )}
+
+              {/* Action Buttons: Confirm & Keep current */}
+              <div className="flex flex-col gap-2.5 pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full h-12 min-h-[44px] bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-base cursor-pointer"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="animate-spin" size={18} />
+                  ) : (
+                    <CheckCircle2 size={18} />
+                  )}
+                  <span>
+                    {isSubmitting
+                      ? (t?.savingCutoff || 'Saving...')
+                      : (t?.confirmCutoff || 'Confirm Cut-Off')}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                  className="w-full h-11 min-h-[44px] px-4 rounded-xl font-medium text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-center"
+                >
+                  {t?.skipCutoff || 'Keep Current / Skip for Now'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+export default CutoffPopup;
+
+
+
+================================================
+FILE: frontend/src/components/owner/HeadcountReviewsCard.jsx
+================================================
+import React, { useState, useEffect } from 'react';
+import { Sunrise, Moon, Star, TrendingUp } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  Cell
+} from 'recharts';
+import { API_URL } from '../../utils/config';
+
+const HeadcountReviewsCard = ({
+  t,
+  user,
+  stats,
+  historyData = []
+}) => {
+  const morningCount = stats?.morning?.coming ?? 0;
+  const eveningCount = stats?.night?.coming ?? 0;
+
+  // Reviews state (fetches 3 most recent reviews via existing endpoint)
+  const [reviews, setReviews] = useState([]);
+  const [isReviewsLoading, setIsReviewsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user?._id) return;
+    const fetchReviews = async () => {
+      setIsReviewsLoading(true);
+      const token = localStorage.getItem('token');
+      try {
+        const res = await fetch(`${API_URL}/api/messes/${user._id}/reviews`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setReviews(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch reviews:', err);
+      } finally {
+        setIsReviewsLoading(false);
+      }
+    };
+    fetchReviews();
+  }, [user?._id]);
+
+  const ratingValue = user?.rating ? Number(user.rating).toFixed(1) : '0.0';
+  const totalReviewsCount = user?.ratingCount || reviews.length || 0;
+  const recentThreeReviews = reviews.slice(0, 3);
+
+  // Custom Tooltip for Recharts Attendance BarChart
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-slate-900 dark:bg-slate-800 text-white p-2.5 rounded-xl shadow-xl border border-slate-700 text-xs font-bold">
+          <p className="mb-1 text-slate-400 border-b border-slate-700 pb-1">{label}</p>
+          <p className="text-emerald-400">{t?.coming || 'Coming'}: {payload[0]?.value}</p>
+          {payload[1] && <p className="text-rose-400">{t?.skip || 'Skip'}: {payload[1]?.value}</p>}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <section className="rounded-2xl p-5 sm:p-6 bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 transition-colors">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start divide-y lg:divide-y-0 lg:divide-x divide-slate-200/80 dark:divide-slate-800">
+        {/* LEFT COLUMN: TODAY'S HEADCOUNT + 7-DAY STATS GRAPH */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+              <TrendingUp size={18} className="text-orange-500" />
+              {t.todayHeadcount || "Today's Headcount"}
+            </h3>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              {t.liveBadge || 'Live'}
+            </span>
+          </div>
+
+          {/* Two plain numbers */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            {/* Morning Headcount */}
+            <div className="p-3.5 sm:p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+              <div className="flex items-center gap-2 mb-1">
+                <Sunrise size={18} className="text-amber-500 shrink-0" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {t.morningHeadcount || 'Morning'}
+                </span>
+              </div>
+              <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white leading-tight">
+                {morningCount}
+              </p>
+            </div>
+
+            {/* Evening Headcount */}
+            <div className="p-3.5 sm:p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+              <div className="flex items-center gap-2 mb-1">
+                <Moon size={18} className="text-indigo-500 shrink-0" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {t.eveningHeadcount || 'Evening'}
+                </span>
+              </div>
+              <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white leading-tight">
+                {eveningCount}
+              </p>
+            </div>
+          </div>
+
+          {/* 7-DAY ATTENDANCE STATS GRAPH (BarChart) */}
+          <div className="p-3 sm:p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                {t.historicalTrends || '7-Day Attendance Trends'}
+              </span>
+              <span className="text-xs font-semibold text-slate-400">
+                Green = Coming Â· Pink = Skip
+              </span>
+            </div>
+            <div className="h-[185px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={historyData || []} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.15} />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(tick) => (tick && tick.length > 5 ? tick.substring(5) : tick)}
+                    stroke="#94a3b8"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} />
+                  <Bar dataKey="coming" fill="#10b981" radius={[4, 4, 0, 0]} barSize={14}>
+                    {(historyData || []).map((_, index) => (
+                      <Cell
+                        key={`coming-${index}`}
+                        fill={index === (historyData || []).length - 1 ? '#10b981' : '#34d399'}
+                      />
+                    ))}
+                  </Bar>
+                  <Bar dataKey="notComing" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={14}>
+                    {(historyData || []).map((_, index) => (
+                      <Cell
+                        key={`skip-${index}`}
+                        fill={index === (historyData || []).length - 1 ? '#f43f5e' : '#fb7185'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: STUDENT REVIEWS */}
+        <div className="space-y-3 pt-6 lg:pt-0 lg:pl-8">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
+              {t.reviewsAndRatings || 'Student Reviews'}
+            </h3>
+            <span className="text-xs font-bold text-slate-400">
+              {totalReviewsCount} {t.reviewsCountLabel || 'reviews'}
+            </span>
+          </div>
+
+          {/* Average Rating Line */}
+          <div className="flex items-center gap-2.5 flex-wrap p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+              {ratingValue}
+            </span>
+            <div className="flex items-center gap-0.5 text-amber-400">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  size={18}
+                  className={
+                    star <= Math.round(Number(ratingValue))
+                      ? 'fill-amber-400 text-amber-400'
+                      : 'text-slate-300 dark:text-slate-700'
+                  }
+                />
+              ))}
+            </div>
+            <span className="text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400">
+              Â· {totalReviewsCount} {t.reviewsCountLabel || 'ratings'}
+            </span>
+          </div>
+
+          {/* 3 Most Recent Reviews (or Friendly Empty State) */}
+          <div className="space-y-2.5 pt-1">
+            {isReviewsLoading ? (
+              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 py-3 text-center">
+                Loading reviews...
+              </p>
+            ) : recentThreeReviews.length === 0 ? (
+              <div className="py-6 px-4 text-center rounded-xl bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800">
+                <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
+                  {t.noReviewsYet || 'No reviews yet'}
+                </p>
+              </div>
+            ) : (
+              recentThreeReviews.map((rev) => (
+                <div
+                  key={rev._id}
+                  className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-1"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
+                      {rev.studentName || 'Student'}
+                    </span>
+                    <div className="flex items-center gap-0.5 text-amber-400 shrink-0">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star
+                          key={s}
+                          size={14}
+                          className={
+                            s <= rev.rating
+                              ? 'fill-amber-400 text-amber-400'
+                              : 'text-slate-300 dark:text-slate-700'
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  {rev.comment ? (
+                    <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+                      "{rev.comment}"
+                    </p>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default HeadcountReviewsCard;
+
+
+
+================================================
+FILE: frontend/src/components/owner/LiveStoriesPanel.jsx
+================================================
+import React from 'react';
+import { Camera, Upload, X, Loader2, Sparkles, Trash2 } from 'lucide-react';
+
+const LiveStoriesPanel = ({
+  storyImage,
+  setStoryImage,
+  storyCaption,
+  setStoryCaption,
+  isPostingStory,
+  storyMsg,
+  myActiveStories,
+  isDeletingStory,
+  handleImageUpload,
+  handlePostStory,
+  handleDeleteStory
+}) => {
+  return (
+    <div className="space-y-6 max-w-xl mx-auto">
+      {/* Intro Banner */}
+      <div className="p-4 rounded-2xl bg-orange-50/70 dark:bg-orange-950/20 border border-orange-200/60 dark:border-orange-800/40 flex items-start gap-3">
+        <div className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-orange-500 text-white flex items-center justify-center shrink-0">
+          <Camera size={22} />
+        </div>
+        <div>
+          <h4 className="text-base font-black text-slate-900 dark:text-white tracking-tight">
+            Post 24-Hour Live Campus Story ðŸ“¸
+          </h4>
+          <p className="text-sm font-normal text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+            Show students what's cooking right now! Live photos disappear automatically after 24 hours from all student feeds.
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={handlePostStory} className="space-y-4">
+        {/* Photo Upload */}
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+            Food / Kitchen Photo
+          </label>
+          {storyImage ? (
+            <div className="relative rounded-2xl overflow-hidden h-48 bg-slate-950 border border-slate-200 dark:border-slate-800">
+              <img src={storyImage} alt="Story Preview" className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={() => setStoryImage('')}
+                className="absolute top-2.5 right-2.5 w-11 h-11 min-w-[44px] min-h-[44px] bg-slate-900/80 hover:bg-rose-600 text-white rounded-xl flex items-center justify-center transition-colors cursor-pointer"
+                title="Remove photo"
+                aria-label="Remove photo"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          ) : (
+            <label className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:border-orange-500 transition-colors bg-slate-50 dark:bg-slate-950 min-h-[120px]">
+              <Upload size={30} className="text-orange-500 mb-2" />
+              <span className="text-base font-medium text-slate-800 dark:text-slate-200">Click to upload photo</span>
+              <span className="text-sm text-slate-500 mt-1">JPG, PNG, WebP (automatically compressed)</span>
+              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+            </label>
+          )}
+        </div>
+
+        {/* Caption */}
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+            Caption (e.g. "Piping hot jalebis ready!")
+          </label>
+          <input
+            type="text"
+            maxLength={100}
+            value={storyCaption}
+            onChange={(e) => setStoryCaption(e.target.value)}
+            placeholder="Short live announcement..."
+            className="w-full p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-base font-medium text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+          />
+          <span className="text-sm text-slate-500 block text-right mt-1">
+            {storyCaption.length}/100
+          </span>
+        </div>
+
+        {storyMsg && (
+          <p className="text-sm font-medium p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+            {storyMsg}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={isPostingStory || !storyImage}
+          className="w-full h-12 min-h-[44px] bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer text-base"
+        >
+          {isPostingStory ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
+          <span>Publish Live Story</span>
+        </button>
+      </form>
+
+      {/* Active Stories List */}
+      {myActiveStories && myActiveStories.length > 0 && (
+        <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              Active Live Stories ({myActiveStories.length})
+            </h4>
+            <span className="text-sm text-slate-500">Auto-deletes in 24h</span>
+          </div>
+
+          <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+            {myActiveStories.map((story) => (
+              <div
+                key={story._id}
+                className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <img
+                    src={story.imageUrl}
+                    alt="Story"
+                    className="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-200 dark:border-slate-700 shadow-xs"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-base font-semibold text-slate-900 dark:text-white truncate">
+                      {story.caption || 'No caption'}
+                    </p>
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                      {new Date(story.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} â€¢ {new Date(story.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleDeleteStory(story._id)}
+                  disabled={isDeletingStory === story._id}
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center transition-colors shrink-0 disabled:opacity-50 cursor-pointer"
+                  title="Delete Story immediately"
+                  aria-label="Delete Story"
+                >
+                  {isDeletingStory === story._id ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={18} />
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default LiveStoriesPanel;
+
+
+
+================================================
+FILE: frontend/src/components/owner/MenuHeroCard.jsx
+================================================
+import React, { useState } from 'react';
+import {
+  ChefHat,
+  Sunrise,
+  Moon,
+  Edit3,
+  Plus,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw
+} from 'lucide-react';
+
+const formatCutoffDisplay = (timeStr) => {
+  if (!timeStr) return '';
+  const parts = timeStr.split(':').map(Number);
+  if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) return timeStr;
+  const [h, m] = parts;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  const minStr = m < 10 ? `0${m}` : m;
+  return `${hour12}:${minStr} ${ampm}`;
+};
+
+const MenuHeroCard = ({
+  t,
+  menuDate,
+  setMenuDate,
+  getLocalDateString,
+  displayDate,
+  morningMenu,
+  nightMenu,
+  morningCutoff,
+  nightCutoff,
+  onSaveMenu,
+  isPublishing
+}) => {
+  // Which meal shift is currently open in the editor (null = calm read-only view)
+  const [editingShift, setEditingShift] = useState(null);
+
+  // Form states for the active editor
+  const [formItems, setFormItems] = useState('');
+  const [formPrice, setFormPrice] = useState('');
+  const [formError, setFormError] = useState('');
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+
+  const handleStartEdit = (shift) => {
+    const existing = shift === 'morning' ? morningMenu : nightMenu;
+    setEditingShift(shift);
+    setFormItems(existing && existing.items ? existing.items.join(', ') : '');
+    setFormPrice(existing && existing.price !== undefined ? existing.price.toString() : '60');
+    setFormError('');
+    setShowMoreOptions(false);
+    setSuccessMsg('');
+  };
+
+  const handleClearForm = () => {
+    setFormItems('');
+    setFormPrice('');
+    setFormError('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingShift(null);
+    setFormError('');
+    setSuccessMsg('');
+  };
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    if (!formItems.trim()) {
+      setFormError('Please enter at least one dish for the menu.');
+      return;
+    }
+    const numPrice = Number(formPrice);
+    if (formPrice === '' || isNaN(numPrice) || numPrice < 0) {
+      setFormError('Please enter a valid non-negative thali price.');
+      return;
+    }
+
+    setFormError('');
+    const itemsArray = formItems
+      .split(',')
+      .map((i) => i.trim())
+      .filter(Boolean);
+
+    try {
+      await onSaveMenu({
+        date: menuDate,
+        shift: editingShift,
+        items: itemsArray,
+        price: numPrice
+      });
+      setSuccessMsg(t.menuUpdatedSuccess || 'Menu saved successfully!');
+      setTimeout(() => {
+        setEditingShift(null);
+        setSuccessMsg('');
+      }, 1000);
+    } catch (err) {
+      setFormError(err.message || 'Failed to save menu.');
+    }
+  };
+
+  // Helper renderer for each meal section
+  const renderMealSection = (shift, isMorning) => {
+    const isEditing = editingShift === shift;
+    const menuData = isMorning ? morningMenu : nightMenu;
+    const cutoffTime = isMorning ? morningCutoff : nightCutoff;
+    const shiftLabel = isMorning
+      ? (t.morningMenu || 'Morning Menu (Lunch)')
+      : (t.nightMenu || 'Evening Menu (Dinner)');
+    const IconComponent = isMorning ? Sunrise : Moon;
+    const themeAccent = isMorning
+      ? 'border-amber-200 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-950/20'
+      : 'border-indigo-200 dark:border-indigo-900/40 bg-indigo-50/40 dark:bg-indigo-950/20';
+    const iconColor = isMorning
+      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+      : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300';
+
+    return (
+      <div
+        className={`rounded-2xl p-4 sm:p-6 border transition-all flex flex-col justify-between ${themeAccent}`}
+      >
+        <div>
+          {/* Section Header: Icon, Clean Heading, Read-Only Cut-off Info */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-4 border-b border-slate-200/60 dark:border-slate-800/60">
+            <div className="flex items-center gap-3">
+              <div className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center shrink-0 ${iconColor}`}>
+                <IconComponent size={22} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                  {shiftLabel}
+                </h3>
+                <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                  {isMorning ? 'Lunch meal' : 'Dinner meal'}
+                </span>
+              </div>
+            </div>
+
+            {/* Read-only Cutoff Display (Small readable text only, NO editing controls here) */}
+            <div
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 dark:bg-slate-900/90 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 text-sm font-medium shrink-0 self-start sm:self-auto"
+              title="Attendance cut-off time for students"
+            >
+              <Clock size={16} className={isMorning ? 'text-amber-600' : 'text-indigo-600'} />
+              <span>
+                {t.cutoffTimeTag || 'Cut-off'}: {formatCutoffDisplay(cutoffTime) || (isMorning ? '9:30 AM' : '5:30 PM')}
+              </span>
+            </div>
+          </div>
+
+          {/* VIEW 1: READ-ONLY SUMMARY (PAGE STAYS CALM) */}
+          {!isEditing ? (
+            menuData && menuData.items && menuData.items.length > 0 ? (
+              <div className="py-4 space-y-4">
+                {/* Dishes list */}
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-2">
+                    {t.menuItems || 'Menu Items'}:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {menuData.items.map((dish, idx) => (
+                      <span
+                        key={idx}
+                        className="px-3 py-1.5 rounded-xl text-base font-medium bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 shadow-2xs"
+                      >
+                        {dish}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Price and Published status */}
+                <div className="flex items-center justify-between text-base font-medium pt-2">
+                  <div className="text-slate-800 dark:text-slate-200">
+                    <span>{t.priceLabel || 'Thali Price'}: </span>
+                    <span className="text-orange-600 dark:text-orange-400 font-bold text-lg">
+                      â‚¹{menuData.price !== undefined ? menuData.price : 60}
+                    </span>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-100/70 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg">
+                    <CheckCircle2 size={16} /> Published
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="py-6 px-4 my-3 text-center rounded-xl bg-white/60 dark:bg-slate-900/40 border border-dashed border-slate-300 dark:border-slate-800">
+                <p className="text-base font-medium text-slate-600 dark:text-slate-400">
+                  {t.menuNotSet || 'No dishes published yet for this shift'}
+                </p>
+                <p className="text-sm text-slate-500 dark:text-slate-500 mt-1">
+                  Tap below to add today's items and price
+                </p>
+              </div>
+            )
+          ) : (
+            /* VIEW 2: SIMPLE, PROFESSIONAL MENU SETTER FORM */
+            <form onSubmit={handleFormSubmit} className="py-4 space-y-4">
+              {/* Tidy input for dishes */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  {t.dishesLabel || 'Dishes (Comma-separated)'}
+                </label>
+                <textarea
+                  rows={2}
+                  required
+                  value={formItems}
+                  onChange={(e) => setFormItems(e.target.value)}
+                  placeholder={t.dishesPlaceholder || 'Roti, Dal, Rice, Sabzi'}
+                  className="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-normal text-base outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all resize-none"
+                />
+                <span className="text-sm font-normal text-slate-500 dark:text-slate-400 block mt-1">
+                  Example: Roti, Dal, Rice, Sabzi, Gulab Jamun
+                </span>
+              </div>
+
+              {/* Tidy input for price */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  {t.priceLabel || 'Thali Price (â‚¹)'}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 font-bold text-base">
+                    â‚¹
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={formPrice}
+                    onChange={(e) => setFormPrice(e.target.value)}
+                    placeholder="60"
+                    className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-medium text-base outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* "More options" toggle for rarely used notes */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowMoreOptions(!showMoreOptions)}
+                  className="text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-orange-600 flex items-center gap-1 transition-colors cursor-pointer py-1"
+                >
+                  <span>{t.moreOptions || 'More options'}</span>
+                  {showMoreOptions ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+                {showMoreOptions && (
+                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm font-normal text-slate-600 dark:text-slate-400 mt-2 space-y-1 leading-relaxed">
+                    <p>â€¢ Menu updates broadcast in real-time to student apps.</p>
+                    <p>â€¢ You will be prompted to confirm attendance cut-off times right after saving.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Inline validation messages */}
+              {formError && (
+                <p className="text-sm font-medium text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 p-3 rounded-xl border border-rose-200 dark:border-rose-900">
+                  {formError}
+                </p>
+              )}
+              {successMsg && (
+                <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-xl border border-emerald-200 dark:border-emerald-900 flex items-center gap-2">
+                  <CheckCircle2 size={18} /> {successMsg}
+                </p>
+              )}
+
+              {/* Exactly two action buttons: Primary Save & Secondary Reset/Cancel */}
+              <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+                <button
+                  type="submit"
+                  disabled={isPublishing}
+                  className="flex-1 h-12 min-h-[44px] bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold py-2.5 px-5 rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 text-base cursor-pointer"
+                >
+                  {isPublishing ? (
+                    <Loader2 className="animate-spin" size={18} />
+                  ) : (
+                    <CheckCircle2 size={18} />
+                  )}
+                  <span>{isPublishing ? (t.savingMenu || 'Saving...') : (t.saveMenu || 'Save Menu')}</span>
+                </button>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleClearForm}
+                    className="h-12 min-h-[44px] px-4 rounded-xl font-medium text-base text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    title={t.clearMenuForm || 'Clear input fields'}
+                  >
+                    <RotateCcw size={16} />
+                    <span>{t.clearMenuForm || 'Clear'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="h-12 min-h-[44px] px-4 rounded-xl font-medium text-base text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                  >
+                    {t.cancelEdit || 'Cancel'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+        </div>
+
+        {/* Read-Only State Action Button */}
+        {!isEditing && (
+          <div className="pt-3">
+            <button
+              type="button"
+              onClick={() => handleStartEdit(shift)}
+              className={`w-full h-12 min-h-[44px] px-5 rounded-xl font-medium text-base transition-colors flex items-center justify-center gap-2 cursor-pointer ${
+                menuData
+                  ? 'bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 shadow-2xs'
+                  : 'bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-sm'
+              }`}
+            >
+              {menuData ? <Edit3 size={18} /> : <Plus size={18} />}
+              <span>
+                {menuData
+                  ? `${t.editMenu || 'Edit Menu'}`
+                  : `${t.addMenu || 'Add Dishes'}`}
+              </span>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <section className="relative rounded-3xl p-5 sm:p-7 bg-white dark:bg-slate-900 border-2 border-orange-500/40 dark:border-orange-500/30 shadow-lg transition-all">
+      {/* Top accent highlight */}
+      <div className="absolute top-0 left-6 right-6 h-1 bg-orange-500 rounded-full" />
+
+      {/* Header: Prominent Card Title + Date Selector */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200/80 dark:border-slate-800">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 min-w-[44px] min-h-[44px] rounded-2xl bg-orange-500 text-white flex items-center justify-center shadow-xs shrink-0">
+            <ChefHat size={26} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              {t.menuSetup || "Today's Menu"}
+            </h2>
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+              {displayDate}
+            </p>
+          </div>
+        </div>
+
+        {/* Date Selector: Today / Tomorrow */}
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => {
+              setMenuDate(getLocalDateString(0));
+              setEditingShift(null);
+            }}
+            className={`h-11 min-h-[44px] px-4 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              menuDate === getLocalDateString(0)
+                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+            }`}
+          >
+            {t.today}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMenuDate(getLocalDateString(1));
+              setEditingShift(null);
+            }}
+            className={`h-11 min-h-[44px] px-4 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+              menuDate === getLocalDateString(1)
+                ? 'bg-orange-500 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+            }`}
+          >
+            {t.tomorrow}
+          </button>
+        </div>
+      </div>
+
+      {/* Two clearly separated meal sections (Morning / Evening) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mt-6">
+        {renderMealSection('morning', true)}
+        {renderMealSection('night', false)}
+      </div>
+    </section>
+  );
+};
+
+export default MenuHeroCard;
+
+
+
+================================================
+FILE: frontend/src/components/owner/MessSettingsPanel.jsx
+================================================
+import React from 'react';
+import {
+  IndianRupee,
+  MapPin,
+  Navigation,
+  Loader2,
+  CheckCircle2,
+  AlertCircle
+} from 'lucide-react';
+import { API_URL } from '../../utils/config';
+
+const MessSettingsPanel = ({
+  t,
+  mode = 'all',
+  // UPI props
+  upiId,
+  setUpiId,
+  isSavingUpi,
+  upiMsg,
+  handleSaveUpi,
+  members = [],
+  updateSubscription,
+  // Location props
+  savedLocation,
+  setSavedLocation,
+  isSettingLocation,
+  setIsSettingLocation,
+  locationMsg,
+  setLocationMsg
+}) => {
+  const pendingMembers = members.filter((m) => m.status === 'verification_pending');
+
+  const showUpi = mode === 'all' || mode === 'upi' || mode === 'mess_settings';
+  const showLocation = mode === 'all' || mode === 'mess_settings';
+
+  const handleDetectLocation = async () => {
+    setIsSettingLocation(true);
+    setLocationMsg('');
+    if (!('geolocation' in navigator)) {
+      setLocationMsg('Geolocation is not supported by your browser.');
+      setIsSettingLocation(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const token = localStorage.getItem('token');
+        try {
+          const res = await fetch(`${API_URL}/api/owner/location`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude
+            })
+          });
+          if (res.ok) {
+            setLocationMsg(
+              `Location saved! (${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)})`
+            );
+            setSavedLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          } else {
+            setLocationMsg('Failed to save location.');
+          }
+        } catch {
+          setLocationMsg('Connection failed.');
+        } finally {
+          setIsSettingLocation(false);
+        }
+      },
+      () => {
+        setLocationMsg('Location access denied. Please enable GPS permissions.');
+        setIsSettingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  };
+
+  return (
+    <div className="space-y-6 max-w-2xl mx-auto pb-4">
+      {/* 1. UPI PAYMENT CONFIGURATION */}
+      {showUpi && (
+        <section className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <IndianRupee size={22} />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                {t.upiPaymentsTile || 'UPI Payment Configuration'}
+              </h3>
+              <p className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                VPA for direct student fee transfers via PhonePe, GPay, or Paytm
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSaveUpi} className="space-y-4 pt-1">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                Your Mess UPI ID / VPA
+              </label>
+              <input
+                type="text"
+                value={upiId}
+                onChange={(e) => setUpiId(e.target.value)}
+                placeholder="e.g. messowner@okaxis"
+                required
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-mono font-medium text-base outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSavingUpi}
+              className="w-full h-12 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer text-base"
+            >
+              {isSavingUpi ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
+              <span>Save UPI ID</span>
+            </button>
+          </form>
+
+          {upiMsg && (
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+              {upiMsg}
+            </p>
+          )}
+
+          {/* Pending UTR approvals quick list */}
+          {pendingMembers.length > 0 && (
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+              <span className="text-sm font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                <AlertCircle size={16} />
+                Pending Payment Approvals ({pendingMembers.length})
+              </span>
+              <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
+                {pendingMembers.map((sub) => (
+                  <div
+                    key={sub._id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50"
+                  >
+                    <div>
+                      <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm block">
+                        {sub.studentName}
+                      </span>
+                      <span className="text-sm font-mono text-amber-800 dark:text-amber-300">
+                        UTR: {sub.lastUtrNumber || 'N/A'} â€¢ â‚¹{sub.monthlyFee || 0}
+                      </span>
+                    </div>
+                    {updateSubscription && (
+                      <button
+                        type="button"
+                        onClick={() => updateSubscription(sub._id, { status: 'paid' })}
+                        className="h-11 min-h-[44px] px-4 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer flex items-center justify-center self-start sm:self-auto"
+                      >
+                        Approve Payment
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* 2. MESS LOCATION (GPS) */}
+      {showLocation && (
+        <section className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+              <MapPin size={22} />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                {t.setMessLocation || 'Mess Location (GPS)'}
+              </h3>
+              <p className="text-sm font-normal text-slate-500 dark:text-slate-400">
+                Pins your mess on the student campus map so students can find directions
+              </p>
+            </div>
+          </div>
+
+          {savedLocation ? (
+            <div className="p-3.5 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-indigo-800 dark:text-indigo-300 font-medium text-sm">
+                <CheckCircle2 size={18} className="shrink-0" />
+                <span>
+                  {savedLocation.lat.toFixed(5)}, {savedLocation.lng.toFixed(5)}
+                </span>
+              </div>
+              <span className="text-sm font-semibold text-indigo-900 dark:text-indigo-200 bg-indigo-200/60 dark:bg-indigo-800/50 px-2.5 py-1 rounded-md">
+                Active
+              </span>
+            </div>
+          ) : (
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-sm font-normal">
+              No GPS coordinates recorded yet. Click below while physically at your mess.
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleDetectLocation}
+            disabled={isSettingLocation}
+            className="w-full h-12 min-h-[44px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-50 cursor-pointer text-base"
+          >
+            {isSettingLocation ? <Loader2 className="animate-spin" size={18} /> : <Navigation size={18} />}
+            <span>
+              {isSettingLocation
+                ? t.detecting
+                : savedLocation
+                ? `${t.updateCurrentLocation}`
+                : `${t.useCurrentLocation}`}
+            </span>
+          </button>
+
+          {locationMsg && (
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+              {locationMsg}
+            </p>
+          )}
+        </section>
+      )}
+    </div>
+  );
+};
+
+export default MessSettingsPanel;
+
+
+
+================================================
+FILE: frontend/src/components/owner/NavIconButton.jsx
+================================================
+import React from 'react';
+
+const NavIconButton = ({
+  icon: Icon,
+  label,
+  onClick,
+  badgeCount = 0,
+  hasLiveDot = false,
+  title,
+  ariaLabel,
+  ariaExpanded,
+  className = '',
+  activeColor = 'hover:text-orange-600 dark:hover:text-orange-400'
+}) => {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative flex flex-col items-center justify-center min-h-[46px] min-w-[52px] xs:min-w-[56px] px-2 sm:px-3 py-1 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/50 ${activeColor} ${className}`}
+      title={title || label}
+      aria-label={ariaLabel || label}
+      aria-expanded={ariaExpanded}
+    >
+      {/* Icon with potential badges */}
+      <div className="relative flex items-center justify-center shrink-0">
+        {Icon && <Icon size={21} className="transition-transform group-hover:scale-105" />}
+
+        {/* Badge counter (e.g. Notifications unread count) */}
+        {badgeCount > 0 && (
+          <span className="absolute -top-1.5 -right-2 bg-rose-500 text-white text-[10px] font-bold h-4 min-w-[16px] px-1 rounded-full flex items-center justify-center shadow-xs">
+            {badgeCount > 9 ? '9+' : badgeCount}
+          </span>
+        )}
+
+        {/* Live indicator dot/ring (e.g. Live active stories) */}
+        {hasLiveDot && (
+          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+        )}
+      </div>
+
+      {/* Short Text Label stacked below icon (text-xs, normal weight, single line, no wrap) */}
+      <span className="text-[11px] sm:text-xs font-normal text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-100 tracking-normal leading-tight mt-0.5 whitespace-nowrap select-none">
+        {label}
+      </span>
+    </button>
+  );
+};
+
+export default NavIconButton;
+
+
+
+================================================
+FILE: frontend/src/components/owner/NotificationsPanel.jsx
+================================================
+import React from 'react';
+import { Bell } from 'lucide-react';
+
+const NotificationsPanel = ({ notifications }) => {
+  return (
+    <div className="space-y-4 max-w-xl mx-auto">
+      {notifications.length === 0 ? (
+        <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
+          <Bell className="mx-auto mb-2 text-slate-300 dark:text-slate-600" size={36} />
+          <p className="font-semibold text-base text-slate-700 dark:text-slate-300">No notifications yet.</p>
+          <p className="text-sm font-normal text-slate-500 dark:text-slate-400 mt-1">
+            You will receive alerts here when students submit fees or leave reviews.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {notifications.map((n) => (
+            <div
+              key={n._id}
+              className={`p-4 rounded-2xl border transition-all ${
+                n.isRead
+                  ? 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                  : 'bg-orange-50/70 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800/50 text-slate-900 dark:text-white'
+              }`}
+            >
+              <div className="flex justify-between items-start gap-2 mb-1.5">
+                <h4 className="font-semibold text-base text-slate-900 dark:text-slate-100">{n.title}</h4>
+                <span className="text-sm font-medium text-slate-500 dark:text-slate-400 shrink-0">
+                  {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} â€¢{' '}
+                  {new Date(n.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                </span>
+              </div>
+              <p className="text-sm font-normal text-slate-600 dark:text-slate-400 leading-relaxed">{n.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default NotificationsPanel;
+
+
+
+================================================
+FILE: frontend/src/components/owner/OwnerHome.jsx
+================================================
+import React from 'react';
+import {
+  Users,
+  IndianRupee,
+  Scale,
+  Settings2
+} from 'lucide-react';
+import MenuHeroCard from './MenuHeroCard';
+import SectionTile from './SectionTile';
+import HeadcountReviewsCard from './HeadcountReviewsCard';
+
+const OwnerHome = ({
+  user,
+  t,
+  menuDate,
+  setMenuDate,
+  getLocalDateString,
+  displayDate,
+  morningMenu,
+  nightMenu,
+  stats,
+  historyData = [],
+  members = [],
+  morningCutoff,
+  nightCutoff,
+  savedLocation,
+  onSaveMenu,
+  isPublishing,
+  onOpenSection
+}) => {
+  const pendingPaymentsCount = members.filter((m) => m.status === 'verification_pending').length;
+
+  return (
+    <div className="space-y-6 sm:space-y-8 pb-10">
+      {/* 1. HERO COMPONENT: TODAY'S MENU (The most prominent element on the page) */}
+      <MenuHeroCard
+        t={t}
+        menuDate={menuDate}
+        setMenuDate={setMenuDate}
+        getLocalDateString={getLocalDateString}
+        displayDate={displayDate}
+        morningMenu={morningMenu}
+        nightMenu={nightMenu}
+        morningCutoff={morningCutoff}
+        nightCutoff={nightCutoff}
+        onSaveMenu={onSaveMenu}
+        isPublishing={isPublishing}
+      />
+
+      {/* 2. ICON GRID FOR REMAINING SECTIONS */}
+      <section aria-labelledby="operations-grid-title" className="space-y-3">
+        <h3
+          id="operations-grid-title"
+          className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1"
+        >
+          {t.quickGlance || 'Quick Operations'}
+        </h3>
+
+        {/* Responsive grid: 3 columns on mobile, 4 on tablet, 4 on desktop */}
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+          {/* Tile 1: Subscribers */}
+          <SectionTile
+            id="subscribers"
+            icon={Users}
+            title={t.subscribersTile || 'Subscribers'}
+            subtitle={t.subscribersDesc || 'Member directory'}
+            color="violet"
+            badge={`${members.length}`}
+            badgeType="default"
+            onClick={() => onOpenSection('subscribers')}
+          />
+
+          {/* Tile 2: Payments / UPI */}
+          <SectionTile
+            id="upi"
+            icon={IndianRupee}
+            title={t.upiPaymentsTile || 'Payments/UPI'}
+            subtitle={t.upiPaymentsDesc || 'UPI ID & UTR check'}
+            color="emerald"
+            badge={
+              pendingPaymentsCount > 0
+                ? `${pendingPaymentsCount} Pending`
+                : user?.upiId
+                ? 'Active'
+                : 'Setup'
+            }
+            badgeType={pendingPaymentsCount > 0 ? 'alert' : 'success'}
+            pulseBadge={pendingPaymentsCount > 0}
+            onClick={() => onOpenSection('upi')}
+          />
+
+          {/* Tile 3: Ration Estimator */}
+          <SectionTile
+            id="ration"
+            icon={Scale}
+            title={t.rationEstimatorTile || 'Ration Norms'}
+            subtitle={t.rationEstimatorDesc || 'Plate calculator'}
+            color="amber"
+            badge={
+              stats?.morning?.estimates?.foodSavedKg
+                ? `${stats.morning.estimates.foodSavedKg}kg saved`
+                : 'Estimator'
+            }
+            badgeType="default"
+            onClick={() => onOpenSection('ration')}
+          />
+
+          {/* Tile 4: Mess Settings (Location & Operations) */}
+          <SectionTile
+            id="mess_settings"
+            icon={Settings2}
+            title={t.messSettingsTile || 'Mess'}
+            subtitle={t.messSettingsDesc || 'Location & GPS'}
+            color="orange"
+            badge={savedLocation ? 'GPS Set' : 'Set GPS'}
+            badgeType={savedLocation ? 'success' : 'warning'}
+            onClick={() => onOpenSection('mess_settings')}
+          />
+        </div>
+      </section>
+
+      {/* 3. COMBINED "HEADCOUNT & REVIEWS" SECTION AT THE VERY BOTTOM */}
+      <HeadcountReviewsCard
+        t={t}
+        user={user}
+        stats={stats}
+        historyData={historyData}
+      />
+    </div>
+  );
+};
+
+export default OwnerHome;
+
+
+
+================================================
+FILE: frontend/src/components/owner/OwnerNavbar.jsx
+================================================
+Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8d in position 7711: character maps to <undefined>
+
+
+================================================
+FILE: frontend/src/components/owner/QrScannerPanel.jsx
+================================================
+import React from 'react';
+import { Loader2, CheckCircle2, AlertCircle, QrCode } from 'lucide-react';
+
+const QrScannerPanel = ({
+  qrTokenInput,
+  setQrTokenInput,
+  isVerifyingQr,
+  verifyResult,
+  handleVerifyQr
+}) => {
+  return (
+    <div className="space-y-6 max-w-lg mx-auto">
+      <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 flex items-start gap-3">
+        <div className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0">
+          <QrCode size={22} />
+        </div>
+        <div>
+          <h4 className="text-base font-black text-emerald-950 dark:text-emerald-300 tracking-tight">
+            Counter Verification Scanner
+          </h4>
+          <p className="text-sm font-normal text-emerald-700 dark:text-emerald-400 mt-1 leading-relaxed">
+            Paste or scan the student's 15-minute Meal Pass Token to confirm eligibility and mark meal served.
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={handleVerifyQr} className="space-y-4">
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+            Meal Pass Token Payload
+          </label>
+          <textarea
+            rows={4}
+            value={qrTokenInput}
+            onChange={(e) => setQrTokenInput(e.target.value)}
+            placeholder="Paste student QR pass token string here..."
+            required
+            className="w-full p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-base font-mono text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all resize-none"
+          />
+        </div>
+
+        {verifyResult && (
+          <div
+            className={`p-4 rounded-xl border text-base font-medium flex items-start gap-3 transition-all ${
+              verifyResult.type === 'success'
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300'
+                : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-300'
+            }`}
+          >
+            {verifyResult.type === 'success' ? (
+              <CheckCircle2 size={22} className="shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+            ) : (
+              <AlertCircle size={22} className="shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+            )}
+            <div>
+              <p className="font-bold">{verifyResult.message}</p>
+              {verifyResult.studentName && (
+                <p className="text-sm font-normal mt-1 opacity-90">
+                  Student: <strong className="font-semibold">{verifyResult.studentName}</strong>
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={isVerifyingQr || !qrTokenInput.trim()}
+          className="w-full h-12 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer text-base"
+        >
+          {isVerifyingQr ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
+          <span>Verify & Claim Meal</span>
+        </button>
+      </form>
+    </div>
+  );
+};
+
+export default QrScannerPanel;
+
+
+
+================================================
+FILE: frontend/src/components/owner/RationEstimatorPanel.jsx
+================================================
+import React from 'react';
+import { Scale, Leaf, Loader2, CheckCircle2, Settings2 } from 'lucide-react';
+
+const RationEstimatorPanel = ({
+  analyticsShift,
+  setAnalyticsShift,
+  currentStats,
+  customRationConfig,
+  setCustomRationConfig,
+  isSavingRation,
+  rationMsg,
+  handleSaveRationConfig
+}) => {
+  return (
+    <div className="space-y-6 max-w-3xl mx-auto">
+      {/* Intro Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 min-w-[44px] min-h-[44px] bg-amber-500 text-white rounded-xl flex items-center justify-center shrink-0">
+            <Scale size={22} />
+          </div>
+          <div>
+            <h3 className="text-base font-black text-slate-900 dark:text-white tracking-tight">
+              Smart Kitchen Ration Estimator ⚖️
+            </h3>
+            <p className="text-sm font-normal text-slate-600 dark:text-slate-400 mt-0.5">
+              Translates live {analyticsShift === 'morning' ? 'Morning' : 'Evening'} headcount ({currentStats.coming} students) into exact raw cooking ingredients.
+            </p>
+          </div>
+        </div>
+
+        {setAnalyticsShift && (
+          <div className="inline-flex rounded-xl bg-slate-200/60 dark:bg-slate-800 p-1 border border-slate-300/40 dark:border-slate-700/60 shrink-0 self-start sm:self-center">
+            <button
+              type="button"
+              onClick={() => setAnalyticsShift('morning')}
+              className={`h-11 min-h-[44px] px-3.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                analyticsShift === 'morning'
+                  ? 'bg-amber-500 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              ☀️ Morning
+            </button>
+            <button
+              type="button"
+              onClick={() => setAnalyticsShift('night')}
+              className={`h-11 min-h-[44px] px-3.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                analyticsShift === 'night'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              🌙 Evening
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 4 Ingredient Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
+          <span className="text-2xl" role="img" aria-label="Rice">🍚</span>
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-2">Rice Required</p>
+          <h4 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+            {currentStats.estimates?.requiredKg?.rice !== undefined
+              ? currentStats.estimates.requiredKg.rice
+              : ((currentStats.coming * (customRationConfig.riceGrams || 120)) / 1000).toFixed(2)}{' '}
+            <span className="text-sm font-normal text-slate-500">kg</span>
+          </h4>
+          <span className="text-sm font-medium text-amber-700 dark:text-amber-400 bg-amber-100/70 dark:bg-amber-900/40 px-2 py-0.5 rounded-md mt-2 inline-block">
+            {customRationConfig.riceGrams || 120}g / plate
+          </span>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-orange-50/70 dark:bg-orange-950/20 border border-orange-200/60 dark:border-orange-800/40">
+          <span className="text-2xl" role="img" aria-label="Atta">🌾</span>
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-2">Flour / Atta</p>
+          <h4 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+            {currentStats.estimates?.requiredKg?.flour !== undefined
+              ? currentStats.estimates.requiredKg.flour
+              : ((currentStats.coming * (customRationConfig.flourGrams || 110)) / 1000).toFixed(2)}{' '}
+            <span className="text-sm font-normal text-slate-500">kg</span>
+          </h4>
+          <span className="text-sm font-medium text-orange-700 dark:text-orange-400 bg-orange-100/70 dark:bg-orange-900/40 px-2 py-0.5 rounded-md mt-2 inline-block">
+            {customRationConfig.flourGrams || 110}g / plate
+          </span>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-yellow-50/70 dark:bg-yellow-950/20 border border-yellow-200/60 dark:border-yellow-800/40">
+          <span className="text-2xl" role="img" aria-label="Dal">🥣</span>
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-2">Dal & Lentils</p>
+          <h4 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+            {currentStats.estimates?.requiredKg?.dal !== undefined
+              ? currentStats.estimates.requiredKg.dal
+              : ((currentStats.coming * (customRationConfig.dalGrams || 45)) / 1000).toFixed(2)}{' '}
+            <span className="text-sm font-normal text-slate-500">kg</span>
+          </h4>
+          <span className="text-sm font-medium text-yellow-800 dark:text-yellow-400 bg-yellow-100/70 dark:bg-yellow-900/40 px-2 py-0.5 rounded-md mt-2 inline-block">
+            {customRationConfig.dalGrams || 45}g / plate
+          </span>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40">
+          <span className="text-2xl" role="img" aria-label="Veggies">🥕</span>
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-2">Fresh Veggies</p>
+          <h4 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+            {currentStats.estimates?.requiredKg?.veggies !== undefined
+              ? currentStats.estimates.requiredKg.veggies
+              : ((currentStats.coming * (customRationConfig.veggieGrams || 150)) / 1000).toFixed(2)}{' '}
+            <span className="text-sm font-normal text-slate-500">kg</span>
+          </h4>
+          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-100/70 dark:bg-emerald-900/40 px-2 py-0.5 rounded-md mt-2 inline-block">
+            {customRationConfig.veggieGrams || 150}g / plate
+          </span>
+        </div>
+      </div>
+
+      {/* Food Waste Prevented Banner */}
+      <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 min-w-[44px] min-h-[44px] bg-emerald-500 text-white rounded-xl flex items-center justify-center shrink-0">
+            <Leaf size={22} />
+          </div>
+          <div>
+            <h4 className="font-semibold text-emerald-950 dark:text-emerald-300 text-base">🌱 Food Waste Prevented</h4>
+            <p className="text-sm font-normal text-emerald-800 dark:text-emerald-400 mt-0.5">
+              Thanks to <strong>{currentStats.notComing}</strong> students skipping in advance for this {analyticsShift} shift!
+            </p>
+          </div>
+        </div>
+        <div className="text-right sm:border-l sm:border-emerald-200 dark:sm:border-emerald-800 sm:pl-6 shrink-0">
+          <span className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+            {currentStats.estimates?.foodSavedKg !== undefined ? currentStats.estimates.foodSavedKg : '0.00'} kg
+          </span>
+          <span className="block text-sm font-medium text-emerald-700/90 dark:text-emerald-400/90">Saved from waste</span>
+        </div>
+      </div>
+
+      {/* Per-Plate Norms Customizer */}
+      <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-2 mb-2">
+          <Settings2 size={20} className="text-amber-500" />
+          <h4 className="text-base font-black text-slate-900 dark:text-white tracking-tight">
+            Customize Per-Plate Kitchen Norms (grams)
+          </h4>
+        </div>
+        <p className="text-sm font-normal text-slate-600 dark:text-slate-400 mb-4">
+          Adjust how many grams of raw ingredients your kitchen allocates per student for lunch or dinner thalis.
+        </p>
+
+        <form onSubmit={handleSaveRationConfig} className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Rice (g)</label>
+              <input
+                type="number"
+                min="1"
+                value={customRationConfig.riceGrams}
+                onChange={(e) => setCustomRationConfig({ ...customRationConfig, riceGrams: Number(e.target.value) })}
+                required
+                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-base font-medium text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Atta (g)</label>
+              <input
+                type="number"
+                min="1"
+                value={customRationConfig.flourGrams}
+                onChange={(e) => setCustomRationConfig({ ...customRationConfig, flourGrams: Number(e.target.value) })}
+                required
+                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-base font-medium text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Dal (g)</label>
+              <input
+                type="number"
+                min="1"
+                value={customRationConfig.dalGrams}
+                onChange={(e) => setCustomRationConfig({ ...customRationConfig, dalGrams: Number(e.target.value) })}
+                required
+                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-base font-medium text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Veggies (g)</label>
+              <input
+                type="number"
+                min="1"
+                value={customRationConfig.veggieGrams}
+                onChange={(e) => setCustomRationConfig({ ...customRationConfig, veggieGrams: Number(e.target.value) })}
+                required
+                className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-base font-medium text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+          </div>
+
+          {rationMsg && (
+            <p className="text-sm font-medium p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+              {rationMsg}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={isSavingRation}
+            className="w-full sm:w-auto px-6 h-12 min-h-[44px] bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer text-base"
+          >
+            {isSavingRation ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
+            <span>Save Per-Plate Norms</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default RationEstimatorPanel;
+
+
+
+================================================
+FILE: frontend/src/components/owner/SectionPanel.jsx
+================================================
+import React, { useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, ArrowLeft } from 'lucide-react';
+
+const colorStyles = {
+  orange: 'bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400',
+  emerald: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400',
+  indigo: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400',
+  violet: 'bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-400',
+  amber: 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400',
+  rose: 'bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400',
+  blue: 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
+};
+
+const SectionPanel = ({
+  isOpen,
+  onClose,
+  title,
+  subtitle,
+  icon: Icon,
+  color = 'orange',
+  children,
+  maxWidth = 'max-w-4xl'
+}) => {
+  // ESC key handler
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // Lock body scroll when panel is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  const chipColor = colorStyles[color] || colorStyles.orange;
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex sm:items-center sm:justify-center">
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity"
+            aria-hidden="true"
+          />
+
+          {/* Modal / Bottom Sheet */}
+          <motion.div
+            initial={{ y: '100%', opacity: 0.8 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: '100%', opacity: 0 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+            className={`relative z-10 w-full ${maxWidth} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[88vh] rounded-t-3xl sm:rounded-3xl overflow-hidden mt-auto sm:mt-0`}
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+          >
+            {/* Mobile swipe / pull indicator */}
+            <div className="sm:hidden flex justify-center pt-2.5 pb-1">
+              <div className="w-12 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
+            </div>
+
+            {/* Panel Header */}
+            <div className="px-4 sm:px-8 py-3.5 sm:py-5 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="sm:hidden w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                  aria-label="Back"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                {Icon && (
+                  <div className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center shrink-0 ${chipColor}`}>
+                    <Icon size={22} />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight truncate">
+                    {title}
+                  </h2>
+                  {subtitle && (
+                    <p className="text-sm font-normal text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                      {subtitle}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shrink-0 ml-2 flex items-center justify-center cursor-pointer"
+                title="Close (Esc)"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Panel Content (Scrollable) */}
+            <div className="p-4 sm:p-8 overflow-y-auto flex-grow overscroll-contain">
+              {children}
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+export default SectionPanel;
+
+
+
+================================================
+FILE: frontend/src/components/owner/SectionTile.jsx
+================================================
+import React from 'react';
+import { motion } from 'framer-motion';
+
+const colorStyles = {
+  orange: {
+    bg: 'bg-orange-500/10 dark:bg-orange-500/20',
+    text: 'text-orange-600 dark:text-orange-400',
+    border: 'hover:border-orange-300 dark:hover:border-orange-500/40'
+  },
+  emerald: {
+    bg: 'bg-emerald-500/10 dark:bg-emerald-500/20',
+    text: 'text-emerald-600 dark:text-emerald-400',
+    border: 'hover:border-emerald-300 dark:hover:border-emerald-500/40'
+  },
+  indigo: {
+    bg: 'bg-indigo-500/10 dark:bg-indigo-500/20',
+    text: 'text-indigo-600 dark:text-indigo-400',
+    border: 'hover:border-indigo-300 dark:hover:border-indigo-500/40'
+  },
+  violet: {
+    bg: 'bg-violet-500/10 dark:bg-violet-500/20',
+    text: 'text-violet-600 dark:text-violet-400',
+    border: 'hover:border-violet-300 dark:hover:border-violet-500/40'
+  },
+  amber: {
+    bg: 'bg-amber-500/10 dark:bg-amber-500/20',
+    text: 'text-amber-600 dark:text-amber-400',
+    border: 'hover:border-amber-300 dark:hover:border-amber-500/40'
+  },
+  rose: {
+    bg: 'bg-rose-500/10 dark:bg-rose-500/20',
+    text: 'text-rose-600 dark:text-rose-400',
+    border: 'hover:border-rose-300 dark:hover:border-rose-500/40'
+  }
+};
+
+const badgeStyles = {
+  default: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+  success: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800',
+  warning: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800',
+  alert: 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800 font-bold',
+  orange: 'bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300 border-orange-300 dark:border-orange-800'
+};
+
+const SectionTile = ({
+  icon: Icon,
+  title,
+  subtitle,
+  badge,
+  badgeType = 'default',
+  color = 'orange',
+  onClick,
+  pulseBadge = false
+}) => {
+  const scheme = colorStyles[color] || colorStyles.orange;
+  const badgeCls = badgeStyles[badgeType] || badgeStyles.default;
+
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.97 }}
+      transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+      className={`group relative flex flex-col items-center justify-between p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md transition-all text-center w-full min-h-[135px] sm:min-h-[145px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/40 ${scheme.border}`}
+    >
+      {/* Live Badge in top-right */}
+      {badge !== undefined && badge !== null && badge !== '' && (
+        <div className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 flex items-center gap-1 z-10">
+          {pulseBadge && (
+            <span className="w-2 h-2 rounded-full bg-rose-500" />
+          )}
+          <span
+            className={`text-sm font-medium px-2 py-0.5 rounded-full border shadow-2xs truncate max-w-[100px] sm:max-w-[140px] ${badgeCls}`}
+          >
+            {badge}
+          </span>
+        </div>
+      )}
+
+      {/* Center Icon Chip */}
+      <div className="mt-2 mb-2 sm:mb-3">
+        <div
+          className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-105 shadow-inner ${scheme.bg} ${scheme.text}`}
+        >
+          {Icon && <Icon className="w-6 h-6 sm:w-7 sm:h-7" />}
+        </div>
+      </div>
+
+      {/* Title & Short Description */}
+      <div className="w-full">
+        <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white leading-snug">
+          {title}
+        </h3>
+        {subtitle && (
+          <p className="text-sm font-normal text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
+            {subtitle}
+          </p>
+        )}
+      </div>
+    </motion.button>
+  );
+};
+
+export default SectionTile;
+
+
+
+================================================
+FILE: frontend/src/components/owner/SubscribersPanel.jsx
+================================================
+import React from 'react';
+import { Users, Phone, Clock, CalendarPlus, Edit3, IndianRupee, CheckCircle2 } from 'lucide-react';
+
+const SubscribersPanel = ({
+  members,
+  handleExtendDays,
+  handleEditSkips,
+  handleSetFee,
+  updateSubscription,
+  togglePaymentStatus
+}) => {
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
+            Active Members & Payment Records
+          </h3>
+          <p className="text-sm font-normal text-slate-500 dark:text-slate-400 mt-0.5">
+            Manage student subscription shifts, skip allowances, custom fees, and approve UPI payments.
+          </p>
+        </div>
+        <div className="bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 px-3.5 py-1.5 rounded-xl text-sm font-semibold border border-indigo-200 dark:border-indigo-800 w-fit shrink-0">
+          Total Members: {members.length}
+        </div>
+      </div>
+
+      {members.length === 0 ? (
+        <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
+          <Users className="mx-auto text-slate-300 dark:text-slate-600 mb-3" size={36} />
+          <p className="text-slate-700 dark:text-slate-300 font-semibold text-base">No active monthly members yet.</p>
+          <p className="text-sm font-normal text-slate-500 dark:text-slate-400 mt-1">Students can subscribe to your mess from their mobile dashboard.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800">
+          <table className="w-full text-left border-collapse whitespace-nowrap text-sm sm:text-base">
+            <thead>
+              <tr className="bg-slate-50 dark:bg-slate-950 text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200/80 dark:border-slate-800">
+                <th className="py-3.5 px-4 font-black">Student Info</th>
+                <th className="py-3.5 px-4 font-black">Shift</th>
+                <th className="py-3.5 px-4 font-black">Membership Dates</th>
+                <th className="py-3.5 px-4 font-black">Skips (Used/Max)</th>
+                <th className="py-3.5 px-4 font-black">Monthly Fee</th>
+                <th className="py-3.5 px-4 font-black text-right">Payment Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-900">
+              {members.map((member) => (
+                <tr key={member._id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="py-3.5 px-4">
+                    <p className="font-semibold text-slate-900 dark:text-white text-base">
+                      {member.studentName}
+                    </p>
+                    <p className="text-sm font-normal text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
+                      <Phone size={14} /> {member.studentPhone || 'N/A'}
+                    </p>
+                    {member.status === 'verification_pending' && (
+                      <span className="text-sm font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-700/50 flex items-center gap-1 w-fit mt-1.5">
+                        <Clock size={14} /> Verification Pending
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <span
+                      className={`text-sm font-medium px-2.5 py-1 rounded-lg ${
+                        member.status === 'expired'
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-700/50'
+                          : member.shift === 'both'
+                          ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400'
+                          : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                      }`}
+                    >
+                      {member.status === 'expired' ? 'Expired' : (member.shift || 'both')}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 text-sm">
+                    <div className="text-slate-600 dark:text-slate-400 font-normal mb-1">
+                      Start: <span className="font-medium text-slate-800 dark:text-slate-200">{new Date(member.startDate).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-600 dark:text-slate-400 font-normal">
+                        End: <span className="font-medium text-slate-800 dark:text-slate-200">{member.endDate ? new Date(member.endDate).toLocaleDateString() : 'N/A'}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleExtendDays(member._id)}
+                        className="w-11 h-11 min-w-[44px] min-h-[44px] text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-xl flex items-center justify-center transition-colors cursor-pointer"
+                        title="Extend Membership for Absences"
+                        aria-label="Extend Membership"
+                      >
+                        <CalendarPlus size={18} />
+                      </button>
+                    </div>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                      <span>{member.usedSkips || 0} / {member.allowedSkips || 5}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleEditSkips(member._id, member.allowedSkips)}
+                        className="w-11 h-11 min-w-[44px] min-h-[44px] text-slate-500 hover:text-indigo-600 rounded-xl flex items-center justify-center transition-colors cursor-pointer"
+                        title="Edit Maximum Allowed Skips"
+                        aria-label="Edit Skips"
+                      >
+                        <Edit3 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="flex items-center gap-1.5 text-base font-semibold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 px-3 py-1.5 w-fit rounded-xl border border-orange-200 dark:border-orange-800/40">
+                      <IndianRupee size={16} />
+                      <span>{member.monthlyFee || 0}</span>
+                      {member.status !== 'paid' && member.status !== 'expired' && (
+                        <button
+                          type="button"
+                          onClick={() => handleSetFee(member._id, member.monthlyFee)}
+                          className="w-11 h-11 min-w-[44px] min-h-[44px] text-slate-500 hover:text-orange-600 ml-1 rounded-xl flex items-center justify-center transition-colors cursor-pointer"
+                          title="Set Custom Monthly Fee"
+                          aria-label="Set Fee"
+                        >
+                          <Edit3 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-3.5 px-4 text-right">
+                    {member.status === 'verification_pending' ? (
+                      <div className="flex flex-col items-end gap-1.5">
+                        <span className="text-sm font-mono font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-700/40">
+                          UTR: {member.lastUtrNumber || 'N/A'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateSubscription(member._id, { status: 'paid' })}
+                          className="h-11 min-h-[44px] px-4 rounded-xl text-sm font-bold transition-colors shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <CheckCircle2 size={16} /> Approve Payment âœ“
+                        </button>
+                      </div>
+                    ) : member.status === 'expired' ? (
+                      <button
+                        type="button"
+                        onClick={() => updateSubscription(member._id, { renew: true, status: 'paid' })}
+                        className="h-11 min-h-[44px] px-4 rounded-xl text-sm font-bold transition-colors shadow-2xs bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
+                      >
+                        Renew (30d)
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => togglePaymentStatus(member._id, member.status)}
+                        disabled={member.status === 'paid'}
+                        className={`h-11 min-h-[44px] px-4 rounded-xl text-sm font-bold transition-colors shadow-2xs cursor-pointer ${
+                          member.status === 'paid'
+                            ? 'bg-emerald-600 text-white shadow-emerald-500/20 cursor-not-allowed opacity-90'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300'
+                        }`}
+                      >
+                        {member.status === 'paid' ? 'Paid âœ“' : 'Mark as Paid'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SubscribersPanel;
+
 
 
 ================================================
@@ -4753,7 +6888,7 @@ Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8d in posi
 ================================================
 FILE: frontend/src/pages/OwnerDashboard.jsx
 ================================================
-Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x9d in position 16151: character maps to <undefined>
+Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x9d in position 16633: character maps to <undefined>
 
 
 ================================================
@@ -4765,7 +6900,7 @@ Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8f in posi
 ================================================
 FILE: frontend/src/utils/config.js
 ================================================
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+export const API_URL = import.meta.env.VITE_API_URL || 'https://avasariconnectbackend.onrender.com';
 
 
 
@@ -4794,5 +6929,5 @@ export default getSocket;
 ================================================
 FILE: frontend/src/utils/translations.js
 ================================================
-Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8d in position 2360: character maps to <undefined>
+Error reading file with 'cp1252': 'charmap' codec can't decode byte 0x8d in position 5922: character maps to <undefined>
 

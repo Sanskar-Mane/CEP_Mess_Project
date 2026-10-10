@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, ScrollView, Alert, TextInput, Modal, SafeAreaView, Platform, StatusBar, RefreshControl, Image } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, ScrollView, Alert, TextInput, Modal, SafeAreaView, Platform, StatusBar, RefreshControl, Image, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { API_URL } from '@/constants/config';
 import { getSocket } from '@/utils/socket';
 import { registerForPushNotificationsAsync } from '@/utils/notifications';
+import { translations, Language } from '@/utils/translations';
 
 const getLocalDateString = (offsetDays = 0) => {
     const d = new Date(); d.setDate(d.getDate() + offsetDays);
@@ -21,6 +22,21 @@ export default function OwnerDashboard() {
     const [user, setUser] = useState<any>(null);
     const [isAuthLoading, setIsAuthLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+
+    // Language State & Persistence
+    const [language, setLanguage] = useState<Language>('en');
+
+    useEffect(() => {
+        AsyncStorage.getItem('owner_language').then((val) => {
+            if (val === 'mr' || val === 'en') setLanguage(val);
+        });
+    }, []);
+
+    const toggleLanguage = async () => {
+        const newLang = language === 'en' ? 'mr' : 'en';
+        setLanguage(newLang);
+        await AsyncStorage.setItem('owner_language', newLang);
+    };
 
     // Active Navigation Tab State
     const [activeTab, setActiveTab] = useState<'kitchen' | 'menu' | 'members' | 'settings'>('kitchen');
@@ -258,7 +274,7 @@ export default function OwnerDashboard() {
         );
     };
 
-    const displayDate = new Date(menuDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const displayDate = new Date(menuDate).toLocaleDateString(language === 'mr' ? 'mr-IN' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
     // 1. Authenticate User
     useEffect(() => {
@@ -675,6 +691,7 @@ export default function OwnerDashboard() {
 
     if (isAuthLoading || !user) return <View style={styles.center}><ActivityIndicator size="large" color="#f97316" /></View>;
 
+    const t = translations[language];
     const currentStats = stats[analyticsShift] || { coming: 0, notComing: 0, consumed: 0 };
     const currentShiftEstimates = (stats as any)?.estimates?.[analyticsShift]?.requiredKg || {
         rice: ((currentStats.coming * (rationConfig.riceGrams || 120)) / 1000).toFixed(1),
@@ -711,10 +728,10 @@ export default function OwnerDashboard() {
             <View style={styles.header}>
                 <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <Text style={styles.greeting}>Chef {user.name.split(' ')[0]} 👨‍🍳</Text>
+                        <Text style={styles.greeting}>{t.chef} {user.name.split(' ')[0]} 👨‍🍳</Text>
                         {user.isTopChef && (
                             <View style={styles.topChefBadgeHeader}>
-                                <Text style={styles.topChefBadgeHeaderText}>👑 Campus Top Chef</Text>
+                                <Text style={styles.topChefBadgeHeaderText}>{t.topChef}</Text>
                             </View>
                         )}
                     </View>
@@ -732,7 +749,7 @@ export default function OwnerDashboard() {
                 <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                     <TouchableOpacity onPress={handleOpenScanner} style={styles.scannerHeaderBtn}>
                         <Feather name="camera" size={15} color="#ffffff" />
-                        <Text style={styles.scannerHeaderBtnText}>Scan QR</Text>
+                        <Text style={styles.scannerHeaderBtnText}>{t.scanQrHeader}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={handleOpenNotifications} style={styles.bellBtn}>
                         <Feather name="bell" size={18} color="#4f46e5" />
@@ -741,6 +758,10 @@ export default function OwnerDashboard() {
                                 <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
                             </View>
                         )}
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={toggleLanguage} style={styles.langToggleBtn} activeOpacity={0.8}>
+                        <Text style={styles.langToggleBadgeText}>अ/A</Text>
+                        <Text style={styles.langToggleText}>{language === 'en' ? 'मराठी' : 'EN'}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
                         <Feather name="log-out" size={18} color="#ef4444" />
@@ -771,13 +792,13 @@ export default function OwnerDashboard() {
                                 style={[styles.dateBtn, menuDate === getLocalDateString(0) && styles.dateBtnActive]}
                                 onPress={() => setMenuDate(getLocalDateString(0))}
                             >
-                                <Text style={[styles.dateBtnText, menuDate === getLocalDateString(0) && styles.dateBtnTextActive]}>Today</Text>
+                                <Text style={[styles.dateBtnText, menuDate === getLocalDateString(0) && styles.dateBtnTextActive]}>{t.today}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.dateBtn, menuDate === getLocalDateString(1) && styles.dateBtnActive]}
                                 onPress={() => setMenuDate(getLocalDateString(1))}
                             >
-                                <Text style={[styles.dateBtnText, menuDate === getLocalDateString(1) && styles.dateBtnTextActive]}>Tomorrow</Text>
+                                <Text style={[styles.dateBtnText, menuDate === getLocalDateString(1) && styles.dateBtnTextActive]}>{t.tomorrow}</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -791,8 +812,8 @@ export default function OwnerDashboard() {
                                 <Feather name="camera" size={24} color="#ffffff" />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.qrScannerHeroTitle}>📷 Scan Student Meal QR</Text>
-                                <Text style={styles.qrScannerHeroSub}>Tap to verify student digital meal passes at the counter</Text>
+                                <Text style={styles.qrScannerHeroTitle}>{t.scanStudentMealQr}</Text>
+                                <Text style={styles.qrScannerHeroSub}>{t.scanStudentMealQrSub}</Text>
                             </View>
                             <Feather name="chevron-right" size={22} color="#ffffff" />
                         </TouchableOpacity>
@@ -800,19 +821,19 @@ export default function OwnerDashboard() {
                         {/* Attendance Stats Section */}
                         <View style={styles.section}>
                             <View style={styles.sectionHeader}>
-                                <Text style={styles.sectionTitle}>Attendance Stats</Text>
+                                <Text style={styles.sectionTitle}>{t.attendanceStats}</Text>
                                 <View style={styles.shiftToggleRow}>
                                     <TouchableOpacity
                                         onPress={() => setAnalyticsShift('morning')}
                                         style={[styles.shiftBtn, analyticsShift === 'morning' && styles.shiftBtnActive]}
                                     >
-                                        <Text style={[styles.shiftBtnText, analyticsShift === 'morning' && styles.shiftBtnTextActive]}>Morning</Text>
+                                        <Text style={[styles.shiftBtnText, analyticsShift === 'morning' && styles.shiftBtnTextActive]}>{t.morning}</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         onPress={() => setAnalyticsShift('night')}
                                         style={[styles.shiftBtn, analyticsShift === 'night' && styles.shiftBtnActive]}
                                     >
-                                        <Text style={[styles.shiftBtnText, analyticsShift === 'night' && styles.shiftBtnTextActive]}>Night</Text>
+                                        <Text style={[styles.shiftBtnText, analyticsShift === 'night' && styles.shiftBtnTextActive]}>{t.night}</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -820,17 +841,17 @@ export default function OwnerDashboard() {
                             <View style={styles.statsRow}>
                                 <View style={[styles.statCard, { backgroundColor: '#10b981' }]}>
                                     <Feather name="users" size={20} color="rgba(255,255,255,0.3)" style={styles.statBgIcon} />
-                                    <Text style={styles.statLabel}>Coming</Text>
+                                    <Text style={styles.statLabel}>{t.statComing}</Text>
                                     <Text style={styles.statValue}>{currentStats.coming}</Text>
                                 </View>
                                 <View style={[styles.statCard, { backgroundColor: '#4f46e5' }]}>
                                     <Feather name="check-circle" size={20} color="rgba(255,255,255,0.3)" style={styles.statBgIcon} />
-                                    <Text style={styles.statLabel}>Served</Text>
+                                    <Text style={styles.statLabel}>{t.statServed}</Text>
                                     <Text style={styles.statValue}>{currentStats.consumed || 0}</Text>
                                 </View>
                                 <View style={[styles.statCard, { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0' }]}>
                                     <Feather name="user-x" size={20} color="rgba(244,63,94,0.1)" style={styles.statBgIcon} />
-                                    <Text style={[styles.statLabel, { color: '#64748b' }]}>Skipped</Text>
+                                    <Text style={[styles.statLabel, { color: '#64748b' }]}>{t.statSkipped}</Text>
                                     <Text style={[styles.statValue, { color: '#f43f5e' }]}>{currentStats.notComing}</Text>
                                 </View>
                             </View>
@@ -840,9 +861,9 @@ export default function OwnerDashboard() {
                         <View style={styles.section}>
                             <View style={styles.sectionHeader}>
                                 <View style={{ flex: 1, marginRight: 8 }}>
-                                    <Text style={styles.sectionTitle}>Kitchen Ration Estimator</Text>
+                                    <Text style={styles.sectionTitle}>{t.kitchenRationEstimator}</Text>
                                     <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '600' }}>
-                                        Raw ingredient quantities for {currentStats.coming} diners ({analyticsShift})
+                                        {t.rawIngredientQuantities} {currentStats.coming} {t.diners} ({analyticsShift === 'morning' ? t.morning : t.night})
                                     </Text>
                                 </View>
                                 <TouchableOpacity
@@ -850,7 +871,7 @@ export default function OwnerDashboard() {
                                     style={styles.customNormsBtn}
                                 >
                                     <Feather name="sliders" size={13} color="#4f46e5" />
-                                    <Text style={styles.customNormsBtnText}>Norms</Text>
+                                    <Text style={styles.customNormsBtnText}>{t.norms}</Text>
                                 </TouchableOpacity>
                             </View>
 
@@ -858,35 +879,35 @@ export default function OwnerDashboard() {
                                 <View style={styles.rationCard}>
                                     <Text style={styles.rationEmoji}>🍚</Text>
                                     <Text style={styles.rationValue}>{currentShiftEstimates.rice} kg</Text>
-                                    <Text style={styles.rationTitle}>Raw Rice</Text>
-                                    <Text style={styles.rationNorm}>{rationConfig.riceGrams}g / plate</Text>
+                                    <Text style={styles.rationTitle}>{t.rawRice}</Text>
+                                    <Text style={styles.rationNorm}>{rationConfig.riceGrams}{t.perPlate}</Text>
                                 </View>
                                 <View style={styles.rationCard}>
                                     <Text style={styles.rationEmoji}>🌾</Text>
                                     <Text style={styles.rationValue}>{currentShiftEstimates.flour} kg</Text>
-                                    <Text style={styles.rationTitle}>Atta / Flour</Text>
-                                    <Text style={styles.rationNorm}>{rationConfig.flourGrams}g / plate</Text>
+                                    <Text style={styles.rationTitle}>{t.attaFlour}</Text>
+                                    <Text style={styles.rationNorm}>{rationConfig.flourGrams}{t.perPlate}</Text>
                                 </View>
                                 <View style={styles.rationCard}>
                                     <Text style={styles.rationEmoji}>🥣</Text>
                                     <Text style={styles.rationValue}>{currentShiftEstimates.dal} kg</Text>
-                                    <Text style={styles.rationTitle}>Dal / Pulses</Text>
-                                    <Text style={styles.rationNorm}>{rationConfig.dalGrams}g / plate</Text>
+                                    <Text style={styles.rationTitle}>{t.dalPulses}</Text>
+                                    <Text style={styles.rationNorm}>{rationConfig.dalGrams}{t.perPlate}</Text>
                                 </View>
                                 <View style={styles.rationCard}>
                                     <Text style={styles.rationEmoji}>🥬</Text>
                                     <Text style={styles.rationValue}>{currentShiftEstimates.veggies} kg</Text>
-                                    <Text style={styles.rationTitle}>Vegetables</Text>
-                                    <Text style={styles.rationNorm}>{rationConfig.veggieGrams}g / plate</Text>
+                                    <Text style={styles.rationTitle}>{t.vegetables}</Text>
+                                    <Text style={styles.rationNorm}>{rationConfig.veggieGrams}{t.perPlate}</Text>
                                 </View>
                             </View>
 
                             <View style={styles.wastePreventedBanner}>
                                 <Feather name="award" size={18} color="#059669" />
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.wastePreventedTitle}>🌱 Food Waste Prevented</Text>
+                                    <Text style={styles.wastePreventedTitle}>🌱 {t.statFoodSaved}</Text>
                                     <Text style={styles.wastePreventedDesc}>
-                                        ~{foodSavedKg} kg raw materials spared thanks to {currentStats.notComing} student advance skips!
+                                        ~{foodSavedKg} kg {t.wastePreventedDesc}
                                     </Text>
                                 </View>
                             </View>
@@ -903,22 +924,22 @@ export default function OwnerDashboard() {
                                 style={[styles.dateBtn, menuDate === getLocalDateString(0) && styles.dateBtnActive]}
                                 onPress={() => setMenuDate(getLocalDateString(0))}
                             >
-                                <Text style={[styles.dateBtnText, menuDate === getLocalDateString(0) && styles.dateBtnTextActive]}>Today</Text>
+                                <Text style={[styles.dateBtnText, menuDate === getLocalDateString(0) && styles.dateBtnTextActive]}>{t.today}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.dateBtn, menuDate === getLocalDateString(1) && styles.dateBtnActive]}
                                 onPress={() => setMenuDate(getLocalDateString(1))}
                             >
-                                <Text style={[styles.dateBtnText, menuDate === getLocalDateString(1) && styles.dateBtnTextActive]}>Tomorrow</Text>
+                                <Text style={[styles.dateBtnText, menuDate === getLocalDateString(1) && styles.dateBtnTextActive]}>{t.tomorrow}</Text>
                             </TouchableOpacity>
                         </View>
 
                         {/* Publish Menu Card */}
                         <View style={styles.section}>
                             <View style={{ marginBottom: 12 }}>
-                                <Text style={styles.sectionTitle}>Publish Menu</Text>
+                                <Text style={styles.sectionTitle}>{t.publishMenuTitle}</Text>
                                 <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '500', marginTop: -10 }}>
-                                    Publish meal items for {displayDate}
+                                    {t.publishMealItemsFor} {displayDate}
                                 </Text>
                             </View>
                             <View style={styles.premiumCard}>
@@ -928,20 +949,20 @@ export default function OwnerDashboard() {
                                         style={[styles.shiftBtn, menuShift === 'morning' && styles.shiftBtnActive]}
                                     >
                                         <Feather name="sun" size={14} color={menuShift === 'morning' ? '#4f46e5' : '#64748b'} style={{ marginRight: 6 }} />
-                                        <Text style={[styles.shiftBtnText, menuShift === 'morning' && styles.shiftBtnTextActive]}>Morning</Text>
+                                        <Text style={[styles.shiftBtnText, menuShift === 'morning' && styles.shiftBtnTextActive]}>{t.morning}</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         onPress={() => setMenuShift('night')}
                                         style={[styles.shiftBtn, menuShift === 'night' && styles.shiftBtnActive]}
                                     >
                                         <Feather name="moon" size={14} color={menuShift === 'night' ? '#4f46e5' : '#64748b'} style={{ marginRight: 6 }} />
-                                        <Text style={[styles.shiftBtnText, menuShift === 'night' && styles.shiftBtnTextActive]}>Night</Text>
+                                        <Text style={[styles.shiftBtnText, menuShift === 'night' && styles.shiftBtnTextActive]}>{t.night}</Text>
                                     </TouchableOpacity>
                                 </View>
 
                                 <TextInput
                                     style={[styles.input, { height: 90, textAlignVertical: 'top' }]}
-                                    placeholder="Items (e.g. Dal, Roti, Paneer)"
+                                    placeholder={t.dishesPlaceholder}
                                     placeholderTextColor="#94a3b8"
                                     multiline
                                     value={menuItems}
@@ -951,7 +972,7 @@ export default function OwnerDashboard() {
                                     <Text style={styles.currencySymbol}>₹</Text>
                                     <TextInput
                                         style={styles.priceInput}
-                                        placeholder="Thali Price"
+                                        placeholder={t.thaliPrice}
                                         placeholderTextColor="#94a3b8"
                                         keyboardType="numeric"
                                         value={price}
@@ -969,7 +990,7 @@ export default function OwnerDashboard() {
                                     ) : (
                                         <>
                                             <Feather name="send" size={16} color="#ffffff" style={{ marginRight: 8 }} />
-                                            <Text style={styles.publishBtnText}>Publish {menuShift.toUpperCase()} Menu</Text>
+                                            <Text style={styles.publishBtnText}>{t.publishButton} ({menuShift === 'morning' ? t.morning : t.night})</Text>
                                         </>
                                     )}
                                 </TouchableOpacity>
@@ -979,9 +1000,9 @@ export default function OwnerDashboard() {
                         {/* Live 24H Story Card */}
                         <View style={styles.section}>
                             <View style={{ marginBottom: 12 }}>
-                                <Text style={styles.sectionTitle}>Live Kitchen Feed</Text>
+                                <Text style={styles.sectionTitle}>{t.liveKitchenFeed}</Text>
                                 <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '500', marginTop: -10 }}>
-                                    Post 24-hour stories to showcase fresh kitchen preparation
+                                    {t.liveFeedSub}
                                 </Text>
                             </View>
                             <TouchableOpacity
@@ -994,10 +1015,10 @@ export default function OwnerDashboard() {
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <Text style={styles.postStoryBtnTitle}>Post Live Update 📸</Text>
+                                        <Text style={styles.postStoryBtnTitle}>{t.postLiveUpdate}</Text>
                                         <View style={styles.liveBadge}><Text style={styles.liveBadgeText}>24H LIVE</Text></View>
                                     </View>
-                                    <Text style={styles.postStoryBtnSub}>Snap what's cooking right now for campus students!</Text>
+                                    <Text style={styles.postStoryBtnSub}>{t.postLiveUpdateSub}</Text>
                                 </View>
                                 <Feather name="plus-circle" size={22} color="#ea580c" />
                             </TouchableOpacity>
@@ -1007,9 +1028,9 @@ export default function OwnerDashboard() {
                                 <View style={{ marginTop: 16 }}>
                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                                         <Text style={styles.activeStoriesTitle}>
-                                            Your Active Stories ({myActiveStories.length})
+                                            {t.activeStories} ({myActiveStories.length})
                                         </Text>
-                                        <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600' }}>Tap to view</Text>
+                                        <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '600' }}>{t.tapToView}</Text>
                                     </View>
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 4 }}>
                                         {myActiveStories.map((s) => (
@@ -1047,9 +1068,9 @@ export default function OwnerDashboard() {
                 {activeTab === 'members' && (
                     <View style={styles.section}>
                         <View style={{ marginBottom: 14 }}>
-                            <Text style={styles.sectionTitle}>Monthly Members ({members.length})</Text>
+                            <Text style={styles.sectionTitle}>{t.monthlyMembers} ({members.length})</Text>
                             <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '500', marginTop: -10 }}>
-                                Manage subscriptions, verify UPI transfers & update skips
+                                {t.monthlyMembersSub}
                             </Text>
                         </View>
 
@@ -1058,7 +1079,7 @@ export default function OwnerDashboard() {
                             <Feather name="search" size={16} color="#94a3b8" style={{ marginRight: 8 }} />
                             <TextInput
                                 style={styles.searchInput}
-                                placeholder="Search member by name or phone..."
+                                placeholder={t.searchMemberPlaceholder}
                                 placeholderTextColor="#94a3b8"
                                 value={memberSearch}
                                 onChangeText={setMemberSearch}
@@ -1082,7 +1103,7 @@ export default function OwnerDashboard() {
                                 onPress={() => setMemberFilter('all')}
                             >
                                 <Text style={[styles.filterPillText, memberFilter === 'all' && styles.filterPillTextActive]}>
-                                    All ({members.length})
+                                    {t.filterAll} ({members.length})
                                 </Text>
                             </TouchableOpacity>
 
@@ -1091,7 +1112,7 @@ export default function OwnerDashboard() {
                                 onPress={() => setMemberFilter('verification_pending')}
                             >
                                 <Text style={[styles.filterPillText, memberFilter === 'verification_pending' && styles.filterPillTextActive, pendingVerifications > 0 && { color: memberFilter === 'verification_pending' ? '#ffffff' : '#ea580c' }]}>
-                                    ⏳ Verify UPI ({pendingVerifications})
+                                    {t.filterVerifyUpi} ({pendingVerifications})
                                 </Text>
                             </TouchableOpacity>
 
@@ -1100,7 +1121,7 @@ export default function OwnerDashboard() {
                                 onPress={() => setMemberFilter('paid')}
                             >
                                 <Text style={[styles.filterPillText, memberFilter === 'paid' && styles.filterPillTextActive]}>
-                                    ✓ Paid ({members.filter(m => m.status === 'paid').length})
+                                    {t.filterPaid} ({members.filter(m => m.status === 'paid').length})
                                 </Text>
                             </TouchableOpacity>
 
@@ -1109,7 +1130,7 @@ export default function OwnerDashboard() {
                                 onPress={() => setMemberFilter('pending')}
                             >
                                 <Text style={[styles.filterPillText, memberFilter === 'pending' && styles.filterPillTextActive]}>
-                                    Unpaid ({members.filter(m => m.status === 'pending').length})
+                                    {t.filterUnpaid} ({members.filter(m => m.status === 'pending').length})
                                 </Text>
                             </TouchableOpacity>
 
@@ -1118,7 +1139,7 @@ export default function OwnerDashboard() {
                                 onPress={() => setMemberFilter('expired')}
                             >
                                 <Text style={[styles.filterPillText, memberFilter === 'expired' && styles.filterPillTextActive]}>
-                                    Expired ({members.filter(m => m.status === 'expired').length})
+                                    {t.filterExpired} ({members.filter(m => m.status === 'expired').length})
                                 </Text>
                             </TouchableOpacity>
                         </ScrollView>
@@ -1128,7 +1149,7 @@ export default function OwnerDashboard() {
                             <View style={styles.emptyState}>
                                 <Feather name="users" size={32} color="#cbd5e1" />
                                 <Text style={styles.emptyText}>
-                                    {memberSearch || memberFilter !== 'all' ? 'No members match the search or filter.' : 'No monthly members yet.'}
+                                    {memberSearch || memberFilter !== 'all' ? t.noMembersMatch : t.noMembersYet}
                                 </Text>
                             </View>
                         ) : (
@@ -1148,22 +1169,26 @@ export default function OwnerDashboard() {
                                             <Text style={styles.memberName}>{member.studentName}</Text>
                                             <Text style={styles.memberPhone}><Feather name="phone" size={10} /> {member.studentPhone || 'N/A'}</Text>
                                         </View>
-                                        <View style={styles.memberShift}><Text style={styles.memberShiftText}>{member.shift} Shift</Text></View>
+                                        <View style={styles.memberShift}>
+                                            <Text style={styles.memberShiftText}>
+                                                {member.shift === 'both' ? (language === 'mr' ? 'दोन्ही' : 'Both') : member.shift === 'morning' ? t.morning : t.night} {t.shift}
+                                            </Text>
+                                        </View>
                                     </View>
 
                                     <View style={styles.memberMetrics}>
                                         <TouchableOpacity style={styles.metricBtn} onPress={() => openModal('skips', member._id, member.allowedSkips, 'Max Skips', 'Enter total allowed skips')}>
-                                            <Text style={styles.metricLabel}>Skips</Text>
+                                            <Text style={styles.metricLabel}>{t.skips}</Text>
                                             <Text style={styles.metricValue}>{member.usedSkips}/{member.allowedSkips} <Feather name="edit-2" size={10} color="#94a3b8" /></Text>
                                         </TouchableOpacity>
 
                                         <TouchableOpacity style={styles.metricBtn} onPress={() => openModal('fee', member._id, member.monthlyFee, 'Monthly Fee (₹)', 'Enter fee amount')}>
-                                            <Text style={styles.metricLabel}>Fee</Text>
+                                            <Text style={styles.metricLabel}>{t.fee}</Text>
                                             <Text style={[styles.metricValue, { color: '#f97316' }]}>₹{member.monthlyFee} <Feather name="edit-2" size={10} color="#94a3b8" /></Text>
                                         </TouchableOpacity>
 
                                         <TouchableOpacity style={styles.metricBtn} onPress={() => openModal('days', member._id, '', 'Extend Days', 'Add days for absenteeism')}>
-                                            <Text style={styles.metricLabel}>Expires</Text>
+                                            <Text style={styles.metricLabel}>{t.expires}</Text>
                                             <Text style={styles.metricValue}>{member.endDate ? new Date(member.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'N/A'} <Feather name="plus-circle" size={10} color="#94a3b8" /></Text>
                                         </TouchableOpacity>
                                     </View>
@@ -1173,7 +1198,7 @@ export default function OwnerDashboard() {
                                         <View style={styles.pendingVerifyCard}>
                                             <View style={styles.pendingVerifyHeader}>
                                                 <Feather name="alert-triangle" size={14} color="#ea580c" />
-                                                <Text style={styles.pendingVerifyTitle}>UPI Payment Verification Requested</Text>
+                                                <Text style={styles.pendingVerifyTitle}>{t.upiVerificationRequested}</Text>
                                             </View>
                                             <Text style={styles.utrText}>
                                                 UTR: <Text style={{ fontWeight: '900', color: '#0f172a' }}>{member.lastUtrNumber || 'Not provided'}</Text>
@@ -1183,18 +1208,18 @@ export default function OwnerDashboard() {
                                                 onPress={() => updateSubscription(member._id, { status: 'paid' })}
                                             >
                                                 <Feather name="check" size={15} color="#ffffff" />
-                                                <Text style={styles.approvePaymentBtnText}>Approve Payment ✓</Text>
+                                                <Text style={styles.approvePaymentBtnText}>{t.approvePaymentBtn}</Text>
                                             </TouchableOpacity>
                                         </View>
                                     ) : member.status === 'expired' ? (
                                         <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
                                             <View style={[styles.payBtn, { flex: 1, backgroundColor: '#fef3c7', borderColor: '#f59e0b' }]}>
-                                                <Text style={[styles.payBtnText, { color: '#b45309' }]}>STATUS: EXPIRED</Text>
+                                                <Text style={[styles.payBtnText, { color: '#b45309' }]}>{t.statusExpired}</Text>
                                             </View>
                                             <TouchableOpacity
                                                 onPress={() => handleRenewMember(member._id)}
                                                 style={[styles.payBtn, { flex: 1, backgroundColor: '#dcfce7', borderColor: '#86efac' }]}>
-                                                <Text style={[styles.payBtnText, { color: '#16a34a' }]}>RENEW (30D) ⟳</Text>
+                                                <Text style={[styles.payBtnText, { color: '#16a34a' }]}>{t.renew30d}</Text>
                                             </TouchableOpacity>
                                         </View>
                                     ) : (
@@ -1202,7 +1227,7 @@ export default function OwnerDashboard() {
                                             onPress={() => togglePaymentStatus(member._id, member.status)}
                                             style={[styles.payBtn, member.status === 'paid' ? styles.payBtnPaid : styles.payBtnPending]}>
                                             <Text style={[styles.payBtnText, member.status === 'paid' ? { color: '#059669' } : { color: '#dc2626' }]}>
-                                                {member.status === 'paid' ? 'STATUS: PAID ✓' : 'MARK AS PAID'}
+                                                {member.status === 'paid' ? t.statusPaid : t.markAsPaidBtn}
                                             </Text>
                                         </TouchableOpacity>
                                     )}
@@ -1215,16 +1240,73 @@ export default function OwnerDashboard() {
                 {/* TAB 4: SETTINGS (Mess Configuration) */}
                 {activeTab === 'settings' && (
                     <View>
+                        {/* Mess Profile Card */}
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>{t.messProfile}</Text>
+                            <View style={styles.premiumCard}>
+                                <View style={styles.messProfileHeader}>
+                                    <View style={styles.messProfileAvatar}>
+                                        <Feather name="coffee" size={24} color="#4f46e5" />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.messProfileTitle}>{user?.messName || t.messProfile}</Text>
+                                        <Text style={styles.messProfileSubtitle}>{t.registeredMessAccount}</Text>
+                                    </View>
+                                    {user?.isVerified ? (
+                                        <View style={styles.verifiedBadgePill}>
+                                            <Feather name="check-circle" size={12} color="#16a34a" />
+                                            <Text style={styles.verifiedBadgeText}>{t.verified}</Text>
+                                        </View>
+                                    ) : (
+                                        <View style={[styles.verifiedBadgePill, { backgroundColor: '#fef3c7' }]}>
+                                            <Feather name="clock" size={12} color="#d97706" />
+                                            <Text style={[styles.verifiedBadgeText, { color: '#d97706' }]}>{t.pending}</Text>
+                                        </View>
+                                    )}
+                                </View>
+
+                                <View style={styles.messProfileDivider} />
+
+                                <View style={styles.messProfileGrid}>
+                                    <View style={styles.messProfileItem}>
+                                        <Text style={styles.messProfileItemLabel}>{t.ownerName}</Text>
+                                        <Text style={styles.messProfileItemValue}>{user?.name || 'N/A'}</Text>
+                                    </View>
+                                    <View style={styles.messProfileItem}>
+                                        <Text style={styles.messProfileItemLabel}>{t.contactPhone}</Text>
+                                        <Text style={styles.messProfileItemValue}>{user?.phone || 'N/A'}</Text>
+                                    </View>
+                                    <View style={styles.messProfileItem}>
+                                        <Text style={styles.messProfileItemLabel}>{t.messName}</Text>
+                                        <Text style={styles.messProfileItemValue}>{user?.messName || 'N/A'}</Text>
+                                    </View>
+                                    <View style={styles.messProfileItem}>
+                                        <Text style={styles.messProfileItemLabel}>{t.fssaiLicenseNumber}</Text>
+                                        <Text style={styles.messProfileItemValue}>{user?.fssaiNumber || t.notSpecified}</Text>
+                                    </View>
+                                </View>
+
+                                <TouchableOpacity
+                                    style={styles.settingsLogoutBtn}
+                                    onPress={handleLogout}
+                                    activeOpacity={0.8}
+                                >
+                                    <Feather name="log-out" size={16} color="#ef4444" />
+                                    <Text style={styles.settingsLogoutBtnText}>{t.logoutAccount}</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
                         {/* Attendance Cut-Off Timers */}
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Attendance Cut-Off Timers</Text>
+                            <Text style={styles.sectionTitle}>{t.cutoffTimersTitle}</Text>
                             <View style={styles.premiumCard}>
                                 <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 16, lineHeight: 20 }}>
-                                    Set daily cut-off times (HH:mm in 24-hr IST) after which students cannot change today's bookings.
+                                    {t.cutoffTimersDesc}
                                 </Text>
                                 <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>Morning Cut-Off</Text>
+                                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>{t.morningCutoff}</Text>
                                         <TextInput
                                             style={[styles.input, { marginBottom: 0 }]}
                                             placeholder="09:30"
@@ -1234,7 +1316,7 @@ export default function OwnerDashboard() {
                                         />
                                     </View>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>Night Cut-Off</Text>
+                                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>{t.nightCutoff}</Text>
                                         <TextInput
                                             style={[styles.input, { marginBottom: 0 }]}
                                             placeholder="17:30"
@@ -1254,7 +1336,7 @@ export default function OwnerDashboard() {
                                     ) : (
                                         <>
                                             <Feather name="clock" size={16} color="#ffffff" style={{ marginRight: 6 }} />
-                                            <Text style={styles.publishBtnText}>Save Cut-Off Times</Text>
+                                            <Text style={styles.publishBtnText}>{t.saveCutoffTimes}</Text>
                                         </>
                                     )}
                                 </TouchableOpacity>
@@ -1263,10 +1345,10 @@ export default function OwnerDashboard() {
 
                         {/* UPI Payment Configuration */}
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>UPI Payment Configuration</Text>
+                            <Text style={styles.sectionTitle}>{t.upiConfigTitle}</Text>
                             <View style={styles.premiumCard}>
                                 <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 16, lineHeight: 20 }}>
-                                    Set your business or personal UPI ID (e.g. messowner@okaxis) to allow students to pay monthly fees directly via native UPI intent links.
+                                    {t.upiConfigDesc}
                                 </Text>
                                 <TextInput
                                     style={styles.input}
@@ -1286,7 +1368,7 @@ export default function OwnerDashboard() {
                                     ) : (
                                         <>
                                             <Feather name="credit-card" size={16} color="#ffffff" style={{ marginRight: 6 }} />
-                                            <Text style={styles.publishBtnText}>Save UPI ID</Text>
+                                            <Text style={styles.publishBtnText}>{t.saveUpiId}</Text>
                                         </>
                                     )}
                                 </TouchableOpacity>
@@ -1295,31 +1377,31 @@ export default function OwnerDashboard() {
 
                         {/* Kitchen Ration Norms Card */}
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Kitchen Ration Norms</Text>
+                            <Text style={styles.sectionTitle}>{t.kitchenRationNorms}</Text>
                             <View style={styles.premiumCard}>
                                 <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 14, lineHeight: 20 }}>
-                                    Current per-plate gram norms used to automatically calculate required raw ingredients based on diner attendance:
+                                    {t.rationNormsDesc}
                                 </Text>
                                 <View style={styles.rationGrid}>
                                     <View style={styles.rationCard}>
                                         <Text style={styles.rationEmoji}>🍚</Text>
                                         <Text style={styles.rationValue}>{rationConfig.riceGrams || 120}g</Text>
-                                        <Text style={styles.rationTitle}>Raw Rice</Text>
+                                        <Text style={styles.rationTitle}>{t.rawRice}</Text>
                                     </View>
                                     <View style={styles.rationCard}>
                                         <Text style={styles.rationEmoji}>🌾</Text>
                                         <Text style={styles.rationValue}>{rationConfig.flourGrams || 110}g</Text>
-                                        <Text style={styles.rationTitle}>Atta / Flour</Text>
+                                        <Text style={styles.rationTitle}>{t.attaFlour}</Text>
                                     </View>
                                     <View style={styles.rationCard}>
                                         <Text style={styles.rationEmoji}>🥣</Text>
                                         <Text style={styles.rationValue}>{rationConfig.dalGrams || 45}g</Text>
-                                        <Text style={styles.rationTitle}>Dal / Pulses</Text>
+                                        <Text style={styles.rationTitle}>{t.dalPulses}</Text>
                                     </View>
                                     <View style={styles.rationCard}>
                                         <Text style={styles.rationEmoji}>🥬</Text>
                                         <Text style={styles.rationValue}>{rationConfig.veggieGrams || 150}g</Text>
-                                        <Text style={styles.rationTitle}>Vegetables</Text>
+                                        <Text style={styles.rationTitle}>{t.vegetables}</Text>
                                     </View>
                                 </View>
                                 <TouchableOpacity
@@ -1327,23 +1409,23 @@ export default function OwnerDashboard() {
                                     onPress={() => setRationModalVisible(true)}
                                 >
                                     <Feather name="sliders" size={16} color="#ffffff" style={{ marginRight: 6 }} />
-                                    <Text style={styles.publishBtnText}>Edit Gram Baselines</Text>
+                                    <Text style={styles.publishBtnText}>{t.editGramBaselines}</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
 
                         {/* Mess Location Map */}
                         <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Mess Location Map</Text>
+                            <Text style={styles.sectionTitle}>{t.messLocationMap}</Text>
                             <View style={styles.premiumCard}>
                                 <Text style={{ color: '#64748b', fontSize: 13, marginBottom: 16, lineHeight: 20 }}>
-                                    Allow students to find your mess on the interactive map by saving your current GPS coordinates.
+                                    {t.messLocationDesc}
                                 </Text>
 
                                 {savedLocation && (
                                     <View style={styles.locationActiveBanner}>
                                         <Feather name="map-pin" size={16} color="#4338ca" />
-                                        <Text style={styles.locationActiveText}>Location is active on map</Text>
+                                        <Text style={styles.locationActiveText}>{t.locationActive}</Text>
                                     </View>
                                 )}
 
@@ -1358,7 +1440,7 @@ export default function OwnerDashboard() {
                                         <>
                                             <Feather name="navigation" size={16} color="#fff" style={{ marginRight: 8 }} />
                                             <Text style={styles.publishBtnText}>
-                                                {savedLocation ? 'Update Current Location' : 'Set Location via GPS'}
+                                                {savedLocation ? t.updateLocation : t.setLocationGps}
                                             </Text>
                                         </>
                                     )}
@@ -1378,7 +1460,7 @@ export default function OwnerDashboard() {
                 >
                     <Feather name="activity" size={20} color={activeTab === 'kitchen' ? '#4f46e5' : '#94a3b8'} />
                     <Text style={[styles.bottomTabText, activeTab === 'kitchen' && styles.bottomTabTextActive]}>
-                        Kitchen
+                        {t.tabKitchen}
                     </Text>
                 </TouchableOpacity>
 
@@ -1389,7 +1471,7 @@ export default function OwnerDashboard() {
                 >
                     <Feather name="book-open" size={20} color={activeTab === 'menu' ? '#4f46e5' : '#94a3b8'} />
                     <Text style={[styles.bottomTabText, activeTab === 'menu' && styles.bottomTabTextActive]}>
-                        Menu
+                        {t.tabMenu}
                     </Text>
                 </TouchableOpacity>
 
@@ -1409,7 +1491,7 @@ export default function OwnerDashboard() {
                         )}
                     </View>
                     <Text style={[styles.bottomTabText, activeTab === 'members' && styles.bottomTabTextActive]}>
-                        Members
+                        {t.tabMembers}
                     </Text>
                 </TouchableOpacity>
 
@@ -1420,7 +1502,7 @@ export default function OwnerDashboard() {
                 >
                     <Feather name="sliders" size={20} color={activeTab === 'settings' ? '#4f46e5' : '#94a3b8'} />
                     <Text style={[styles.bottomTabText, activeTab === 'settings' && styles.bottomTabTextActive]}>
-                        Settings
+                        {t.tabSettings}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -1429,7 +1511,7 @@ export default function OwnerDashboard() {
             <Modal visible={scannerVisible} animationType="slide">
                 <SafeAreaView style={{ flex: 1, backgroundColor: '#0f172a' }}>
                     <View style={styles.scannerHeader}>
-                        <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900' }}>Scan Meal QR Pass 📷</Text>
+                        <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900' }}>{t.scanMealQrPass}</Text>
                         <TouchableOpacity onPress={() => setScannerVisible(false)} style={{ padding: 6 }}>
                             <Feather name="x" size={26} color="#fff" />
                         </TouchableOpacity>
@@ -1748,6 +1830,33 @@ const styles = StyleSheet.create({
     bellBtn: { padding: 10, borderRadius: 12, backgroundColor: '#e0e7ff', position: 'relative' },
     notifBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#ef4444', borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
     notifBadgeText: { color: '#ffffff', fontSize: 10, fontWeight: 'bold' },
+
+    langToggleBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f3e8ff',
+        paddingHorizontal: 9,
+        paddingVertical: 6,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#d8b4fe',
+        gap: 5,
+    },
+    langToggleBadgeText: {
+        fontSize: 10,
+        fontWeight: '900',
+        color: '#7e22ce',
+        backgroundColor: '#ede9fe',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    langToggleText: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#6b21a8',
+    },
 
     content: { flex: 1, paddingHorizontal: 20, paddingTop: 8 },
     sectionTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a', marginBottom: 16 },
@@ -2215,5 +2324,90 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         textAlign: 'center',
+    },
+    messProfileHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 14,
+    },
+    messProfileAvatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#e0e7ff',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    messProfileTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#0f172a',
+    },
+    messProfileSubtitle: {
+        fontSize: 12,
+        color: '#64748b',
+        marginTop: 2,
+    },
+    verifiedBadgePill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#dcfce7',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    verifiedBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#15803d',
+    },
+    messProfileDivider: {
+        height: 1,
+        backgroundColor: '#f1f5f9',
+        marginVertical: 12,
+    },
+    messProfileGrid: {
+        gap: 10,
+        marginBottom: 16,
+    },
+    messProfileItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    messProfileItemLabel: {
+        fontSize: 12,
+        color: '#64748b',
+        fontWeight: '600',
+    },
+    messProfileItemValue: {
+        fontSize: 13,
+        color: '#0f172a',
+        fontWeight: '700',
+    },
+    settingsLogoutBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: '#fef2f2',
+        borderWidth: 1,
+        borderColor: '#fecaca',
+        paddingVertical: 12,
+        borderRadius: 14,
+        marginTop: 4,
+    },
+    settingsLogoutBtnText: {
+        color: '#ef4444',
+        fontSize: 14,
+        fontWeight: '700',
     },
 });

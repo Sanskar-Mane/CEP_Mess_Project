@@ -21,8 +21,8 @@ const getApiUrl = (): string => {
         }
     }
 
-    // 3. Fallback to env variable or localhost
-    return envUrl || 'http://localhost:3000';
+    // 3. Fallback to env variable or production deployed server
+    return envUrl || 'https://avasariconnectbackend.onrender.com';
 };
 
 export const API_URL = getApiUrl();

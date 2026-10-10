@@ -55,14 +55,15 @@ ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
 #### Frontend (`frontend/.env`)
 Copy `frontend/.env.example` to `frontend/.env`:
 ```env
-VITE_API_URL=http://localhost:3000
+# For local dev: http://localhost:3000 | For production Render backend:
+VITE_API_URL=https://avasariconnectbackend.onrender.com
 ```
 
 #### Mobile (`avasari-mobile/.env`)
 Copy `avasari-mobile/.env.example` to `avasari-mobile/.env`:
 ```env
-# Set to your computer's local Wi-Fi IP so physical phones can reach the backend
-EXPO_PUBLIC_API_URL=http://192.168.0.101:3000
+# For local dev: http://192.168.x.x:3000 | For production Render backend:
+EXPO_PUBLIC_API_URL=https://avasariconnectbackend.onrender.com
 ```
 
 ---

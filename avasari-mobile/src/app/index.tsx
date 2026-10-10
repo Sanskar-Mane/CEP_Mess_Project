@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, SafeAreaView, Platform, StatusBar, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -9,11 +9,54 @@ import { API_URL } from '@/constants/config';
 
 export default function AuthScreen() {
   const router = useRouter();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isLogin, setIsLogin] = useState(true);
   const [role, setRole] = useState('student');
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkAuth = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (token) {
+          const response = await fetch(`${API_URL}/api/me`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          if (response.ok) {
+            const user = await response.json();
+            if (user?.role === 'admin') {
+              router.replace('/admin');
+              return;
+            } else if (user?.role === 'owner') {
+              router.replace('/owner');
+              return;
+            } else {
+              router.replace('/student');
+              return;
+            }
+          } else {
+            await AsyncStorage.removeItem('token');
+          }
+        }
+      } catch (err) {
+        // Network or server error - fallback to login screen
+      } finally {
+        if (isMounted) {
+          setIsCheckingAuth(false);
+        }
+      }
+    };
+
+    checkAuth();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const [formData, setFormData] = useState({
     name: '', phone: '', password: '', yearBranch: '', messName: '', messAddress: '', fssaiNumber: '', latitude: null, longitude: null,
@@ -83,6 +126,24 @@ export default function AuthScreen() {
       setIsLoading(false);
     }
   };
+
+  if (isCheckingAuth) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
+        <View style={styles.loadingContainer}>
+          <View style={styles.loadingCard}>
+            <View style={styles.iconCircle}>
+              <Feather name="coffee" size={32} color="#4f46e5" />
+            </View>
+            <Text style={styles.title}>AvasariConnect</Text>
+            <Text style={styles.subtitle}>Checking your campus session...</Text>
+            <ActivityIndicator size="large" color="#4f46e5" style={{ marginTop: 24 }} />
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -265,6 +326,8 @@ export default function AuthScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f8fafc', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  loadingCard: { backgroundColor: '#ffffff', width: '100%', maxWidth: 360, borderRadius: 28, padding: 32, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 20, elevation: 6 },
   container: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   card: { backgroundColor: '#ffffff', width: '100%', maxWidth: 400, borderRadius: 32, padding: 24, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 20, elevation: 6 },
   header: { alignItems: 'center', marginBottom: 24 },
