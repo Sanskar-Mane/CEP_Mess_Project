@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: avasari-connect-backend
+    name: avasariconnectbackend
     runtime: node
     rootDir: backend
     buildCommand: npm install

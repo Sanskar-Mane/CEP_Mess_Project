@@ -3,7 +3,6 @@ import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, ScrollView
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import MessMap from '../../components/MessMap';
 import * as ImagePicker from 'expo-image-picker';
 
 import { API_URL } from '@/constants/config';
@@ -598,8 +597,13 @@ export default function StudentDashboard() {
     // Offline State
     const [isOffline, setIsOffline] = useState<boolean>(false);
 
-    // UPI Payment State
+    // Profile Modal State
+    const [profileModalVisible, setProfileModalVisible] = useState<boolean>(false);
+
+    // UPI Payment & QR Fallback State
     const [paymentModalVisible, setPaymentModalVisible] = useState<boolean>(false);
+    const [fallbackQrModalVisible, setFallbackQrModalVisible] = useState<boolean>(false);
+    const [paymentQrString, setPaymentQrString] = useState<string>('');
     const [selectedSubForPayment, setSelectedSubForPayment] = useState<any>(null);
     const [utrInput, setUtrInput] = useState<string>('');
     const [isSubmittingPayment, setIsSubmittingPayment] = useState<boolean>(false);
@@ -1020,23 +1024,58 @@ export default function StudentDashboard() {
         } catch (e) {}
     };
 
-    const handleOpenPayment = (sub: any) => {
-        setSelectedSubForPayment(sub);
-        setUtrInput('');
+    const openFallbackQrModal = (upiUrl: string, sub?: any) => {
+        if (sub) setSelectedSubForPayment(sub);
+        setPaymentQrString(upiUrl);
+        setFallbackQrModalVisible(true);
         setPaymentModalVisible(true);
     };
 
-    const handleLaunchUPIApp = () => {
-        if (!selectedSubForPayment) return;
-        const ownerUpi = selectedSubForPayment.messId?.upiId || '';
-        if (!ownerUpi) {
-            Alert.alert("Notice", "The mess owner has not added their UPI ID yet. You can pay via QR/cash and enter your UTR number below.");
+    const handlePayViaUPI = async (sub: any) => {
+        if (!sub) return;
+        setSelectedSubForPayment(sub);
+        setUtrInput('');
+        const ownerUpiId = sub.messId?.upiId || sub.upiId || '';
+        const ownerName = encodeURIComponent(sub.messId?.name || sub.messName || 'Mess Owner');
+        const amount = sub.monthlyFee;
+
+        if (!ownerUpiId) {
+            Alert.alert(
+                "UPI ID Not Found",
+                "The mess owner has not added their UPI ID yet. You can submit your payment UTR transaction number below.",
+                [{ text: "Enter UTR", onPress: () => {
+                    setPaymentQrString('');
+                    setPaymentModalVisible(true);
+                    setFallbackQrModalVisible(true);
+                }}]
+            );
             return;
         }
-        const upiUrl = `upi://pay?pa=${ownerUpi}&pn=${encodeURIComponent(selectedSubForPayment.messName)}&am=${selectedSubForPayment.monthlyFee}&cu=INR&tn=${encodeURIComponent('Mess Fee - ' + (user?.name || 'Student'))}`;
-        Linking.openURL(upiUrl).catch(() => {
-            Alert.alert("Notice", `Could not automatically launch UPI app. Please pay to ${ownerUpi} and enter the 12-digit UTR below.`);
-        });
+
+        const upiUrl = `upi://pay?pa=${ownerUpiId}&pn=${ownerName}&am=${amount}&cu=INR`;
+        setPaymentQrString(upiUrl);
+
+        try {
+            // Attempt to open native UPI apps (GPay, PhonePe, Paytm)
+            await Linking.openURL(upiUrl);
+            setPaymentModalVisible(true);
+            setFallbackQrModalVisible(true);
+        } catch (err) {
+            // Fallback if no UPI app is installed or intent fails
+            openFallbackQrModal(upiUrl, sub);
+        }
+    };
+
+    const handleOpenPayment = (sub: any) => {
+        setSelectedSubForPayment(sub);
+        setUtrInput('');
+        const ownerUpiId = sub.messId?.upiId || sub.upiId || '';
+        const ownerName = encodeURIComponent(sub.messId?.name || sub.messName || 'Mess Owner');
+        const amount = sub.monthlyFee;
+        const upiUrl = ownerUpiId ? `upi://pay?pa=${ownerUpiId}&pn=${ownerName}&am=${amount}&cu=INR` : '';
+        setPaymentQrString(upiUrl);
+        setPaymentModalVisible(true);
+        setFallbackQrModalVisible(true);
     };
 
     const handleSubmitUtr = async () => {
@@ -1060,6 +1099,7 @@ export default function StudentDashboard() {
             if (res.ok) {
                 Alert.alert("Success", "Payment submitted! The mess owner will verify and activate your membership.");
                 setPaymentModalVisible(false);
+                setFallbackQrModalVisible(false);
                 fetchData();
             } else {
                 Alert.alert("Notice", data.error || "Failed to submit payment.");
@@ -1211,8 +1251,9 @@ export default function StudentDashboard() {
                             </View>
                         )}
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-                        <Feather name="log-out" size={18} color="#ef4444" />
+                    <TouchableOpacity onPress={() => setProfileModalVisible(true)} style={styles.profileHeaderBtn} activeOpacity={0.8}>
+                        <Feather name="user" size={16} color="#4f46e5" />
+                        <Text style={styles.profileHeaderBtnText}>My Profile</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -1327,12 +1368,53 @@ export default function StudentDashboard() {
                                                 )}
                                             </View>
 
-                                            {/* UPI PAYMENT ACTIONS */}
-                                            {isPending && sub.monthlyFee > 0 && (
-                                                <TouchableOpacity style={styles.payUpiBtn} onPress={() => handleOpenPayment(sub)}>
-                                                    <Feather name="credit-card" size={14} color="#ffffff" />
-                                                    <Text style={styles.payUpiBtnText}>Pay ₹{sub.monthlyFee} via UPI 💳</Text>
-                                                </TouchableOpacity>
+                                            {/* Membership Expiry Visibility */}
+                                            {isPaid && sub.endDate && (() => {
+                                                const daysRemaining = Math.ceil((new Date(sub.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                                                const formattedDate = new Date(sub.endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                                                return (
+                                                    <View style={{ marginTop: 10 }}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                            <Feather name="calendar" size={13} color="#4f46e5" />
+                                                            <Text style={styles.subExpiryDateText}>
+                                                                Valid until: {formattedDate}
+                                                            </Text>
+                                                        </View>
+                                                        {daysRemaining <= 3 && (
+                                                            <View style={styles.subExpiryWarningBadge}>
+                                                                <Feather name="alert-triangle" size={13} color="#b45309" />
+                                                                <Text style={styles.subExpiryWarningText}>
+                                                                    {daysRemaining <= 0
+                                                                        ? '⚠️ Expiring today! Renew soon.'
+                                                                        : `⚠️ Expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}! Renew soon.`}
+                                                                </Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                );
+                                            })()}
+
+                                            {/* 1-TAP UPI PAYMENT ACTIONS */}
+                                            {(isPending || isExpired) && sub.monthlyFee > 0 && (
+                                                <View style={{ marginTop: 12, gap: 8 }}>
+                                                    <TouchableOpacity
+                                                        style={styles.payUpiBtn}
+                                                        onPress={() => handlePayViaUPI(sub)}
+                                                        activeOpacity={0.8}
+                                                    >
+                                                        <Feather name="zap" size={15} color="#ffffff" />
+                                                        <Text style={styles.payUpiBtnText}>Pay via UPI App 💸 (₹{sub.monthlyFee})</Text>
+                                                    </TouchableOpacity>
+
+                                                    <TouchableOpacity
+                                                        style={styles.secondaryQrBtn}
+                                                        onPress={() => handleOpenPayment(sub)}
+                                                        activeOpacity={0.8}
+                                                    >
+                                                        <Feather name="maximize" size={14} color="#4f46e5" />
+                                                        <Text style={styles.secondaryQrBtnText}>Show Payment QR / Enter UTR</Text>
+                                                    </TouchableOpacity>
+                                                </View>
                                             )}
 
                                             {isVerifying && (
@@ -1428,41 +1510,113 @@ export default function StudentDashboard() {
                 )}
 
                 {activeTab === 'map' && (
-                    <View>
-                        <Text style={styles.sectionTitle}>Messes Near You</Text>
-                        <MessMap messes={nearbyMesses} />
+                    <View style={styles.nearbySection}>
+                        <View style={styles.nearbyHeaderRow}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.sectionTitle}>Nearby Messes 🍲</Text>
+                                <Text style={styles.sectionSubtitle}>
+                                    Find verified dining spots near campus with live distance & directions
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.nearbyRefreshBtn}
+                                onPress={fetchData}
+                                activeOpacity={0.7}
+                            >
+                                <Feather name="refresh-cw" size={16} color="#4f46e5" />
+                            </TouchableOpacity>
+                        </View>
 
-                        {nearbyMesses.length > 0 && (
-                            <View style={{ marginTop: 18 }}>
-                                <Text style={[styles.sectionSubtitle, { marginBottom: 12 }]}>All Verified Messes ({nearbyMesses.length})</Text>
+                        {nearbyMesses.length === 0 ? (
+                            <View style={styles.emptyState}>
+                                <View style={styles.emptyIconCircle}>
+                                    <Feather name="map-pin" size={32} color="#94a3b8" />
+                                </View>
+                                <Text style={styles.emptyStateTitle}>No nearby messes found</Text>
+                                <Text style={styles.emptyStateSub}>Turn on GPS location or check back soon!</Text>
+                                <TouchableOpacity style={styles.emptyStateBtn} onPress={fetchData}>
+                                    <Feather name="refresh-cw" size={14} color="#ffffff" style={{ marginRight: 6 }} />
+                                    <Text style={styles.emptyStateBtnText}>Refresh Messes</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <View style={styles.nearbyListContainer}>
                                 {nearbyMesses.map((mess) => {
-                                    const [lng, lat] = mess.location?.coordinates || [0, 0];
+                                    const lng = mess.location?.coordinates?.[0] ?? 0;
+                                    const lat = mess.location?.coordinates?.[1] ?? 0;
+                                    const hasCoordinates = lat !== 0 || lng !== 0;
+
                                     return (
                                         <View key={mess._id} style={styles.nearbyMessCard}>
-                                            <View style={{ flex: 1, paddingRight: 8 }}>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                                    <Text style={styles.nearbyMessTitle}>{mess.messName}</Text>
-                                                    {mess.distanceKm !== undefined && (
-                                                        <View style={styles.distanceBadge}>
-                                                            <Text style={styles.distanceBadgeText}>📍 {mess.distanceKm} km away</Text>
-                                                        </View>
-                                                    )}
+                                            <View style={styles.nearbyMessCardTop}>
+                                                <View style={{ flex: 1, paddingRight: 8 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                                        <Text style={styles.nearbyMessTitle}>{mess.messName}</Text>
+                                                        {mess.isTopChef && (
+                                                            <View style={styles.topChefBadgeHeader}>
+                                                                <Text style={styles.topChefBadgeHeaderText}>👑 Top Chef</Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                    <Text style={styles.nearbyMessAddress} numberOfLines={2}>
+                                                        {mess.messAddress || 'Avasari Khurd, Campus Area'}
+                                                    </Text>
                                                 </View>
-                                                <Text style={styles.nearbyMessAddress} numberOfLines={1}>{mess.messAddress || 'Avasari Khurd'}</Text>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                                                    <Text style={styles.ratingText}>⭐ {mess.ratingCount > 0 ? Number(mess.rating).toFixed(1) : 'New'}</Text>
-                                                    <Text style={styles.ratingCountText}>({mess.ratingCount || 0} reviews)</Text>
+
+                                                {mess.distanceKm !== undefined ? (
+                                                    <View style={styles.distanceBadge}>
+                                                        <Text style={styles.distanceBadgeText}>📍 {mess.distanceKm} km</Text>
+                                                    </View>
+                                                ) : (
+                                                    <View style={[styles.distanceBadge, { backgroundColor: '#f1f5f9', borderColor: '#e2e8f0' }]}>
+                                                        <Text style={[styles.distanceBadgeText, { color: '#64748b' }]}>📍 Nearby</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+
+                                            <View style={styles.nearbyMessMetaRow}>
+                                                <View style={styles.nearbyMetaPill}>
+                                                    <Text style={styles.ratingText}>
+                                                        ⭐ {mess.ratingCount > 0 ? Number(mess.rating).toFixed(1) : 'New'}
+                                                    </Text>
+                                                    <Text style={styles.ratingCountText}>
+                                                        ({mess.ratingCount || 0} reviews)
+                                                    </Text>
+                                                </View>
+
+                                                <View style={[styles.nearbyMetaPill, { backgroundColor: '#ecfdf5' }]}>
+                                                    <Feather name="check-circle" size={12} color="#059669" />
+                                                    <Text style={[styles.ratingCountText, { color: '#065f46', fontWeight: '700' }]}>
+                                                        FSSAI: {mess.fssaiNumber || 'Verified'}
+                                                    </Text>
                                                 </View>
                                             </View>
-                                            {lat !== 0 && (
-                                                <TouchableOpacity
-                                                    style={styles.directionsBtn}
-                                                    onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`)}
-                                                >
-                                                    <Feather name="navigation" size={14} color="#ffffff" />
-                                                    <Text style={styles.directionsBtnText}>Go</Text>
-                                                </TouchableOpacity>
+
+                                            {mess.topTags && mess.topTags.length > 0 && (
+                                                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                                                    {mess.topTags.slice(0, 3).map((tag: string, idx: number) => (
+                                                        <View key={idx} style={styles.tagBadge}>
+                                                            <Text style={styles.tagBadgeText}>🏷️ {tag}</Text>
+                                                        </View>
+                                                    ))}
+                                                </View>
                                             )}
+
+                                            <TouchableOpacity
+                                                style={[styles.getDirectionsBtn, !hasCoordinates && styles.directionsBtnDisabled]}
+                                                onPress={() => {
+                                                    if (hasCoordinates) {
+                                                        const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+                                                        Linking.openURL(url);
+                                                    } else {
+                                                        Alert.alert("Notice", "Location coordinates not available for this mess.");
+                                                    }
+                                                }}
+                                                activeOpacity={0.8}
+                                            >
+                                                <Feather name="navigation" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                                                <Text style={styles.getDirectionsBtnText}>Get Directions 🗺️</Text>
+                                            </TouchableOpacity>
                                         </View>
                                     );
                                 })}
@@ -1745,80 +1899,177 @@ export default function StudentDashboard() {
 
                 <TouchableOpacity style={styles.bottomTabBtn} onPress={() => setActiveTab('map')}>
                     <Feather name="map-pin" size={20} color={activeTab === 'map' ? '#4f46e5' : '#94a3b8'} />
-                    <Text style={[styles.bottomTabText, activeTab === 'map' && styles.bottomTabTextActive]}>Map</Text>
+                    <Text style={[styles.bottomTabText, activeTab === 'map' && styles.bottomTabTextActive]}>Nearby</Text>
                 </TouchableOpacity>
             </View>
 
-            {/* UPI PAYMENT MODAL */}
-            <Modal visible={paymentModalVisible} transparent animationType="slide">
+            {/* STUDENT PROFILE MODAL */}
+            <Modal visible={profileModalVisible} transparent animationType="slide" onRequestClose={() => setProfileModalVisible(false)}>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalBox}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <Text style={styles.modalTitle}>Pay Mess Fee 💳</Text>
-                            <TouchableOpacity onPress={() => setPaymentModalVisible(false)}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={styles.profileAvatarIcon}>
+                                    <Feather name="user" size={18} color="#4f46e5" />
+                                </View>
+                                <Text style={styles.modalTitle}>My Student Profile</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setProfileModalVisible(false)}>
                                 <Feather name="x" size={24} color="#64748b" />
                             </TouchableOpacity>
                         </View>
 
-                        {selectedSubForPayment && (
-                            <View style={{ marginBottom: 16 }}>
-                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#0f172a' }}>
-                                    {selectedSubForPayment.messName}
-                                </Text>
-                                <Text style={{ fontSize: 14, color: '#64748b', marginTop: 4 }}>
-                                    Amount Due: <Text style={{ fontWeight: 'bold', color: '#10b981' }}>₹{selectedSubForPayment.monthlyFee}</Text>
-                                </Text>
-                                {selectedSubForPayment.messId?.upiId ? (
-                                    <Text style={{ fontSize: 13, color: '#6366f1', marginTop: 4 }}>
-                                        UPI ID: {selectedSubForPayment.messId.upiId}
+                        <View style={styles.profileDetailsCard}>
+                            <View style={styles.profileUserHeader}>
+                                <View style={styles.profileBigAvatar}>
+                                    <Text style={styles.profileAvatarInitials}>
+                                        {user?.name ? user.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : 'ST'}
                                     </Text>
-                                ) : (
-                                    <Text style={{ fontSize: 12, color: '#f59e0b', marginTop: 4 }}>
-                                        ⚠️ Mess owner has not set a custom UPI ID. Please confirm with the owner.
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                        <Text style={styles.profileFullName}>{user?.name || 'Student'}</Text>
+                                        {user?.isStudentVerified && (
+                                            <View style={styles.blueVerifiedBadge}>
+                                                <Feather name="check-circle" size={12} color="#2563eb" />
+                                                <Text style={styles.blueVerifiedText}>Verified</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                    <Text style={styles.profileRoleText}>Role: {user?.role ? user.role.toUpperCase() : 'STUDENT'}</Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.profileDivider} />
+
+                            <View style={styles.profileRowsContainer}>
+                                <View style={styles.profileRowItem}>
+                                    <Feather name="phone" size={15} color="#6366f1" />
+                                    <Text style={styles.profileRowLabel}>Phone Number:</Text>
+                                    <Text style={styles.profileRowValue}>{user?.phone || 'Not available'}</Text>
+                                </View>
+
+                                <View style={styles.profileRowItem}>
+                                    <Feather name="book" size={15} color="#6366f1" />
+                                    <Text style={styles.profileRowLabel}>Year & Branch:</Text>
+                                    <Text style={styles.profileRowValue}>{user?.yearBranch || 'Not specified'}</Text>
+                                </View>
+
+                                <View style={styles.profileRowItem}>
+                                    <Feather name="shield" size={15} color={user?.isStudentVerified ? '#2563eb' : '#f59e0b'} />
+                                    <Text style={styles.profileRowLabel}>Verification:</Text>
+                                    <Text style={[styles.profileRowValue, { color: user?.isStudentVerified ? '#2563eb' : '#d97706', fontWeight: '800' }]}>
+                                        {user?.isStudentVerified ? 'Blue Badge Verified ✓' : 'Unverified ID'}
                                     </Text>
-                                )}
+                                </View>
+                            </View>
 
-                                <TouchableOpacity
-                                    style={styles.upiAppBtn}
-                                    onPress={() => {
-                                        const upiId = selectedSubForPayment.messId?.upiId || 'messowner@upi';
-                                        const url = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(selectedSubForPayment.messName)}&am=${selectedSubForPayment.monthlyFee}&cu=INR&tn=${encodeURIComponent('Mess Fee - ' + (user?.name || 'Student'))}`;
-                                        Linking.openURL(url).catch(() => {
-                                            Alert.alert("Notice", "Could not open a UPI app. You can manually pay to " + upiId + " and submit the UTR below.");
-                                        });
-                                    }}
-                                >
-                                    <Feather name="external-link" size={16} color="#ffffff" />
-                                    <Text style={styles.upiAppBtnText}>Open UPI App (GPay / PhonePe / Paytm)</Text>
-                                </TouchableOpacity>
+                            {/* Logout button moved inside Profile Section */}
+                            <TouchableOpacity
+                                style={styles.profileLogoutBtn}
+                                onPress={() => {
+                                    setProfileModalVisible(false);
+                                    handleLogout();
+                                }}
+                                activeOpacity={0.8}
+                            >
+                                <Feather name="log-out" size={16} color="#ef4444" />
+                                <Text style={styles.profileLogoutBtnText}>Log Out of Account</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
-                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#334155', marginTop: 16, marginBottom: 6 }}>
-                                    Enter 12-digit UPI Ref / UTR Number:
-                                </Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="e.g. 324109849201"
-                                    placeholderTextColor="#94a3b8"
-                                    value={utrInput}
-                                    onChangeText={setUtrInput}
-                                    keyboardType="numeric"
-                                    maxLength={16}
-                                />
-
-                                <TouchableOpacity
-                                    style={styles.submitPaymentBtn}
-                                    onPress={handleSubmitUtr}
-                                    disabled={isSubmittingPayment}
-                                >
-                                    {isSubmittingPayment ? (
-                                        <ActivityIndicator color="#ffffff" size="small" />
-                                    ) : (
-                                        <Text style={styles.submitPaymentBtnText}>I Have Paid ✓</Text>
-                                    )}
+            {/* UPI PAYMENT & FALLBACK QR MODAL */}
+            <Modal visible={paymentModalVisible || fallbackQrModalVisible} transparent animationType="slide" onRequestClose={() => { setPaymentModalVisible(false); setFallbackQrModalVisible(false); }}>
+                <View style={styles.modalOverlay}>
+                    <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }} showsVerticalScrollIndicator={false}>
+                        <View style={styles.modalBox}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <Feather name="credit-card" size={20} color="#4f46e5" />
+                                    <Text style={styles.modalTitle}>Pay Mess Fee 💳</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => { setPaymentModalVisible(false); setFallbackQrModalVisible(false); }}>
+                                    <Feather name="x" size={24} color="#64748b" />
                                 </TouchableOpacity>
                             </View>
-                        )}
-                    </View>
+
+                            {selectedSubForPayment && (
+                                <View style={{ marginBottom: 16 }}>
+                                    <View style={styles.paymentSummaryCard}>
+                                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#0f172a' }}>
+                                            {selectedSubForPayment.messName}
+                                        </Text>
+                                        <Text style={{ fontSize: 14, color: '#64748b', marginTop: 4 }}>
+                                            Amount Due: <Text style={{ fontWeight: 'bold', color: '#10b981', fontSize: 16 }}>₹{selectedSubForPayment.monthlyFee}</Text>
+                                        </Text>
+                                        {(selectedSubForPayment.messId?.upiId || selectedSubForPayment.upiId) ? (
+                                            <Text style={{ fontSize: 13, color: '#6366f1', marginTop: 4, fontWeight: '600' }}>
+                                                UPI ID: {selectedSubForPayment.messId?.upiId || selectedSubForPayment.upiId}
+                                            </Text>
+                                        ) : (
+                                            <Text style={{ fontSize: 12, color: '#f59e0b', marginTop: 4 }}>
+                                                ⚠️ Mess owner has not configured a custom UPI ID.
+                                            </Text>
+                                        )}
+                                    </View>
+
+                                    {/* 1-Tap UPI Launch Button */}
+                                    <TouchableOpacity
+                                        style={styles.upiAppBtn}
+                                        onPress={() => handlePayViaUPI(selectedSubForPayment)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Feather name="zap" size={16} color="#ffffff" />
+                                        <Text style={styles.upiAppBtnText}>Pay via UPI App 💸 (GPay / PhonePe / Paytm)</Text>
+                                    </TouchableOpacity>
+
+                                    {/* Fallback QR Modal Display */}
+                                    {paymentQrString ? (
+                                        <View style={styles.paymentQrSection}>
+                                            <View style={styles.qrCodeWrapper}>
+                                                <QRCode value={paymentQrString} size={200} />
+                                            </View>
+                                            <Text style={styles.paymentQrHelperText}>
+                                                Scan this with any UPI app on another phone to pay ₹{selectedSubForPayment.monthlyFee}
+                                            </Text>
+                                        </View>
+                                    ) : null}
+
+                                    {/* UTR Submission Form */}
+                                    <View style={{ marginTop: 14 }}>
+                                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#334155', marginBottom: 6 }}>
+                                            Enter 12-digit UPI Ref / UTR Number:
+                                        </Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="e.g. 324109849201"
+                                            placeholderTextColor="#94a3b8"
+                                            value={utrInput}
+                                            onChangeText={setUtrInput}
+                                            keyboardType="numeric"
+                                            maxLength={16}
+                                        />
+
+                                        <TouchableOpacity
+                                            style={styles.submitPaymentBtn}
+                                            onPress={handleSubmitUtr}
+                                            disabled={isSubmittingPayment}
+                                            activeOpacity={0.8}
+                                        >
+                                            {isSubmittingPayment ? (
+                                                <ActivityIndicator color="#ffffff" size="small" />
+                                            ) : (
+                                                <Text style={styles.submitPaymentBtnText}>I Have Paid ✓ Submit UTR</Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+                    </ScrollView>
                 </View>
             </Modal>
 
@@ -2270,6 +2521,9 @@ const styles = StyleSheet.create({
     subBadgeRow: { flexDirection: 'row', gap: 8 },
     subBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
     subBadgeText: { fontSize: 12, fontWeight: 'bold', color: '#475569' },
+    subExpiryDateText: { fontSize: 12, fontWeight: '700', color: '#475569' },
+    subExpiryWarningBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#fde68a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginTop: 6 },
+    subExpiryWarningText: { fontSize: 12, fontWeight: '800', color: '#b45309' },
 
     emptyState: { alignItems: 'center', justifyContent: 'center', padding: 40, marginTop: 40 },
     emptyIconCircle: { backgroundColor: '#f1f5f9', padding: 24, borderRadius: 100, marginBottom: 16 },
@@ -2471,34 +2725,52 @@ const styles = StyleSheet.create({
     },
     nearbyMessCard: {
         backgroundColor: '#ffffff',
-        padding: 14,
-        borderRadius: 18,
-        marginBottom: 10,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        borderRadius: 20,
+        padding: 16,
+        marginBottom: 12,
         borderWidth: 1,
-        borderColor: '#f1f5f9',
+        borderColor: '#e2e8f0',
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.04,
-        shadowRadius: 3,
-        elevation: 1,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    nearbyMessCardTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: 10,
     },
     nearbyMessTitle: {
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: '800',
         color: '#0f172a',
     },
     nearbyMessAddress: {
         fontSize: 12,
         color: '#64748b',
-        marginTop: 2,
+        marginTop: 3,
+        lineHeight: 18,
+    },
+    nearbyMessMetaRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 10,
+        alignItems: 'center',
+    },
+    nearbyMetaPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#fef3c7',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
     },
     distanceBadge: {
         backgroundColor: '#ecfdf5',
-        paddingHorizontal: 7,
-        paddingVertical: 2,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
         borderRadius: 999,
         borderWidth: 1,
         borderColor: '#d1fae5',
@@ -2517,20 +2789,26 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#94a3b8',
     },
-    directionsBtn: {
+    getDirectionsBtn: {
         backgroundColor: '#4f46e5',
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 12,
-        marginLeft: 8,
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 14,
+        marginTop: 12,
+        shadowColor: '#4f46e5',
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 2,
     },
-    directionsBtnText: {
+    getDirectionsBtnText: {
         color: '#ffffff',
-        fontSize: 12,
-        fontWeight: '700',
+        fontSize: 14,
+        fontWeight: '800',
+    },
+    directionsBtnDisabled: {
+        opacity: 0.5,
     },
 
     // --- TOP CHEF & QUALITY TAGS STYLES ---
@@ -3088,5 +3366,213 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: '#c7d2fe',
+    },
+    profileHeaderBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#e0e7ff',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 14,
+    },
+    profileHeaderBtnText: {
+        color: '#4f46e5',
+        fontWeight: '800',
+        fontSize: 13,
+    },
+    profileAvatarIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#e0e7ff',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    profileDetailsCard: {
+        marginTop: 4,
+    },
+    profileUserHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        marginBottom: 12,
+    },
+    profileBigAvatar: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: '#4f46e5',
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#4f46e5',
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    profileAvatarInitials: {
+        color: '#ffffff',
+        fontSize: 20,
+        fontWeight: '900',
+    },
+    profileFullName: {
+        fontSize: 18,
+        fontWeight: '900',
+        color: '#0f172a',
+    },
+    blueVerifiedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#dbeafe',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 10,
+    },
+    blueVerifiedText: {
+        color: '#2563eb',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    profileRoleText: {
+        fontSize: 12,
+        color: '#64748b',
+        fontWeight: '700',
+        marginTop: 2,
+    },
+    profileDivider: {
+        height: 1,
+        backgroundColor: '#f1f5f9',
+        marginVertical: 12,
+    },
+    profileRowsContainer: {
+        gap: 10,
+        marginBottom: 18,
+    },
+    profileRowItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: '#f8fafc',
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    profileRowLabel: {
+        fontSize: 13,
+        color: '#64748b',
+        fontWeight: '600',
+    },
+    profileRowValue: {
+        fontSize: 13,
+        color: '#0f172a',
+        fontWeight: '700',
+        marginLeft: 'auto',
+    },
+    profileLogoutBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: '#ef4444',
+        paddingVertical: 14,
+        borderRadius: 14,
+        shadowColor: '#ef4444',
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    profileLogoutBtnText: {
+        color: '#ffffff',
+        fontSize: 14,
+        fontWeight: '800',
+    },
+    paymentSummaryCard: {
+        backgroundColor: '#f8fafc',
+        padding: 14,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        marginBottom: 14,
+    },
+    paymentQrSection: {
+        marginTop: 14,
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        padding: 16,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    qrCodeWrapper: {
+        padding: 16,
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        shadowColor: '#000',
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        elevation: 2,
+        marginBottom: 12,
+    },
+    paymentQrHelperText: {
+        fontSize: 12,
+        color: '#64748b',
+        textAlign: 'center',
+        fontWeight: '600',
+        paddingHorizontal: 10,
+    },
+    secondaryQrBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#eef2ff',
+        borderWidth: 1,
+        borderColor: '#c7d2fe',
+        paddingVertical: 10,
+        borderRadius: 12,
+        gap: 6,
+    },
+    secondaryQrBtnText: {
+        color: '#4f46e5',
+        fontWeight: '700',
+        fontSize: 13,
+    },
+    nearbySection: {
+        marginTop: 4,
+    },
+    nearbyHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 14,
+    },
+    nearbyRefreshBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 12,
+        backgroundColor: '#e0e7ff',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    nearbyListContainer: {
+        gap: 12,
+    },
+    emptyStateBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#4f46e5',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 12,
+        marginTop: 14,
+    },
+    emptyStateBtnText: {
+        color: '#ffffff',
+        fontSize: 13,
+        fontWeight: '700',
     },
 });
