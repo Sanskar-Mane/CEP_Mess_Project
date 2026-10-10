@@ -1,16 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChefHat, Users, CheckCircle2, XCircle, LogOut, Loader2, PlusCircle, TrendingUp, CalendarDays, LineChart, Calculator, MapPin, Navigation, IndianRupee, CalendarPlus, Edit3, Phone, Clock, Bell, QrCode, AlertCircle, X, Scale, Leaf, Settings2, Camera, Trophy, Sparkles, Upload, Trash2 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
-import ThemeToggle from '../components/ThemeToggle';
-import LanguageToggle from '../components/LanguageToggle';
+import {
+  Loader2,
+  QrCode,
+  Radio,
+  Bell,
+  Users,
+  IndianRupee,
+  Scale,
+  Settings2
+} from 'lucide-react';
 import { translations } from '../utils/translations';
 import { API_URL } from '../utils/config';
 import { getSocket } from '../utils/socket';
 
+// Modular Components
+import OwnerNavbar from '../components/owner/OwnerNavbar';
+import OwnerHome from '../components/owner/OwnerHome';
+import SectionPanel from '../components/owner/SectionPanel';
+import QrScannerPanel from '../components/owner/QrScannerPanel';
+import LiveStoriesPanel from '../components/owner/LiveStoriesPanel';
+import NotificationsPanel from '../components/owner/NotificationsPanel';
+import SubscribersPanel from '../components/owner/SubscribersPanel';
+import RationEstimatorPanel from '../components/owner/RationEstimatorPanel';
+import MessSettingsPanel from '../components/owner/MessSettingsPanel';
+import CutoffPopup from '../components/owner/CutoffPopup';
+
 const getLocalDateString = (offsetDays = 0) => {
-  const d = new Date(); d.setDate(d.getDate() + offsetDays);
-  return new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 };
 
 const OwnerDashboard = () => {
@@ -21,17 +40,20 @@ const OwnerDashboard = () => {
   const [user, setUser] = useState(location.state?.user || null);
   const [isAuthLoading, setIsAuthLoading] = useState(!user);
 
+  // Active Open Section (null = Home screen)
+  const [activeSection, setActiveSection] = useState(null);
+
   // Language State
   const [lang, setLang] = useState(() => localStorage.getItem('app_lang') || 'en');
-  const t = translations[lang];
+  const t = translations[lang] || translations.en;
 
-  // Publish Form State
+  // Menu State
   const [menuDate, setMenuDate] = useState(getLocalDateString(0));
-  const [menuShift, setMenuShift] = useState('morning');
-  const [menuItems, setMenuItems] = useState('');
-  const [price, setPrice] = useState('');
+  const [morningMenu, setMorningMenu] = useState(null);
+  const [nightMenu, setNightMenu] = useState(null);
+
+  // Menu Publishing State
   const [isPublishing, setIsPublishing] = useState(false);
-  const [isMenuExisting, setIsMenuExisting] = useState(false);
 
   // Analytics & Members State
   const [analyticsShift, setAnalyticsShift] = useState('morning');
@@ -43,7 +65,6 @@ const OwnerDashboard = () => {
   const [members, setMembers] = useState([]);
 
   // Kitchen Ration Estimator State
-  const [rationModalOpen, setRationModalOpen] = useState(false);
   const [customRationConfig, setCustomRationConfig] = useState({
     riceGrams: 120,
     flourGrams: 110,
@@ -53,8 +74,7 @@ const OwnerDashboard = () => {
   const [isSavingRation, setIsSavingRation] = useState(false);
   const [rationMsg, setRationMsg] = useState('');
 
-  // QR Meal Pass Verification Modal State
-  const [verifyModalOpen, setVerifyModalOpen] = useState(false);
+  // QR Meal Pass Verification State
   const [qrTokenInput, setQrTokenInput] = useState('');
   const [isVerifyingQr, setIsVerifyingQr] = useState(false);
   const [verifyResult, setVerifyResult] = useState(null);
@@ -67,24 +87,20 @@ const OwnerDashboard = () => {
   // Notifications State
   const [notifications, setNotifications] = useState([]);
   const [unreadNotifsCount, setUnreadNotifsCount] = useState(0);
-  const [notifDrawerOpen, setNotifDrawerOpen] = useState(false);
 
-  // Calculator State
-  const [estThalis, setEstThalis] = useState('');
 
   // Location State
   const [isSettingLocation, setIsSettingLocation] = useState(false);
   const [locationMsg, setLocationMsg] = useState('');
   const [savedLocation, setSavedLocation] = useState(null);
 
-  // Cut-off Timers State
+  // Cut-off Timers State (Set via popup right after saving menu)
   const [morningCutoff, setMorningCutoff] = useState(user?.morningCutoff || '09:30');
   const [nightCutoff, setNightCutoff] = useState(user?.nightCutoff || '17:30');
-  const [isSavingCutoff, setIsSavingCutoff] = useState(false);
-  const [cutoffMsg, setCutoffMsg] = useState('');
+  const [isCutoffPopupOpen, setIsCutoffPopupOpen] = useState(false);
+  const [cutoffPopupShift, setCutoffPopupShift] = useState('morning');
 
   // 24H Live Story State
-  const [storyModalOpen, setStoryModalOpen] = useState(false);
   const [storyImage, setStoryImage] = useState('');
   const [storyCaption, setStoryCaption] = useState('');
   const [isPostingStory, setIsPostingStory] = useState(false);
@@ -92,7 +108,7 @@ const OwnerDashboard = () => {
   const [myActiveStories, setMyActiveStories] = useState([]);
   const [isDeletingStory, setIsDeletingStory] = useState(null);
 
-  // Compress image via Canvas (max width 1080px, JPEG 0.75 quality)
+  // Canvas Image Compression (max width 1080px, JPEG 0.75 quality)
   const compressImage = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -115,7 +131,6 @@ const OwnerDashboard = () => {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Compress to JPEG with 0.75 quality
           const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
           resolve(compressedDataUrl);
         };
@@ -141,29 +156,34 @@ const OwnerDashboard = () => {
     }
   };
 
-  const fetchMyStories = async () => {
+  const fetchMyStories = useCallback(async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
     try {
       const res = await fetch(`${API_URL}/api/stories`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         const groups = await res.json();
-        const myGroup = groups.find(g =>
-          g.ownerId === user?._id ||
-          g.ownerId?._id === user?._id ||
-          String(g.ownerId) === String(user?._id)
+        const myGroup = groups.find(
+          (g) =>
+            g.ownerId === user?._id ||
+            g.ownerId?._id === user?._id ||
+            String(g.ownerId) === String(user?._id)
         );
         setMyActiveStories(myGroup ? myGroup.stories : []);
       }
     } catch (err) {
-      console.warn("Failed to fetch stories:", err);
+      console.warn('Failed to fetch stories:', err);
     }
-  };
+  }, [user?._id]);
 
   const handleDeleteStory = async (storyId) => {
-    if (!window.confirm("Are you sure you want to delete this live story? It will be removed immediately from Cloudinary and students' feeds.")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this live story? It will be removed immediately from Cloudinary and students' feeds."
+      )
+    ) {
       return;
     }
     setIsDeletingStory(storyId);
@@ -171,18 +191,16 @@ const OwnerDashboard = () => {
     try {
       const res = await fetch(`${API_URL}/api/stories/${storyId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
-        setMyActiveStories(prev => prev.filter(s => s._id !== storyId));
+        setMyActiveStories((prev) => prev.filter((s) => s._id !== storyId));
       } else {
         const d = await res.json();
-        alert(d.error || "Failed to delete story");
+        alert(d.error || 'Failed to delete story');
       }
-    } catch (err) {
-      alert("Network error deleting story");
+    } catch {
+      alert('Network error deleting story');
     } finally {
       setIsDeletingStory(null);
     }
@@ -191,7 +209,7 @@ const OwnerDashboard = () => {
   const handlePostStory = async (e) => {
     e.preventDefault();
     if (!storyImage) {
-      alert("Please select or upload a live photo for your story!");
+      alert('Please select or upload a live photo for your story!');
       return;
     }
     setIsPostingStory(true);
@@ -202,7 +220,7 @@ const OwnerDashboard = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
           imageUrl: storyImage,
@@ -211,37 +229,47 @@ const OwnerDashboard = () => {
       });
       const data = await res.json();
       if (res.ok) {
-        setStoryMsg("🎉 Live story published! It will appear on campus student feeds for 24 hours.");
+        setStoryMsg('🎉 Live story published! It will appear on campus student feeds for 24 hours.');
         fetchMyStories();
         setTimeout(() => {
-          setStoryModalOpen(false);
           setStoryImage('');
           setStoryCaption('');
           setStoryMsg('');
+          setActiveSection(null);
         }, 1800);
       } else {
-        alert(data.error || "Failed to post story");
+        alert(data.error || 'Failed to post story');
       }
-    } catch (err) {
-      alert("Network error posting story");
+    } catch {
+      alert('Network error posting story');
     } finally {
       setIsPostingStory(false);
     }
   };
 
-  const displayDate = new Date(menuDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  const displayDate = new Date(menuDate).toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric'
+  });
 
   // 1. Verify User Session (Refresh Fix)
   useEffect(() => {
     const verifyToken = async () => {
       const token = localStorage.getItem('token');
-      if (!token) { navigate('/'); return; }
+      if (!token) {
+        navigate('/');
+        return;
+      }
       try {
-        const res = await fetch(`${API_URL}/api/me`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch(`${API_URL}/api/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
         if (res.ok) {
           const data = await res.json();
-          if (data.role !== 'owner') navigate('/');
-          else {
+          if (data.role !== 'owner') {
+            navigate('/');
+          } else {
             setUser(data);
             if (data.upiId) setUpiId(data.upiId);
             if (data.morningCutoff) setMorningCutoff(data.morningCutoff);
@@ -258,8 +286,11 @@ const OwnerDashboard = () => {
           localStorage.removeItem('token');
           navigate('/');
         }
-      } catch (e) { console.error("Auth error", e); }
-      finally { setIsAuthLoading(false); }
+      } catch (e) {
+        console.error('Auth error', e);
+      } finally {
+        setIsAuthLoading(false);
+      }
     };
 
     if (!user) verifyToken();
@@ -272,68 +303,91 @@ const OwnerDashboard = () => {
     }
   }, [navigate, user]);
 
-  // 2. Fetch Menu whenever the date OR shift changes
-  useEffect(() => {
+  // 2. Fetch both Morning and Night menus for menuDate
+  const fetchDayMenus = useCallback(async () => {
     if (!user) return;
-    const fetchExistingMenu = async () => {
-      const token = localStorage.getItem('token');
-      try {
-        const response = await fetch(`${API_URL}/api/menus/${menuDate}`, { headers: { 'Authorization': `Bearer ${token}` } });
-        if (response.ok) {
-          const menus = await response.json();
-          const myMenu = menus.find(m => (m.ownerId._id === user._id || m.ownerId === user._id) && m.shift === menuShift);
-          if (myMenu) {
-            setMenuItems(myMenu.items.join(', '));
-            setPrice(myMenu.price.toString());
-            setIsMenuExisting(true);
-          } else {
-            setMenuItems('');
-            setPrice('');
-            setIsMenuExisting(false);
-          }
-        }
-      } catch (e) { console.error("Failed to fetch menus", e); }
-    };
-    fetchExistingMenu();
-  }, [menuDate, menuShift, user]);
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_URL}/api/menus/${menuDate}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const menus = await response.json();
+        const mMorning = menus.find(
+          (m) =>
+            (m.ownerId?._id === user._id || m.ownerId === user._id) &&
+            m.shift === 'morning'
+        );
+        const mNight = menus.find(
+          (m) =>
+            (m.ownerId?._id === user._id || m.ownerId === user._id) &&
+            m.shift === 'night'
+        );
+        setMorningMenu(mMorning || null);
+        setNightMenu(mNight || null);
+      }
+    } catch (e) {
+      console.error('Failed to fetch menus', e);
+    }
+  }, [menuDate, user]);
 
-  // 3. Fetch other stats based on date
+  useEffect(() => {
+    fetchDayMenus();
+  }, [fetchDayMenus]);
+
+  // 3. Fetch background stats, history, members, notifications, stories
   useEffect(() => {
     if (!user) return;
 
     const fetchStats = async () => {
       const token = localStorage.getItem('token');
       try {
-        const response = await fetch(`${API_URL}/api/attendance/stats/${encodeURIComponent(user.messName || 'Partner Mess')}/${menuDate}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const response = await fetch(
+          `${API_URL}/api/attendance/stats/${encodeURIComponent(user.messName || 'Partner Mess')}/${menuDate}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
         if (response.ok) {
           const data = await response.json();
           setStats(data);
           if (data.rationConfig) setCustomRationConfig(data.rationConfig);
         }
 
-        const notifRes = await fetch(`${API_URL}/api/notifications`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const notifRes = await fetch(`${API_URL}/api/notifications`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
         if (notifRes.ok) {
           const notifs = await notifRes.json();
           setNotifications(notifs);
-          setUnreadNotifsCount(notifs.filter(n => !n.isRead).length);
+          setUnreadNotifsCount(notifs.filter((n) => !n.isRead).length);
         }
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error(e);
+      }
     };
 
     const fetchHistory = async () => {
       const token = localStorage.getItem('token');
       try {
-        const response = await fetch(`${API_URL}/api/attendance/history/${encodeURIComponent(user.messName || 'Partner Mess')}`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const response = await fetch(
+          `${API_URL}/api/attendance/history/${encodeURIComponent(user.messName || 'Partner Mess')}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
         if (response.ok) setHistoryData(await response.json());
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error(e);
+      }
     };
 
     const fetchMembers = async () => {
       const token = localStorage.getItem('token');
       try {
-        const res = await fetch(`${API_URL}/api/subscriptions/mess`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch(`${API_URL}/api/subscriptions/mess`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
         if (res.ok) setMembers(await res.json());
-      } catch (e) { console.error("Failed to fetch members", e); }
+      } catch (e) {
+        console.error('Failed to fetch members', e);
+      }
     };
 
     fetchStats();
@@ -360,15 +414,17 @@ const OwnerDashboard = () => {
     const onNotificationNew = (data) => {
       if (!user) return;
       if (!data?.userIds || data.userIds.includes(user._id)) {
-        setUnreadNotifsCount(prev => prev + 1);
+        setUnreadNotifsCount((prev) => prev + 1);
         const token = localStorage.getItem('token');
         if (token) {
-          fetch(`${API_URL}/api/notifications`, { headers: { 'Authorization': `Bearer ${token}` } })
-            .then(r => r.ok ? r.json() : null)
-            .then(notifs => {
+          fetch(`${API_URL}/api/notifications`, {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((notifs) => {
               if (notifs) {
                 setNotifications(notifs);
-                setUnreadNotifsCount(notifs.filter(n => !n.isRead).length);
+                setUnreadNotifsCount(notifs.filter((n) => !n.isRead).length);
               }
             });
         }
@@ -393,18 +449,20 @@ const OwnerDashboard = () => {
       socket.off('story:new', onStoryEvent);
       socket.off('story:deleted', onStoryEvent);
     };
-  }, [menuDate, user]);
+  }, [menuDate, user, fetchMyStories]);
 
   const handleOpenNotifications = async () => {
-    setNotifDrawerOpen(true);
+    setActiveSection('notifications');
     setUnreadNotifsCount(0);
     const token = localStorage.getItem('token');
     try {
       await fetch(`${API_URL}/api/notifications/read-all`, {
         method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
-    } catch (e) {}
+    } catch {
+      // ignore
+    }
   };
 
   const handleSaveUpi = async (e) => {
@@ -416,13 +474,16 @@ const OwnerDashboard = () => {
     try {
       const res = await fetch(`${API_URL}/api/owner/upi`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
         body: JSON.stringify({ upiId: upiId.trim() })
       });
       const data = await res.json();
       if (res.ok) {
         setUpiMsg('✅ UPI ID saved successfully!');
-        setUser(prev => ({ ...prev, upiId: upiId.trim() }));
+        setUser((prev) => ({ ...prev, upiId: upiId.trim() }));
       } else {
         setUpiMsg(`❌ ${data.error || 'Failed to save UPI ID'}`);
       }
@@ -441,13 +502,16 @@ const OwnerDashboard = () => {
     try {
       const res = await fetch(`${API_URL}/api/owner/ration-config`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
         body: JSON.stringify(customRationConfig)
       });
       const data = await res.json();
       if (res.ok) {
         setRationMsg('✅ Ration norms updated successfully!');
-        setUser(prev => ({ ...prev, rationConfig: customRationConfig }));
+        setUser((prev) => ({ ...prev, rationConfig: customRationConfig }));
         forceStatsRefresh();
       } else {
         setRationMsg(`❌ ${data.error || 'Failed to update norms'}`);
@@ -468,7 +532,10 @@ const OwnerDashboard = () => {
     try {
       const res = await fetch(`${API_URL}/api/attendance/verify-qr`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
         body: JSON.stringify({ qrToken: qrTokenInput.trim() })
       });
       const data = await res.json();
@@ -496,42 +563,35 @@ const OwnerDashboard = () => {
     }
   };
 
-  const handleSaveCutoff = async (e) => {
-    e.preventDefault();
-    setIsSavingCutoff(true);
-    setCutoffMsg('');
+  const handleConfirmCutoff = async ({ morningCutoff: newMorning, nightCutoff: newNight }) => {
     const token = localStorage.getItem('token');
-    try {
-      const res = await fetch(`${API_URL}/api/owner/cutoff`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ morningCutoff, nightCutoff })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setCutoffMsg('✅ Attendance cut-offs updated successfully!');
-        setUser(prev => ({ ...prev, morningCutoff, nightCutoff }));
-      } else {
-        setCutoffMsg(`❌ ${data.error || 'Failed to update cut-offs'}`);
-      }
-    } catch {
-      setCutoffMsg('❌ Network error saving cut-offs');
-    } finally {
-      setIsSavingCutoff(false);
+    const res = await fetch(`${API_URL}/api/owner/cutoff`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ morningCutoff: newMorning, nightCutoff: newNight })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to update cut-off times.');
     }
+    setMorningCutoff(newMorning);
+    setNightCutoff(newNight);
+    setUser((prev) => ({ ...prev, morningCutoff: newMorning, nightCutoff: newNight }));
   };
 
-  // --- RENDER GUARDS ---
-  if (isAuthLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-900"><Loader2 className="animate-spin text-orange-500" size={48} /></div>;
-  if (!user || user.role !== 'owner') return <div className="min-h-screen flex flex-col gap-4 items-center justify-center bg-slate-900"><p className="text-white">Session Expired</p><button onClick={() => navigate('/')} className="text-orange-400 font-bold underline">Return to Login</button></div>;
-
-  // --- HELPER FUNCTIONS ---
   const forceMembersRefresh = async () => {
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`${API_URL}/api/subscriptions/mess`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const res = await fetch(`${API_URL}/api/subscriptions/mess`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       if (res.ok) setMembers(await res.json());
-    } catch (e) { console.error("Failed to fetch members", e); }
+    } catch (e) {
+      console.error('Failed to fetch members', e);
+    }
   };
 
   const updateSubscription = async (subId, payload) => {
@@ -539,73 +599,88 @@ const OwnerDashboard = () => {
     try {
       const res = await fetch(`${API_URL}/api/subscriptions/${subId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
         body: JSON.stringify(payload)
       });
       if (res.ok) forceMembersRefresh();
-    } catch (e) { console.error("Failed to update subscription", e); }
+    } catch (e) {
+      console.error('Failed to update subscription', e);
+    }
   };
 
   const togglePaymentStatus = (subId, currentStatus) => {
-    if (currentStatus === 'paid') return; // Do nothing if it's already paid!
+    if (currentStatus === 'paid') return;
     updateSubscription(subId, { status: 'paid' });
   };
 
   const handleSetFee = (subId, currentFee) => {
-    const fee = window.prompt("Enter the custom monthly fee (₹) for this student:", currentFee || 0);
+    const fee = window.prompt('Enter the custom monthly fee (₹) for this student:', currentFee || 0);
     if (fee !== null && !isNaN(fee)) updateSubscription(subId, { monthlyFee: Number(fee) });
   };
 
   const handleExtendDays = (subId) => {
-    const days = window.prompt("How many days should be added to extend this membership?");
+    const days = window.prompt('How many days should be added to extend this membership?');
     if (days !== null && !isNaN(days)) updateSubscription(subId, { extendDays: Number(days) });
   };
 
   const handleEditSkips = (subId, currentSkips) => {
-    const skips = window.prompt("Set the MAXIMUM number of skips allowed for this student:", currentSkips || 5);
+    const skips = window.prompt('Set the MAXIMUM number of skips allowed for this student:', currentSkips || 5);
     if (skips !== null && !isNaN(skips)) updateSubscription(subId, { allowedSkips: Number(skips) });
   };
 
   const forceStatsRefresh = async () => {
     const token = localStorage.getItem('token');
     try {
-      const statsRes = await fetch(`${API_URL}/api/attendance/stats/${encodeURIComponent(user.messName || 'Partner Mess')}/${menuDate}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const statsRes = await fetch(
+        `${API_URL}/api/attendance/stats/${encodeURIComponent(user.messName || 'Partner Mess')}/${menuDate}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       if (statsRes.ok) setStats(await statsRes.json());
-      const histRes = await fetch(`${API_URL}/api/attendance/history/${encodeURIComponent(user.messName || 'Partner Mess')}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const histRes = await fetch(
+        `${API_URL}/api/attendance/history/${encodeURIComponent(user.messName || 'Partner Mess')}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       if (histRes.ok) setHistoryData(await histRes.json());
       forceMembersRefresh();
-    } catch (e) { console.error(e); }
-  }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
-  const handlePublishMenu = async (e) => {
-    e.preventDefault();
+  const handleSaveMenuDirect = async ({ date, shift, items, price }) => {
     setIsPublishing(true);
     const token = localStorage.getItem('token');
-
     try {
-      const itemsArray = menuItems.split(',').map(item => item.trim()).filter(Boolean);
       const response = await fetch(`${API_URL}/api/menus`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
         body: JSON.stringify({
-          messName: user.messName || `${user.name || 'Owner'}'s Mess`,
-          date: menuDate,
-          shift: menuShift,
-          items: itemsArray,
+          messName: user?.messName || `${user?.name || 'Owner'}'s Mess`,
+          date,
+          shift,
+          items,
           price: Number(price)
         })
       });
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Server rejected the menu`);
+        throw new Error(errData.error || 'Server rejected the menu');
       }
 
-      const data = await response.json();
-      alert(data.message || `Menu saved successfully for ${displayDate.split(',')[0]} (${menuShift})!`);
-      setIsMenuExisting(true); // Automatically switch to Edit Mode now
-    } catch (error) {
-      alert(`Failed to save menu: ${error.message}`);
+      await fetchDayMenus();
+
+      // Automatically open the Cut-off popup for the meal just saved
+      setCutoffPopupShift(shift || 'morning');
+      setIsCutoffPopupOpen(true);
+
+      return true;
     } finally {
       setIsPublishing(false);
     }
@@ -616,903 +691,251 @@ const OwnerDashboard = () => {
     navigate('/');
   };
 
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-slate-900 dark:bg-slate-800 text-white p-3 rounded-xl shadow-xl border border-slate-700 text-xs font-bold">
-          <p className="mb-2 text-slate-400 border-b border-slate-700 pb-1">{label}</p>
-          <p className="text-emerald-400">{t.coming}: {payload[0].value}</p>
-          <p className="text-rose-400">{t.skip}: {payload[1].value}</p>
-        </div>
-      );
-    }
-    return null;
-  };
+  // --- RENDER GUARDS ---
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+        <Loader2 className="animate-spin text-orange-500" size={48} />
+      </div>
+    );
+  }
 
-  const currentStats = stats[analyticsShift] || { coming: 0, notComing: 0, consumed: 0 };
+  if (!user || user.role !== 'owner') {
+    return (
+      <div className="min-h-screen flex flex-col gap-4 items-center justify-center bg-slate-900">
+        <p className="text-white font-semibold text-lg">Session Expired</p>
+        <button
+          onClick={() => navigate('/')}
+          className="text-orange-400 font-medium text-base underline cursor-pointer h-11 min-h-[44px] px-4 flex items-center"
+        >
+          Return to Login
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen font-sans bg-slate-50 dark:bg-slate-950 transition-colors duration-500 pb-12 selection:bg-orange-500 selection:text-white">
+      {/* 1. TOP NAVBAR WITH 3 QUICK-ACCESS ICONS */}
+      <OwnerNavbar
+        user={user}
+        t={t}
+        lang={lang}
+        setLang={setLang}
+        unreadNotifsCount={unreadNotifsCount}
+        myActiveStoriesCount={myActiveStories.length}
+        notifications={notifications}
+        onOpenNotifications={handleOpenNotifications}
+        onOpenQr={() => {
+          setVerifyResult(null);
+          setActiveSection('qr');
+        }}
+        onOpenStories={() => {
+          setStoryMsg('');
+          setActiveSection('stories');
+        }}
+        onLogout={handleLogout}
+      />
 
-      <nav className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 transition-colors duration-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-orange-500 to-rose-500 p-2 rounded-lg text-white shadow-md">
-              <ChefHat size={20} />
-            </div>
-            <h1 className="font-black text-slate-900 dark:text-white text-lg tracking-tight hidden sm:block">{user.messName || 'Partner Mess'} <span className="text-orange-500">{t.partner}</span></h1>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => { setStoryModalOpen(true); setStoryMsg(''); }}
-              className="flex items-center gap-2 text-xs sm:text-sm font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-100 dark:hover:bg-orange-500/20 px-3 py-2 rounded-xl transition-all border border-orange-200 dark:border-orange-500/20 shadow-sm"
-              title="Post 24-Hour Live Food Story"
-            >
-              <Camera size={16} /> <span className="hidden md:inline">Post Live Story 📸</span>
-              {myActiveStories.length > 0 && (
-                <span className="bg-orange-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
-                  {myActiveStories.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => { setVerifyModalOpen(true); setVerifyResult(null); }}
-              className="flex items-center gap-2 text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 px-3 py-2 rounded-xl transition-all border border-emerald-200 dark:border-emerald-500/20"
-            >
-              <QrCode size={16} /> <span className="hidden md:inline">Verify Meal Pass</span>
-            </button>
-            <button
-              onClick={handleOpenNotifications}
-              className="relative p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-orange-500 transition-colors"
-              title="Notifications"
-            >
-              <Bell size={18} />
-              {unreadNotifsCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center animate-pulse">
-                  {unreadNotifsCount > 9 ? '9+' : unreadNotifsCount}
-                </span>
-              )}
-            </button>
-            <LanguageToggle lang={lang} setLang={setLang} />
-            <ThemeToggle />
-            <button onClick={handleLogout} className="flex items-center gap-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-500/10 px-4 py-2 rounded-xl transition-all">
-              <LogOut size={16} /> <span className="hidden sm:inline">{t.logout}</span>
-            </button>
-          </div>
-        </div>
-      </nav>
+      {/* 2. MAIN CONTAINER */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
+        {/* HOME VIEW: MENU HERO CARD + 4 SECTION TILES + COMBINED HEADCOUNT & REVIEWS */}
+        <OwnerHome
+          user={user}
+          t={t}
+          menuDate={menuDate}
+          setMenuDate={setMenuDate}
+          getLocalDateString={getLocalDateString}
+          displayDate={displayDate}
+          morningMenu={morningMenu}
+          nightMenu={nightMenu}
+          analyticsShift={analyticsShift}
+          setAnalyticsShift={setAnalyticsShift}
+          stats={stats}
+          forceStatsRefresh={forceStatsRefresh}
+          historyData={historyData}
+          members={members}
+          morningCutoff={morningCutoff}
+          nightCutoff={nightCutoff}
+          savedLocation={savedLocation}
+          onSaveMenu={handleSaveMenuDirect}
+          isPublishing={isPublishing}
+          onOpenSection={(section) => setActiveSection(section)}
+        />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-8">
+        {/* SECTION PANELS (Modal on Desktop, Bottom Sheet on Mobile) */}
+        {/* A. QR Scanner Panel (from Navbar Quick-Action) */}
+        <SectionPanel
+          isOpen={activeSection === 'qr'}
+          onClose={() => setActiveSection(null)}
+          title={t.qrScannerTile || 'Verify Student Meal Pass'}
+          subtitle="Counter QR Verification"
+          icon={QrCode}
+          color="emerald"
+          maxWidth="max-w-lg"
+        >
+          <QrScannerPanel
+            qrTokenInput={qrTokenInput}
+            setQrTokenInput={setQrTokenInput}
+            isVerifyingQr={isVerifyingQr}
+            verifyResult={verifyResult}
+            handleVerifyQr={handleVerifyQr}
+          />
+        </SectionPanel>
 
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-          <div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                {t.dashboardOverview}
-                <span className="relative flex h-2 w-2 mb-4">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
-                </span>
-              </h2>
-              {user?.isTopChef && (
-                <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-100 via-yellow-200 to-amber-300 text-amber-950 px-3 py-1 rounded-full border border-amber-400 shadow-md">
-                  <Trophy size={14} className="text-amber-700" />
-                  <span className="text-xs font-black uppercase tracking-wider">👑 Campus Top Chef</span>
-                  {user.topTags && user.topTags.length > 0 && (
-                    <span className="text-[10px] font-bold text-amber-800 hidden sm:inline">
-                      ({user.topTags.join(' • ')})
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2 mt-3 bg-white dark:bg-slate-800 p-1 w-fit rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-              <button onClick={() => setMenuDate(getLocalDateString(0))} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${menuDate === getLocalDateString(0) ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>{t.todaysData}</button>
-              <button onClick={() => setMenuDate(getLocalDateString(1))} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${menuDate === getLocalDateString(1) ? 'bg-orange-500 text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>{t.tomorrowsPreBookings}</button>
-            </div>
+        {/* C. Live Stories Panel (from Navbar Quick-Action) */}
+        <SectionPanel
+          isOpen={activeSection === 'stories'}
+          onClose={() => setActiveSection(null)}
+          title={t.liveStoriesTile || '24H Live Campus Stories'}
+          subtitle="Kitchen & Food Live Announcements"
+          icon={Radio}
+          color="rose"
+          maxWidth="max-w-lg"
+        >
+          <LiveStoriesPanel
+            storyImage={storyImage}
+            setStoryImage={setStoryImage}
+            storyCaption={storyCaption}
+            setStoryCaption={setStoryCaption}
+            isPostingStory={isPostingStory}
+            storyMsg={storyMsg}
+            myActiveStories={myActiveStories}
+            isDeletingStory={isDeletingStory}
+            handleImageUpload={handleImageUpload}
+            handlePostStory={handlePostStory}
+            handleDeleteStory={handleDeleteStory}
+          />
+        </SectionPanel>
 
-            <div className="flex items-center gap-2 mt-3 bg-slate-100 dark:bg-slate-900 p-1 w-fit rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-              <button onClick={() => setAnalyticsShift('morning')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${analyticsShift === 'morning' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>☀️ Morning Shift</button>
-              <button onClick={() => setAnalyticsShift('night')} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${analyticsShift === 'night' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>🌙 Night Shift</button>
-            </div>
+        {/* D. Notifications Panel (from Navbar Quick-Action) */}
+        <SectionPanel
+          isOpen={activeSection === 'notifications'}
+          onClose={() => setActiveSection(null)}
+          title={t.notificationsTile || 'Notifications'}
+          subtitle="Mess Alerts & Student Activities"
+          icon={Bell}
+          color="amber"
+          maxWidth="max-w-lg"
+        >
+          <NotificationsPanel notifications={notifications} />
+        </SectionPanel>
 
-          </div>
-          <button onClick={() => forceStatsRefresh()} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm text-sm flex items-center gap-2"><LineChart size={16} /> {t.refreshMetrics}</button>
-        </div>
+        {/* E. Subscribers Directory Panel (from Grid Tile) */}
+        <SectionPanel
+          isOpen={activeSection === 'subscribers'}
+          onClose={() => setActiveSection(null)}
+          title={t.subscribersTile || 'Monthly Members Directory'}
+          subtitle={`Total Registered: ${members.length}`}
+          icon={Users}
+          color="violet"
+          maxWidth="max-w-5xl"
+        >
+          <SubscribersPanel
+            members={members}
+            handleExtendDays={handleExtendDays}
+            handleEditSkips={handleEditSkips}
+            handleSetFee={handleSetFee}
+            updateSubscription={updateSubscription}
+            togglePaymentStatus={togglePaymentStatus}
+          />
+        </SectionPanel>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-emerald-500 to-teal-500 rounded-[2rem] p-6 shadow-xl shadow-emerald-500/20 text-white relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-6 opacity-20 transition-transform group-hover:scale-110"><CheckCircle2 size={80} /></div>
-            <p className="text-sm font-bold text-emerald-50 mb-1">{t.confirmedComing} ({analyticsShift})</p>
-            <h3 className="text-4xl font-black">{currentStats.coming}</h3>
-            <div className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-emerald-900 bg-emerald-400/40 px-2.5 py-1 rounded-md backdrop-blur-sm">{t.prepareExactly} {currentStats.coming} {t.thali}</div>
-          </div>
+        {/* F. UPI & Payments Panel (from Grid Tile) */}
+        <SectionPanel
+          isOpen={activeSection === 'upi'}
+          onClose={() => setActiveSection(null)}
+          title={t.upiPaymentsTile || 'Payments & UPI Verification'}
+          subtitle={t.upiPaymentsDesc || 'Manage QR ID & Verify Pending UTRs'}
+          icon={IndianRupee}
+          color="emerald"
+          maxWidth="max-w-2xl"
+        >
+          <MessSettingsPanel
+            t={t}
+            mode="upi"
+            morningCutoff={morningCutoff}
+            nightCutoff={nightCutoff}
+            upiId={upiId}
+            setUpiId={setUpiId}
+            isSavingUpi={isSavingUpi}
+            upiMsg={upiMsg}
+            handleSaveUpi={handleSaveUpi}
+            members={members}
+            updateSubscription={updateSubscription}
+            savedLocation={savedLocation}
+            setSavedLocation={setSavedLocation}
+            isSettingLocation={isSettingLocation}
+            setIsSettingLocation={setIsSettingLocation}
+            locationMsg={locationMsg}
+            setLocationMsg={setLocationMsg}
+          />
+        </SectionPanel>
 
-          <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] p-6 shadow-xl shadow-indigo-500/20 text-white relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-6 opacity-20 transition-transform group-hover:scale-110"><QrCode size={80} /></div>
-            <p className="text-sm font-bold text-indigo-100 mb-1">Served / Consumed ({analyticsShift})</p>
-            <h3 className="text-4xl font-black">{currentStats.consumed || 0}</h3>
-            <div className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-indigo-900 bg-indigo-200/50 px-2.5 py-1 rounded-md backdrop-blur-sm">
-              {currentStats.coming > 0 ? `${Math.round(((currentStats.consumed || 0) / currentStats.coming) * 100)}% Claimed` : 'Verified at Counter'}
-            </div>
-          </div>
+        {/* G. Ration Norms Panel (from Grid Tile) */}
+        <SectionPanel
+          isOpen={activeSection === 'ration'}
+          onClose={() => setActiveSection(null)}
+          title={t.rationEstimatorTile || 'Kitchen Ration Estimator'}
+          subtitle={`Raw ingredients calculator & custom norms (${analyticsShift})`}
+          icon={Scale}
+          color="amber"
+          maxWidth="max-w-3xl"
+        >
+          <RationEstimatorPanel
+            analyticsShift={analyticsShift}
+            setAnalyticsShift={setAnalyticsShift}
+            currentStats={stats[analyticsShift] || { coming: 0, notComing: 0, consumed: 0 }}
+            customRationConfig={customRationConfig}
+            setCustomRationConfig={setCustomRationConfig}
+            isSavingRation={isSavingRation}
+            rationMsg={rationMsg}
+            handleSaveRationConfig={handleSaveRationConfig}
+          />
+        </SectionPanel>
 
-          <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 border border-slate-100 dark:border-slate-700 relative overflow-hidden transition-colors">
-            <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">{t.skippedAttendance} ({analyticsShift})</p>
-            <h3 className="text-4xl font-black text-rose-500">{currentStats.notComing}</h3>
-            <div className="mt-4 inline-flex text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-md">{t.savedRawMaterials}</div>
-          </div>
+        {/* H. Mess Settings Panel (Location & GPS - from Grid Tile) */}
+        <SectionPanel
+          isOpen={activeSection === 'mess_settings'}
+          onClose={() => setActiveSection(null)}
+          title={t.messSettingsTile || 'Mess Settings'}
+          subtitle={t.messSettingsDesc || 'Location, GPS & mess operations'}
+          icon={Settings2}
+          color="orange"
+          maxWidth="max-w-2xl"
+        >
+          <MessSettingsPanel
+            t={t}
+            mode="mess_settings"
+            morningCutoff={morningCutoff}
+            nightCutoff={nightCutoff}
+            upiId={upiId}
+            setUpiId={setUpiId}
+            isSavingUpi={isSavingUpi}
+            upiMsg={upiMsg}
+            handleSaveUpi={handleSaveUpi}
+            members={members}
+            updateSubscription={updateSubscription}
+            savedLocation={savedLocation}
+            setSavedLocation={setSavedLocation}
+            isSettingLocation={isSettingLocation}
+            setIsSettingLocation={setIsSettingLocation}
+            locationMsg={locationMsg}
+            setLocationMsg={setLocationMsg}
+          />
+        </SectionPanel>
 
-          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-[2rem] p-6 border border-amber-200 dark:border-amber-700/50 relative">
-            <div className="flex items-center gap-2 mb-3 text-amber-900 dark:text-amber-500 font-black"><Calculator size={20} /> {t.quickWasteOptimizer}</div>
-            <label className="text-xs font-bold text-amber-700 dark:text-amber-600 block mb-1">{t.howManyPrepared}</label>
-            <input
-              type="number"
-              min="0"
-              value={estThalis}
-              onChange={e => {
-                const val = e.target.value;
-                if (val === '' || Number(val) >= 0) {
-                  setEstThalis(val);
-                }
-              }}
-              placeholder={`e.g. ${currentStats.coming + 15}`}
-              className="w-full bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700/50 p-2 rounded-xl text-sm font-bold focus:outline-none mb-3 dark:text-white"
-            />
-            {estThalis !== '' && Number(estThalis) >= 0 && Number(estThalis) > currentStats.coming ? (
-              <div className="text-sm font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-800 p-2 rounded-lg border border-rose-100 dark:border-rose-900/50">
-                ⚠️ {t.overproducedBy} {Number(estThalis) - currentStats.coming} {t.thali}.
-              </div>
-            ) : estThalis !== '' && Number(estThalis) >= 0 && Number(estThalis) < currentStats.coming ? (
-              <div className="text-sm font-bold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-800 p-2 rounded-lg">
-                🚨 {t.shortfallOf} {currentStats.coming - Number(estThalis)} {t.cookMore}
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        {/* TASK 1: SMART KITCHEN RATION & FOOD WASTE ESTIMATOR */}
-        <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-2xl">
-                <Scale size={24} />
-              </div>
-              <div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white">Smart Kitchen Ration Estimator ⚖️</h3>
-                <p className="text-xs text-slate-400 font-bold">
-                  Translates your live {analyticsShift} headcount ({currentStats.coming} students) into exact raw cooking ingredients
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => { setRationModalOpen(true); setRationMsg(''); }}
-              className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 px-4 py-2.5 rounded-xl transition-all w-fit active:scale-95"
-            >
-              <Settings2 size={15} /> Customize Per-Plate Norms
-            </button>
-          </div>
-
-          {/* 4 Ingredient Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="p-4 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
-              <span className="text-2xl">🍚</span>
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-2">Rice Required</p>
-              <h4 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-                {currentStats.estimates?.requiredKg?.rice !== undefined ? currentStats.estimates.requiredKg.rice : ((currentStats.coming * (customRationConfig.riceGrams || 120)) / 1000).toFixed(2)} <span className="text-sm font-bold text-slate-400">kg</span>
-              </h4>
-              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 rounded-md mt-2 inline-block">
-                {customRationConfig.riceGrams || 120}g / student
-              </span>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-orange-50/60 dark:bg-orange-950/20 border border-orange-200/60 dark:border-orange-800/40">
-              <span className="text-2xl">🌾</span>
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-2">Flour / Atta</p>
-              <h4 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-                {currentStats.estimates?.requiredKg?.flour !== undefined ? currentStats.estimates.requiredKg.flour : ((currentStats.coming * (customRationConfig.flourGrams || 110)) / 1000).toFixed(2)} <span className="text-sm font-bold text-slate-400">kg</span>
-              </h4>
-              <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40 px-2 py-0.5 rounded-md mt-2 inline-block">
-                {customRationConfig.flourGrams || 110}g / student
-              </span>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-yellow-50/60 dark:bg-yellow-950/20 border border-yellow-200/60 dark:border-yellow-800/40">
-              <span className="text-2xl">🥣</span>
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-2">Dal & Lentils</p>
-              <h4 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-                {currentStats.estimates?.requiredKg?.dal !== undefined ? currentStats.estimates.requiredKg.dal : ((currentStats.coming * (customRationConfig.dalGrams || 45)) / 1000).toFixed(2)} <span className="text-sm font-bold text-slate-400">kg</span>
-              </h4>
-              <span className="text-[10px] font-bold text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/40 px-2 py-0.5 rounded-md mt-2 inline-block">
-                {customRationConfig.dalGrams || 45}g / student
-              </span>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40">
-              <span className="text-2xl">🥕</span>
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mt-2">Fresh Veggies</p>
-              <h4 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-                {currentStats.estimates?.requiredKg?.veggies !== undefined ? currentStats.estimates.requiredKg.veggies : ((currentStats.coming * (customRationConfig.veggieGrams || 150)) / 1000).toFixed(2)} <span className="text-sm font-bold text-slate-400">kg</span>
-              </h4>
-              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-md mt-2 inline-block">
-                {customRationConfig.veggieGrams || 150}g / student
-              </span>
-            </div>
-          </div>
-
-          {/* Food Waste Prevented Banner */}
-          <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-emerald-500 text-white rounded-xl shadow-md">
-                <Leaf size={20} />
-              </div>
-              <div>
-                <h4 className="font-black text-emerald-900 dark:text-emerald-300 text-sm">🌱 Food Waste Prevented</h4>
-                <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mt-0.5">
-                  Thanks to <strong>{currentStats.notComing}</strong> students skipping in advance for this {analyticsShift} shift, you saved raw ingredients!
-                </p>
-              </div>
-            </div>
-            <div className="text-right sm:border-l sm:border-emerald-200 dark:sm:border-emerald-800 sm:pl-6 shrink-0">
-              <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                {currentStats.estimates?.foodSavedKg !== undefined ? currentStats.estimates.foodSavedKg : '0.00'} kg
-              </span>
-              <span className="block text-[10px] font-bold uppercase text-emerald-600/80 dark:text-emerald-400/80">Saved from bin</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white mb-8"><TrendingUp className="text-orange-500" /> {t.historicalTrends} (Combined)</h2>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={historyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
-                  <XAxis dataKey="date" tickFormatter={(tick) => tick.substring(5)} stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} dy={10} />
-                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} dx={-10} />
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} />
-                  <Bar dataKey="coming" name="Coming" fill="#10b981" radius={[6, 6, 0, 0]} barSize={24}>
-                    {historyData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === historyData.length - 1 ? '#10b981' : '#34d399'} />
-                    ))}
-                  </Bar>
-                  <Bar dataKey="notComing" name="Skipped" radius={[6, 6, 0, 0]} barSize={24}>
-                    {historyData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === historyData.length - 1 ? '#f43f5e' : '#fb7185'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="lg:col-span-1 bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors flex flex-col h-full">
-            <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-slate-900 dark:text-white"><PlusCircle className="text-orange-500" /> {t.menuSetup}: {displayDate.split(',')[0]}</h2>
-
-            <form onSubmit={handlePublishMenu} className="space-y-4 flex-grow flex flex-col justify-between">
-              <div className="space-y-4">
-
-                <div className="flex gap-2 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
-                  <button type="button" onClick={() => setMenuShift('morning')} className={`flex-1 py-2 text-xs rounded-lg font-bold transition-all ${menuShift === 'morning' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>☀️ Morning</button>
-                  <button type="button" onClick={() => setMenuShift('night')} className={`flex-1 py-2 text-xs rounded-lg font-bold transition-all ${menuShift === 'night' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>🌙 Night</button>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.menuItems}</label>
-                  <textarea required rows="4" className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-4 focus:ring-orange-500/10 outline-none resize-none" placeholder={t.menuPlaceholder} value={menuItems} onChange={(e) => setMenuItems(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t.thaliPrice}</label>
-                  <input type="number" required min="0" className="w-full px-4 py-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-4 font-bold outline-none" placeholder="60" value={price} onChange={(e) => setPrice(e.target.value)} />
-                </div>
-              </div>
-              <button disabled={isPublishing} type="submit" className="mt-6 w-full bg-slate-900 hover:bg-slate-800 dark:bg-orange-500 dark:hover:bg-orange-600 text-white font-bold py-4 rounded-2xl transition-all shadow-lg active:scale-95 flex justify-center gap-2">
-                {isPublishing ? <Loader2 className="animate-spin" size={20} /> : `${isMenuExisting ? 'Update' : 'Publish'} ${menuShift} Menu`}
-              </button>
-            </form>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-              <Users className="text-indigo-500" /> Monthly Members Directory
-            </h2>
-            <div className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-lg text-sm font-bold border border-indigo-100 dark:border-indigo-500/20">
-              Total Members: {members.length}
-            </div>
-          </div>
-
-          {members.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-              <Users className="mx-auto text-slate-300 dark:text-slate-600 mb-3" size={32} />
-              <p className="text-slate-500 dark:text-slate-400 font-bold">No active monthly members yet.</p>
-              <p className="text-xs text-slate-400 mt-1">Students can subscribe to your mess from their dashboard.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-700/50">
-              <table className="w-full text-left border-collapse whitespace-nowrap">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-900/50 text-[11px] tracking-wider uppercase text-slate-500 dark:text-slate-400">
-                    <th className="py-4 px-5 font-black">Student Info</th>
-                    <th className="py-4 px-5 font-black">Shift</th>
-                    <th className="py-4 px-5 font-black">Membership Dates</th>
-                    <th className="py-4 px-5 font-black">Skips (Used/Max)</th>
-                    <th className="py-4 px-5 font-black">Monthly Fee</th>
-                    <th className="py-4 px-5 font-black text-right">Payment</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                  {members.map(member => (
-                    <tr key={member._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="py-4 px-5">
-                        <p className="font-bold text-slate-900 dark:text-white flex items-center gap-2">{member.studentName}</p>
-                        <p className="text-xs font-bold text-slate-400 mt-0.5 flex items-center gap-1"><Phone size={10} /> {member.studentPhone || 'N/A'}</p>
-                        {member.status === 'verification_pending' && (
-                          <span className="text-[10px] font-black px-2 py-0.5 rounded uppercase bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-700/50 flex items-center gap-1 w-fit mt-1">
-                            <Clock size={10} /> Verification Pending
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-4 px-5">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-black px-2 py-1 rounded uppercase ${member.status === 'expired' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-700/50' : member.shift === 'both' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
-                            {member.status === 'expired' ? 'Expired' : (member.shift || 'both')}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-5 text-xs">
-                        <div className="text-slate-500 dark:text-slate-400 font-medium mb-1">
-                          Start: <span className="font-bold">{new Date(member.startDate).toLocaleDateString()}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-500 dark:text-slate-400 font-medium">
-                            End: <span className="font-bold text-slate-700 dark:text-slate-200">{member.endDate ? new Date(member.endDate).toLocaleDateString() : 'N/A'}</span>
-                          </span>
-                          <button onClick={() => handleExtendDays(member._id)} className="text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/20 p-1 rounded transition-colors" title="Extend Membership for Absences">
-                            <CalendarPlus size={14} />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-4 px-5">
-                        <div className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-                          <span>{member.usedSkips || 0} / {member.allowedSkips || 5}</span>
-                          <button onClick={() => handleEditSkips(member._id, member.allowedSkips)} className="text-slate-400 hover:text-indigo-500 transition-colors" title="Edit Maximum Allowed Skips">
-                            <Edit3 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-4 px-5">
-                        <div className="flex items-center gap-2 text-sm font-bold text-orange-500 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 w-fit rounded-lg border border-orange-100 dark:border-orange-500/20">
-                          <IndianRupee size={14} />{member.monthlyFee || 0}
-                          {member.status !== 'paid' && member.status !== 'expired' && (
-                            <button onClick={() => handleSetFee(member._id, member.monthlyFee)} className="text-slate-400 hover:text-orange-500 ml-1 transition-colors">
-                              <Edit3 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-4 px-5 text-right">
-                        {member.status === 'verification_pending' ? (
-                          <div className="flex flex-col items-end gap-1.5">
-                            <span className="text-xs font-mono font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-700/40">
-                              UTR: {member.lastUtrNumber || 'N/A'}
-                            </span>
-                            <button
-                              onClick={() => updateSubscription(member._id, { status: 'paid' })}
-                              className="px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 active:scale-95"
-                            >
-                              <CheckCircle2 size={13} /> Approve Payment ✓
-                            </button>
-                          </div>
-                        ) : member.status === 'expired' ? (
-                          <button
-                            onClick={() => updateSubscription(member._id, { renew: true, status: 'paid' })}
-                            className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 bg-indigo-600 hover:bg-indigo-700 text-white"
-                          >
-                            Renew (30d)
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => togglePaymentStatus(member._id, member.status)}
-                            disabled={member.status === 'paid'}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 ${member.status === 'paid'
-                                ? 'bg-emerald-500 text-white shadow-emerald-500/20 cursor-not-allowed opacity-80'
-                                : 'bg-rose-100 text-rose-600 border border-rose-200 hover:bg-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30 dark:hover:bg-rose-500/20'
-                              }`}
-                          >
-                            {member.status === 'paid' ? 'Paid ✓' : 'Mark as Paid'}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* CUT-OFF TIMERS SECTION */}
-        <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors mb-8">
-          <h2 className="text-xl font-bold mb-2 flex items-center gap-2 text-slate-900 dark:text-white">
-            <Clock className="text-orange-500" /> Attendance Cut-Off Timers (IST)
-          </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-            Lock attendance automatically so chefs get accurate headcounts before cooking begins.
-          </p>
-
-          <form onSubmit={handleSaveCutoff} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">☀️ Morning Shift Cut-Off</label>
-              <input
-                type="time"
-                value={morningCutoff}
-                onChange={(e) => setMorningCutoff(e.target.value)}
-                required
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-orange-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">🌙 Night Shift Cut-Off</label>
-              <input
-                type="time"
-                value={nightCutoff}
-                onChange={(e) => setNightCutoff(e.target.value)}
-                required
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-orange-500"
-              />
-            </div>
-            <div>
-              <button
-                type="submit"
-                disabled={isSavingCutoff}
-                className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-orange-500 dark:hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
-              >
-                {isSavingCutoff ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
-                Save Cut-Off Times
-              </button>
-            </div>
-          </form>
-          {cutoffMsg && <p className="mt-4 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl">{cutoffMsg}</p>}
-        </div>
-
-        {/* UPI CONFIGURATION SECTION */}
-        <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <IndianRupee className="text-emerald-500" />
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">UPI Payment Configuration (Instant Student Fee Collection)</h2>
-          </div>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-            Configure your mess UPI ID (VPA) so students can make direct 1-tap monthly subscription payments to your bank account via PhonePe, GPay, Paytm, etc.
-          </p>
-
-          <form onSubmit={handleSaveUpi} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Your UPI ID (VPA)</label>
-              <input
-                type="text"
-                value={upiId}
-                onChange={(e) => setUpiId(e.target.value)}
-                placeholder="e.g. messowner@okaxis or 9876543210@paytm"
-                required
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-mono font-bold outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <div>
-              <button
-                type="submit"
-                disabled={isSavingUpi}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95"
-              >
-                {isSavingUpi ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
-                Save UPI ID
-              </button>
-            </div>
-          </form>
-          {upiMsg && <p className="mt-4 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl">{upiMsg}</p>}
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-700 transition-colors">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white"><MapPin className="text-indigo-500" /> {t.setMessLocation}</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t.locationDesc}</p>
-
-          {savedLocation && (
-            <div className="mb-4 inline-flex items-center gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-bold text-sm rounded-lg border border-indigo-100 dark:border-indigo-500/20">
-              <CheckCircle2 size={16} /> {t.locationSavedAt} {savedLocation.lat.toFixed(5)}, {savedLocation.lng.toFixed(5)}
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={async () => {
-                setIsSettingLocation(true); setLocationMsg('');
-                if (!('geolocation' in navigator)) { setLocationMsg('❌ Geolocation not supported.'); setIsSettingLocation(false); return; }
-                navigator.geolocation.getCurrentPosition(
-                  async (pos) => {
-                    const token = localStorage.getItem('token');
-                    try {
-                      const res = await fetch(`${API_URL}/api/owner/location`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
-                      });
-                      if (res.ok) {
-                        setLocationMsg(`✅ Location saved! (${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)})`);
-                        setSavedLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-                      } else {
-                        setLocationMsg('❌ Failed to save location.');
-                      }
-                    } catch { setLocationMsg('❌ Connection failed.'); }
-                    setIsSettingLocation(false);
-                  },
-                  () => { setLocationMsg('❌ Location access denied. Please enable GPS.'); setIsSettingLocation(false); },
-                  { enableHighAccuracy: true, timeout: 15000 }
-                );
-              }}
-              disabled={isSettingLocation}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-3 rounded-xl flex items-center gap-2 transition-colors shadow-md disabled:opacity-50"
-            >
-              {isSettingLocation ? <Loader2 className="animate-spin" size={18} /> : <Navigation size={18} />}
-              {isSettingLocation ? t.detecting : savedLocation ? `📍 ${t.updateCurrentLocation}` : `📍 ${t.useCurrentLocation}`}
-            </button>
-          </div>
-          {locationMsg && <p className="mt-4 text-sm font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-3 rounded-xl">{locationMsg}</p>}
-        </div>
+        {/* CUT-OFF TIME POPUP (Opens automatically right after saving menu) */}
+        <CutoffPopup
+          isOpen={isCutoffPopupOpen}
+          onClose={() => setIsCutoffPopupOpen(false)}
+          shift={cutoffPopupShift}
+          initialMorningCutoff={morningCutoff}
+          initialNightCutoff={nightCutoff}
+          onConfirm={handleConfirmCutoff}
+          t={t}
+        />
       </main>
-
-      {/* MEAL PASS VERIFICATION MODAL */}
-      {verifyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative">
-            <button
-              onClick={() => { setVerifyModalOpen(false); setVerifyResult(null); }}
-              className="absolute top-5 right-5 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
-            >
-              <X size={18} />
-            </button>
-
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-3 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-2xl">
-                <QrCode size={24} />
-              </div>
-              <div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white">Verify Student Meal Pass</h3>
-                <p className="text-xs text-slate-400 font-bold">Counter Verification Scanner</p>
-              </div>
-            </div>
-
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 mb-6">
-              Paste or type the student's 15-minute signed Meal Pass Token to verify their attendance and mark meal as served.
-            </p>
-
-            <form onSubmit={handleVerifyQr} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">QR Token Payload</label>
-                <textarea
-                  rows={3}
-                  value={qrTokenInput}
-                  onChange={(e) => setQrTokenInput(e.target.value)}
-                  placeholder="Paste student QR pass token here..."
-                  required
-                  className="w-full p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              {verifyResult && (
-                <div
-                  className={`p-4 rounded-xl border text-sm font-bold flex items-start gap-2.5 ${
-                    verifyResult.type === 'success'
-                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
-                      : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300'
-                  }`}
-                >
-                  {verifyResult.type === 'success' ? (
-                    <CheckCircle2 size={18} className="shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
-                  ) : (
-                    <AlertCircle size={18} className="shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
-                  )}
-                  <div>
-                    <p>{verifyResult.message}</p>
-                    {verifyResult.studentName && (
-                      <p className="text-xs font-normal mt-0.5 opacity-90">Student: <strong>{verifyResult.studentName}</strong></p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isVerifyingQr || !qrTokenInput.trim()}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
-              >
-                {isVerifyingQr ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
-                Verify & Claim Meal
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* NOTIFICATIONS DRAWER */}
-      {notifDrawerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl relative max-h-[85vh] flex flex-col">
-            <button
-              onClick={() => setNotifDrawerOpen(false)}
-              className="absolute top-5 right-5 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
-            >
-              <X size={18} />
-            </button>
-
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-3 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-2xl">
-                <Bell size={24} />
-              </div>
-              <div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white">Mess Notifications</h3>
-                <p className="text-xs text-slate-400 font-bold">Activity Feed & Alerts</p>
-              </div>
-            </div>
-
-            <div className="overflow-y-auto space-y-3 flex-grow pr-1">
-              {notifications.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
-                  <Bell className="mx-auto mb-2 opacity-30" size={32} />
-                  <p className="font-bold text-sm">No notifications yet.</p>
-                </div>
-              ) : (
-                notifications.map((n) => (
-                  <div
-                    key={n._id}
-                    className={`p-4 rounded-2xl border transition-all ${
-                      n.isRead
-                        ? 'bg-slate-50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-                        : 'bg-orange-50/50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800/50 text-slate-900 dark:text-white'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start gap-2 mb-1">
-                      <h4 className="font-black text-sm">{n.title}</h4>
-                      <span className="text-[10px] font-bold text-slate-400 shrink-0">
-                        {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{n.body}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* RATION CONFIG MODAL */}
-      {rationModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative">
-            <button
-              onClick={() => setRationModalOpen(false)}
-              className="absolute top-5 right-5 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
-            >
-              <X size={18} />
-            </button>
-
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-3 bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-2xl">
-                <Scale size={24} />
-              </div>
-              <div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white">Per-Plate Ration Norms</h3>
-                <p className="text-xs text-slate-400 font-bold">Configure Kitchen Baselines (in grams)</p>
-              </div>
-            </div>
-
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2 mb-6">
-              Adjust how many grams of raw ingredients your kitchen allocates per student for lunch or dinner thalis.
-            </p>
-
-            <form onSubmit={handleSaveRationConfig} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">🍚 Rice (g)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={customRationConfig.riceGrams}
-                    onChange={(e) => setCustomRationConfig({ ...customRationConfig, riceGrams: Number(e.target.value) })}
-                    required
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">🌾 Atta / Flour (g)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={customRationConfig.flourGrams}
-                    onChange={(e) => setCustomRationConfig({ ...customRationConfig, flourGrams: Number(e.target.value) })}
-                    required
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">🥣 Dal (g)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={customRationConfig.dalGrams}
-                    onChange={(e) => setCustomRationConfig({ ...customRationConfig, dalGrams: Number(e.target.value) })}
-                    required
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">🥕 Veggies (g)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={customRationConfig.veggieGrams}
-                    onChange={(e) => setCustomRationConfig({ ...customRationConfig, veggieGrams: Number(e.target.value) })}
-                    required
-                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-              </div>
-
-              {rationMsg && (
-                <p className="text-xs font-bold p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                  {rationMsg}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                disabled={isSavingRation}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 mt-4"
-              >
-                {isSavingRation ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
-                Save Norms
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* POST 24H LIVE STORY MODAL */}
-      {storyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative">
-            <button
-              onClick={() => setStoryModalOpen(false)}
-              className="absolute top-5 right-5 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
-            >
-              <X size={18} />
-            </button>
-
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-3 bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-2xl">
-                <Camera size={24} />
-              </div>
-              <div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white">Post Live Update 📸</h3>
-                <p className="text-xs text-orange-500 font-bold uppercase tracking-wider">24-Hour Campus Story</p>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-5">
-              Show students what's cooking right now! Live photos disappear automatically after 24 hours.
-            </p>
-
-            <form onSubmit={handlePostStory} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-2">Food / Kitchen Photo</label>
-                {storyImage ? (
-                  <div className="relative rounded-2xl overflow-hidden h-48 bg-slate-950 mb-3 border border-slate-200 dark:border-slate-700">
-                    <img src={storyImage} alt="Story Preview" className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => setStoryImage('')}
-                      className="absolute top-2 right-2 bg-slate-900/80 text-white p-1.5 rounded-full hover:bg-rose-600 transition-colors"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:border-orange-500 transition-colors bg-slate-50 dark:bg-slate-950">
-                    <Upload size={28} className="text-orange-500 mb-2" />
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Click to upload photo</span>
-                    <span className="text-[10px] text-slate-400">JPG, PNG, WebP up to 10MB</span>
-                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                  </label>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">
-                  Caption (e.g. "Piping hot jalebis ready!")
-                </label>
-                <input
-                  type="text"
-                  maxLength={100}
-                  value={storyCaption}
-                  onChange={(e) => setStoryCaption(e.target.value)}
-                  placeholder="Short live announcement..."
-                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-500"
-                />
-                <span className="text-[10px] text-slate-400 font-bold block text-right mt-1">
-                  {storyCaption.length}/100
-                </span>
-              </div>
-
-              {storyMsg && (
-                <p className="text-xs font-bold p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                  {storyMsg}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                disabled={isPostingStory || !storyImage}
-                className="w-full bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
-              >
-                {isPostingStory ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
-                Publish Live 🚀
-              </button>
-            </form>
-
-            {/* Active Stories List & Immediate Delete */}
-            {myActiveStories && myActiveStories.length > 0 && (
-              <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                    Active Live Stories ({myActiveStories.length})
-                  </h4>
-                  <span className="text-[10px] text-slate-400 font-bold">Auto-deletes in 24h</span>
-                </div>
-                <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
-                  {myActiveStories.map((story) => (
-                    <div
-                      key={story._id}
-                      className="flex items-center justify-between gap-3 p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 transition-colors"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <img
-                          src={story.imageUrl}
-                          alt="Story"
-                          className="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-200 dark:border-slate-700 shadow-sm"
-                        />
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                            {story.caption || 'No caption'}
-                          </p>
-                          <p className="text-[10px] text-slate-400 font-medium">
-                            {new Date(story.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(story.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteStory(story._id)}
-                        disabled={isDeletingStory === story._id}
-                        className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-colors shrink-0 disabled:opacity-50"
-                        title="Delete Story (from Cloudinary & Student Feeds)"
-                      >
-                        {isDeletingStory === story._id ? (
-                          <Loader2 size={16} className="animate-spin" />
-                        ) : (
-                          <Trash2 size={16} />
-                        )}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
