@@ -47,7 +47,7 @@ app.use(compression());
 // CORS Configuration (Permit ALLOWED_ORIGINS + Mobile Apps with no origin)
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
-  : ['http://localhost:5173', 'http://localhost:3000'];
+  : ['http://localhost:5173', 'http://localhost:3000', '*', 'https://cep-mess-project-dfrp04veh-sanskar-c638.vercel.app/'];
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -121,7 +121,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('✅ Successfully connected to MongoDB Atlas!');
-    Story.collection.dropIndex('createdAt_1').catch(() => {});
+    Story.collection.dropIndex('createdAt_1').catch(() => { });
     expireOutdatedSubscriptions();
     calculateTopChef();
     cleanupExpiredStories();
@@ -629,7 +629,7 @@ app.post('/api/menus', authenticateToken, validateMenu, async (req, res) => {
         .then(subs => {
           const ids = subs.map(s => s.studentId);
           if (ids.length > 0) sendNotification(ids, `Menu Updated: ${shift === 'morning' ? '☀️ Morning' : '🌙 Night'}`, `🍽️ ${messName || 'Mess'} updated the ${shift} menu!`);
-        }).catch(() => {});
+        }).catch(() => { });
       return res.status(200).json({ message: `${shift} menu updated!` });
     }
     const newMenu = new Menu({ ownerId, messName, date, shift, items, price });
@@ -640,7 +640,7 @@ app.post('/api/menus', authenticateToken, validateMenu, async (req, res) => {
       .then(subs => {
         const ids = subs.map(s => s.studentId);
         if (ids.length > 0) sendNotification(ids, `Menu Published: ${shift === 'morning' ? '☀️ Morning' : '🌙 Night'}`, `🍽️ ${messName || 'Mess'} published the ${shift} menu!`);
-      }).catch(() => {});
+      }).catch(() => { });
     res.status(201).json({ message: `${shift} menu published!` });
   } catch (error) { res.status(500).json({ error: 'Failed to publish' }); }
 });
