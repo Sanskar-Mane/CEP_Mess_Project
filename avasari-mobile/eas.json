@@ -20,7 +20,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://YOUR-BACKEND-NAME.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://avasariconnectbackend.onrender.com"
       }
     }
   },

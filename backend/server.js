@@ -31,78 +31,99 @@ if (isCloudinaryConfigured) {
   console.log('☁️ Cloudinary CDN configured and active!');
 }
 
-// Nodemailer SMTP Transport
+// Nodemailer SMTP Transporter
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT, 10) || 587,
-  secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
+  port: parseInt(process.env.SMTP_PORT || '587', 10),
+  secure: String(process.env.SMTP_PORT) === '465',
   auth: {
     user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
+    pass: process.env.SMTP_PASS
+  }
 });
 
-// Helper: Send Professional OTP Verification Email
-const sendOtpEmail = async (toEmail, otp) => {
+// Verify SMTP connection on startup if credentials exist
+if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+  transporter.verify((error) => {
+    if (error) {
+      console.warn('⚠️ Nodemailer SMTP verification warning:', error.message);
+    } else {
+      console.log('📧 Nodemailer SMTP transporter is ready to send emails!');
+    }
+  });
+}
+
+const sendOtpEmail = async (email, otp) => {
+  const fromAddress = process.env.SMTP_FROM || `"Avasari Connect" <${process.env.SMTP_USER || 'noreply@avasari.local'}>`;
+
   const mailOptions = {
-    from: process.env.SMTP_FROM || `"Avasari Connect" <${process.env.SMTP_USER || 'no-reply@avasari.connect'}>`,
-    to: toEmail,
+    from: fromAddress,
+    to: email,
     subject: `${otp} is your Avasari Connect Verification Code`,
+    text: `Welcome to Avasari Connect!\n\nYour 6-digit verification code is: ${otp}\n\nThis code will expire in 10 minutes. If you did not request this, please ignore this email.`,
     html: `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Account Verification</title>
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b; }
-          .container { max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 36px 32px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
-          .brand { text-align: center; margin-bottom: 24px; }
-          .brand-title { font-size: 24px; font-weight: 900; color: #4f46e5; margin: 0; letter-spacing: -0.5px; }
-          .brand-subtitle { font-size: 13px; color: #64748b; margin-top: 4px; font-weight: 500; }
-          .greeting { font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 12px; }
-          .message { font-size: 14px; line-height: 1.6; color: #475569; margin: 0 0 24px 0; }
-          .otp-card { background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%); border: 2px dashed #6366f1; border-radius: 16px; padding: 24px; text-align: center; margin: 24px 0; }
-          .otp-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #4f46e5; margin-bottom: 8px; }
-          .otp-code { font-size: 40px; font-weight: 900; letter-spacing: 10px; color: #1e1b4b; margin: 0; font-family: 'Courier New', Courier, monospace; }
-          .expiry-note { font-size: 13px; color: #64748b; text-align: center; margin-top: 8px; }
-          .footer { border-top: 1px solid #f1f5f9; padding-top: 20px; margin-top: 28px; font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.5; }
-        </style>
+        <title>Avasari Connect Verification</title>
       </head>
-      <body>
-        <div class="container">
-          <div class="brand">
-            <h1 class="brand-title">Avasari Connect</h1>
-            <p class="brand-subtitle">Campus Dining & Living Network</p>
-          </div>
-          <div class="greeting">Verify your email address</div>
-          <p class="message">Thank you for connecting with Avasari Connect. Please use the verification code below to complete your registration or login verification.</p>
-          <div class="otp-card">
-            <div class="otp-label">Verification Code (OTP)</div>
-            <div class="otp-code">${otp}</div>
-            <div class="expiry-note">⏱️ Expires in 10 minutes</div>
-          </div>
-          <p class="message">If you did not request this verification code, please ignore this email or contact support if you suspect unauthorized activity.</p>
-          <div class="footer">
-            &copy; ${new Date().getFullYear()} Avasari Connect. All rights reserved.<br>
-            Government College of Engineering and Research, Avasari Khurd.
-          </div>
-        </div>
+      <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 40px 16px;">
+          <tr>
+            <td align="center">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 500px; background-color: #ffffff; border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #e2e8f0;">
+                <tr>
+                  <td style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 36px 32px; text-align: center;">
+                    <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px;">Avasari Connect</h1>
+                    <p style="color: #e0e7ff; margin: 6px 0 0 0; font-size: 14px; font-weight: 500;">Campus Dining & Living Network</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 36px 32px; text-align: center;">
+                    <p style="color: #475569; font-size: 15px; margin: 0 0 18px 0; font-weight: 500;">
+                      Use the 6-digit verification code below to verify your account:
+                    </p>
+                    <div style="background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 16px; padding: 20px; display: inline-block; margin: 0 auto 20px auto; min-width: 220px;">
+                      <span style="font-size: 38px; font-weight: 800; letter-spacing: 10px; color: #1e1b4b; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;">${otp}</span>
+                    </div>
+                    <p style="color: #ef4444; font-size: 13px; font-weight: 600; margin: 0 0 16px 0;">
+                      ⏱️ Valid for 10 minutes only
+                    </p>
+                    <p style="color: #64748b; font-size: 13px; line-height: 1.5; margin: 0;">
+                      If you did not request this verification code, please ignore this email.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background-color: #f8fafc; padding: 20px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+                    <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+                      © ${new Date().getFullYear()} Avasari Connect. All rights reserved.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       </body>
       </html>
-    `,
+    `
   };
 
   try {
-    console.log(`📨 [OTP Dispatch] Generated OTP for ${toEmail}: ${otp}`);
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ OTP email successfully dispatched to ${toEmail}`);
-    return true;
-  } catch (mailError) {
-    console.error(`⚠️ Failed to send OTP email to ${toEmail}:`, mailError.message);
-    console.log(`ℹ️ [CONSOLE OTP FALLBACK] Email: ${toEmail} | OTP: ${otp}`);
-    return false;
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn(`⚠️ [SMTP NOT CONFIGURED] OTP for ${email}: [ ${otp} ]`);
+      return { success: true, simulated: true };
+    }
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✉️ OTP email sent to ${email} (Message ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`❌ Failed to send OTP email to ${email}:`, err.message);
+    console.log(`🔑 Console Fallback OTP for ${email}: [ ${otp} ]`);
+    return { success: false, error: err.message };
   }
 };
 
@@ -197,20 +218,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 // 1. DATABASE CONNECTION
 // ==========================================
 mongoose.connect(process.env.MONGO_URI)
-  .then(async () => {
+  .then(() => {
     console.log('✅ Successfully connected to MongoDB Atlas!');
     Story.collection.dropIndex('createdAt_1').catch(() => { });
     User.collection.dropIndex('phone_1').catch(() => { });
-    try {
-      const legacyUsers = await User.find({ $or: [{ email: { $exists: false } }, { email: null }, { email: '' }] });
-      for (const u of legacyUsers) {
-        u.email = `legacy_${u.phone || u._id}@avasari.local`;
-        u.isEmailVerified = true;
-        await u.save().catch(() => {});
-      }
-    } catch (migErr) {
-      console.warn('Legacy user email migration note:', migErr.message);
-    }
     expireOutdatedSubscriptions();
     calculateTopChef();
     cleanupExpiredStories();
@@ -227,11 +238,11 @@ const UserSchema = new mongoose.Schema({
   role: { type: String, required: true, enum: ['student', 'owner', 'admin'] },
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-  phone: { type: String, required: true },
+  phone: { type: String, required: true, trim: true },
+  password: { type: String, required: true },
   isEmailVerified: { type: Boolean, default: false },
   otp: { type: String },
   otpExpires: { type: Date },
-  password: { type: String, required: true },
   messName: String,
   messAddress: String,
   fssaiNumber: String,
@@ -556,24 +567,37 @@ const authenticateAdmin = (req, res, next) => {
 };
 
 // --- VALIDATION MIDDLEWARE ---
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const phoneRegex = /^[6-9]\d{9}$/;
+
 const validateRegister = (req, res, next) => {
-  const { email, name, phone, password, role } = req.body;
-  if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-    return res.status(400).json({ error: 'Valid email address is required.' });
-  }
+  const { name, email, phone, password, role } = req.body;
+
   if (!name || typeof name !== 'string' || !name.trim()) {
-    return res.status(400).json({ error: 'Name is required.' });
+    return res.status(400).json({ error: 'Full name is required.' });
   }
+
+  if (!email || typeof email !== 'string' || !email.trim()) {
+    return res.status(400).json({ error: 'Email address is required.' });
+  }
+  if (!emailRegex.test(email.trim().toLowerCase())) {
+    return res.status(400).json({ error: 'Invalid email address format.' });
+  }
+
   if (!phone || typeof phone !== 'string' || !phone.trim()) {
     return res.status(400).json({ error: 'Phone number is required.' });
   }
-  const phoneRegex = /^[6-9]\d{9}$/;
   if (!phoneRegex.test(phone.trim())) {
     return res.status(400).json({ error: 'Invalid mobile number. Must be a 10-digit number starting with 6-9.' });
   }
+
   if (!password || typeof password !== 'string' || !password.trim()) {
     return res.status(400).json({ error: 'Password is required.' });
   }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+  }
+
   if (!role || !['student', 'owner', 'admin'].includes(role)) {
     return res.status(400).json({ error: 'Valid role is required (student, owner, or admin).' });
   }
@@ -582,8 +606,11 @@ const validateRegister = (req, res, next) => {
 
 const validateLogin = (req, res, next) => {
   const { email, password, role } = req.body;
-  if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-    return res.status(400).json({ error: 'Valid email address is required.' });
+  if (!email || typeof email !== 'string' || !email.trim()) {
+    return res.status(400).json({ error: 'Email address is required.' });
+  }
+  if (!emailRegex.test(email.trim().toLowerCase())) {
+    return res.status(400).json({ error: 'Invalid email address format.' });
   }
   if (!password || typeof password !== 'string' || !password.trim()) {
     return res.status(400).json({ error: 'Password is required.' });
@@ -626,10 +653,13 @@ const validateRating = (req, res, next) => {
 app.post('/api/register', validateRegister, async (req, res) => {
   try {
     const { role, name, email, phone, password, messName, messAddress, fssaiNumber, yearBranch, latitude, longitude } = req.body;
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = email.trim().toLowerCase();
+    const cleanPhone = phone.trim();
 
     const existingUser = await User.findOne({ email: normalizedEmail });
-    if (existingUser) return res.status(400).json({ error: 'Email already registered' });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email already registered. Please sign in.' });
+    }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -641,7 +671,7 @@ app.post('/api/register', validateRegister, async (req, res) => {
       role,
       name: name.trim(),
       email: normalizedEmail,
-      phone: phone.trim(),
+      phone: cleanPhone,
       password: hashedPassword,
       isEmailVerified: false,
       otp,
@@ -659,6 +689,7 @@ app.post('/api/register', validateRegister, async (req, res) => {
     const newUser = new User(userData);
     await newUser.save();
 
+    // Send OTP email asynchronously, catching any mailer errors gracefully
     await sendOtpEmail(normalizedEmail, otp);
 
     res.status(201).json({
@@ -667,10 +698,7 @@ app.post('/api/register', validateRegister, async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
-    if (error.code === 11000) {
-      return res.status(400).json({ error: 'Email already registered.' });
-    }
-    res.status(500).json({ error: 'Server error during registration' });
+    res.status(500).json({ error: 'Server error during registration.' });
   }
 });
 
@@ -681,9 +709,13 @@ app.post('/api/verify-otp', async (req, res) => {
       return res.status(400).json({ error: 'Email and OTP are required.' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = email.trim().toLowerCase();
+    const cleanOtp = String(otp).trim();
+
     const user = await User.findOne({ email: normalizedEmail });
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
 
     if (user.isEmailVerified) {
       const token = jwt.sign({ id: user._id, role: user.role, messName: user.messName }, JWT_SECRET, { expiresIn: '7d' });
@@ -694,16 +726,8 @@ app.post('/api/verify-otp', async (req, res) => {
       return res.status(200).json({ message: 'Email already verified', user: userResponse, token });
     }
 
-    if (!user.otp || !user.otpExpires) {
-      return res.status(400).json({ error: 'No active OTP found. Please request a new OTP.' });
-    }
-
-    if (new Date() > user.otpExpires) {
-      return res.status(400).json({ error: 'OTP has expired. Please request a new OTP.' });
-    }
-
-    if (user.otp !== String(otp).trim()) {
-      return res.status(400).json({ error: 'Invalid verification code. Please try again.' });
+    if (!user.otp || !user.otpExpires || user.otpExpires.getTime() < Date.now() || user.otp !== cleanOtp) {
+      return res.status(400).json({ error: 'Invalid or expired OTP. Please try again or request a new code.' });
     }
 
     user.isEmailVerified = true;
@@ -717,21 +741,29 @@ app.post('/api/verify-otp', async (req, res) => {
     delete userResponse.otp;
     delete userResponse.otpExpires;
 
-    res.status(200).json({ message: 'Email verified successfully', user: userResponse, token });
+    res.status(200).json({
+      message: 'Account verified successfully',
+      user: userResponse,
+      token
+    });
   } catch (error) {
-    console.error('OTP verification error:', error);
-    res.status(500).json({ error: 'Server error during verification' });
+    console.error('OTP Verification error:', error);
+    res.status(500).json({ error: 'Server error during OTP verification.' });
   }
 });
 
 app.post('/api/login', validateLogin, async (req, res) => {
   try {
     const { email, password } = req.body;
-    const normalizedEmail = email.toLowerCase().trim();
-    const user = await User.findOne({ email: normalizedEmail });
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (!(await bcrypt.compare(password, user.password))) {
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found with this email' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
       return res.status(400).json({ error: 'Invalid password' });
     }
 
@@ -759,20 +791,26 @@ app.post('/api/login', validateLogin, async (req, res) => {
     res.status(200).json({ message: 'Login successful', user: userResponse, token });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error during login.' });
   }
 });
 
 app.post('/api/resend-otp', async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      return res.status(400).json({ error: 'Valid email address is required.' });
+    if (!email || !email.trim()) {
+      return res.status(400).json({ error: 'Email is required' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = email.trim().toLowerCase();
     const user = await User.findOne({ email: normalizedEmail });
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({ error: 'Email is already verified. Please sign in.' });
+    }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     user.otp = otp;
@@ -781,10 +819,10 @@ app.post('/api/resend-otp', async (req, res) => {
 
     await sendOtpEmail(normalizedEmail, otp);
 
-    res.status(200).json({ message: 'OTP resent to your email', email: normalizedEmail });
+    res.status(200).json({ message: 'A new verification code has been sent to your email.', email: normalizedEmail });
   } catch (error) {
     console.error('Resend OTP error:', error);
-    res.status(500).json({ error: 'Server error while resending OTP' });
+    res.status(500).json({ error: 'Failed to resend OTP.' });
   }
 });
 
@@ -1988,3 +2026,5 @@ const gracefulShutdown = async (signal) => {
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+module.exports = { app, server };
