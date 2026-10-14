@@ -141,22 +141,50 @@ if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(compression());
 
-// CORS Configuration (Permit ALLOWED_ORIGINS + Mobile Apps with no origin)
+// CORS Configuration (Permit ALLOWED_ORIGINS + Mobile Apps with no origin + Vercel Deployments)
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
-  : ['http://localhost:5173', 'http://localhost:3000', '*', 'https://cep-mess-project-dfrp04veh-sanskar-c638.vercel.app/'];
+  : [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    '*',
+    'https://cep-mess-project-eight.vercel.app',
+    'https://cep-mess-project-git-email-sanskar-c638.vercel.app',
+    'https://cep-mess-project-dfrp04veh-sanskar-c638.vercel.app'
+  ];
 
 const corsOptions = {
   origin: (origin, callback) => {
     // Permit requests with no origin (e.g., mobile apps, curl, native tools)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+
+    const cleanOrigin = origin.replace(/\/+$/, '');
+
+    // Check against configured list (normalizing trailing slashes)
+    const isExplicitlyAllowed = allowedOrigins.some(o => {
+      const cleanAllowed = o.replace(/\/+$/, '');
+      return cleanAllowed === '*' || cleanAllowed === cleanOrigin;
+    });
+
+    if (isExplicitlyAllowed) {
       return callback(null, true);
     }
+
+    // Automatically allow any Vercel preview/production deployments for this project
+    try {
+      const url = new URL(origin);
+      if (url.hostname.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+    } catch (e) {
+      // invalid URL string
+    }
+
     // In development or local network, allow origins
     if (process.env.NODE_ENV !== 'production') {
       return callback(null, true);
     }
+
     return callback(new Error(`Not allowed by CORS: ${origin}`));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
