@@ -15,7 +15,7 @@ const AuthPage = () => {
   const [authMode, setAuthMode] = useState('login');
   const [role, setRole] = useState('student');
   const [step, setStep] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(() => Boolean(localStorage.getItem('token')));
   const [isResending, setIsResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendSuccess, setResendSuccess] = useState('');
@@ -46,6 +46,60 @@ const AuthPage = () => {
     }
     return () => clearTimeout(timer);
   }, [resendCooldown]);
+
+  // Verify existing token on mount
+  useEffect(() => {
+    let isMounted = true;
+    const verifyToken = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        if (isMounted) setIsLoading(false);
+        return;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      try {
+        const res = await fetch(`${API_URL}/api/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const user = await res.json();
+          if (isMounted) {
+            routeByRole(user);
+          }
+        } else {
+          // Token invalid or expired
+          localStorage.removeItem('token');
+          if (isMounted) {
+            setIsLoading(false);
+          }
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        // Server unreachable, timeout, or backend asleep
+        localStorage.removeItem('token');
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    verifyToken();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -96,9 +150,9 @@ const AuthPage = () => {
     else navigate('/student', { state: { user } });
   };
 
-  // Handle Login & Registration Submit
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // Handle Login Submit
+  const handleLogin = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
     setIsLoading(true);
     setError('');
     setResendSuccess('');
@@ -112,35 +166,26 @@ const AuthPage = () => {
       return;
     }
 
-    if (authMode === 'register') {
-      const phoneRegex = /^[6-9]\d{9}$/;
-      if (!phoneRegex.test(formData.phone.trim())) {
-        setError('Please enter a valid 10-digit Indian mobile number.');
-        setIsLoading(false);
-        return;
-      }
-      if (!formData.password || formData.password.length < 6) {
-        setError('Password must be at least 6 characters long.');
-        setIsLoading(false);
-        return;
-      }
+    if (!formData.password) {
+      setError('Please enter your password.');
+      setIsLoading(false);
+      return;
     }
 
-    const endpoint = authMode === 'login' ? '/api/login' : '/api/register';
-    const payload = authMode === 'login'
-      ? { email: cleanEmail, password: formData.password }
-      : { ...formData, email: cleanEmail, phone: formData.phone.trim(), role };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     try {
-      const response = await fetch(`${API_URL}${endpoint}`, {
+      const response = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ email: cleanEmail, password: formData.password }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (response.status === 403 && data.unverified) {
-        // Email not verified -> switch to OTP verification screen
         setOtpEmail(data.email || cleanEmail);
         setOtp('');
         setAuthMode('verifyOtp');
@@ -150,30 +195,96 @@ const AuthPage = () => {
       }
 
       if (response.ok) {
-        if (authMode === 'register') {
-          // Registration successful -> prompt for OTP verification
-          setOtpEmail(data.email || cleanEmail);
-          setOtp('');
-          setAuthMode('verifyOtp');
-          setResendCooldown(60);
-        } else {
-          // Login successful
-          localStorage.setItem('token', data.token);
-          routeByRole(data.user);
-        }
+        localStorage.setItem('token', data.token);
+        routeByRole(data.user);
       } else {
         setError(data.error || 'Authentication failed');
       }
     } catch (err) {
-      setError('Cannot connect to server. Ensure backend is running.');
+      clearTimeout(timeoutId);
+      if (err?.name === 'AbortError') {
+        setError('Request timed out. The backend server might be waking up, please retry.');
+      } else {
+        setError('Cannot connect to server. Ensure backend is running.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Handle Registration Submit
+  const handleRegister = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    setResendSuccess('');
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const cleanEmail = (formData.email || '').trim().toLowerCase();
+
+    if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+      setError('Please enter a valid email address.');
+      setIsLoading(false);
+      return;
+    }
+
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(formData.phone.trim())) {
+      setError('Please enter a valid 10-digit Indian mobile number.');
+      setIsLoading(false);
+      return;
+    }
+    if (!formData.password || formData.password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      setIsLoading(false);
+      return;
+    }
+
+    const payload = { ...formData, email: cleanEmail, phone: formData.phone.trim(), role };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    try {
+      const response = await fetch(`${API_URL}/api/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      const data = await response.json();
+
+      if (response.ok) {
+        setOtpEmail(data.email || cleanEmail);
+        setOtp('');
+        setAuthMode('verifyOtp');
+        setResendCooldown(60);
+      } else {
+        setError(data.error || 'Registration failed');
+      }
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err?.name === 'AbortError') {
+        setError('Request timed out. The backend server might be waking up, please retry.');
+      } else {
+        setError('Cannot connect to server. Ensure backend is running.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = (e) => {
+    if (authMode === 'login') {
+      return handleLogin(e);
+    } else {
+      return handleRegister(e);
+    }
+  };
+
   // Handle Verify OTP Submit
   const handleVerifyOtp = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!otp.trim() || otp.trim().length !== 6) {
       setError('Please enter the 6-digit OTP sent to your email.');
       return;
@@ -183,6 +294,9 @@ const AuthPage = () => {
     setError('');
     setResendSuccess('');
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     try {
       const response = await fetch(`${API_URL}/api/verify-otp`, {
         method: 'POST',
@@ -190,8 +304,10 @@ const AuthPage = () => {
         body: JSON.stringify({
           email: otpEmail || formData.email.trim().toLowerCase(),
           otp: otp.trim()
-        })
+        }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (response.ok) {
@@ -201,7 +317,12 @@ const AuthPage = () => {
         setError(data.error || 'Invalid or expired OTP code.');
       }
     } catch (err) {
-      setError('Failed to reach server. Please try again.');
+      clearTimeout(timeoutId);
+      if (err?.name === 'AbortError') {
+        setError('Verification timed out. Please try again.');
+      } else {
+        setError('Failed to reach server. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -214,13 +335,18 @@ const AuthPage = () => {
     setError('');
     setResendSuccess('');
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     try {
       const targetEmail = otpEmail || formData.email.trim().toLowerCase();
       const response = await fetch(`${API_URL}/api/resend-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: targetEmail })
+        body: JSON.stringify({ email: targetEmail }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (response.ok) {
@@ -230,11 +356,30 @@ const AuthPage = () => {
         setError(data.error || 'Unable to resend OTP at this time.');
       }
     } catch (err) {
-      setError('Failed to request new code. Ensure backend is running.');
+      clearTimeout(timeoutId);
+      if (err?.name === 'AbortError') {
+        setError('Resend timed out. Please try again.');
+      } else {
+        setError('Failed to request new code. Ensure backend is running.');
+      }
     } finally {
       setIsResending(false);
     }
   };
+
+  if (isLoading && !formData.email && !formData.password && localStorage.getItem('token')) {
+    return (
+      <div className="min-h-[85vh] flex items-center justify-center p-4 font-sans relative z-10">
+        <div className="bg-white/80 backdrop-blur-2xl p-8 rounded-3xl shadow-xl border border-slate-100 flex flex-col items-center max-w-sm w-full text-center">
+          <div className="inline-flex bg-indigo-50 p-4 rounded-2xl mb-4">
+            <RefreshCw className="animate-spin text-indigo-600" size={32} />
+          </div>
+          <h3 className="text-xl font-extrabold text-slate-800 tracking-tight mb-1">AvasariConnect</h3>
+          <p className="text-slate-500 font-medium text-sm">Verifying your campus session...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4 font-sans relative z-10">
