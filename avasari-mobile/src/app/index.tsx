@@ -1,5 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, SafeAreaView, Platform, StatusBar, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  ActivityIndicator,
+  ScrollView,
+  TextInput,
+  SafeAreaView,
+  Platform,
+  StatusBar,
+  Alert,
+  Animated
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -11,10 +24,17 @@ export default function AuthScreen() {
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isLogin, setIsLogin] = useState(true);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [role, setRole] = useState('student');
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState('');
+  const [otp, setOtp] = useState('');
+
+  // Smooth transition animation for OTP screen
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     let isMounted = true;
@@ -59,16 +79,84 @@ export default function AuthScreen() {
   }, []);
 
   const [formData, setFormData] = useState({
-    name: '', phone: '', password: '', yearBranch: '', messName: '', messAddress: '', fssaiNumber: '', latitude: null, longitude: null,
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    yearBranch: '',
+    messName: '',
+    messAddress: '',
+    fssaiNumber: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
   });
   const [isGettingLocation, setIsGettingLocation] = useState(false);
 
-  const handleInputChange = (name, value) => {
+  const handleInputChange = (name: string, value: string) => {
     setFormData({ ...formData, [name]: value });
   };
 
-  const nextStep = () => setStep(step + 1);
-  const prevStep = () => setStep(step - 1);
+  const showOtpScreen = () => {
+    setIsVerifyingOtp(true);
+    fadeAnim.setValue(0);
+    slideAnim.setValue(20);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const hideOtpScreen = () => {
+    setIsVerifyingOtp(false);
+    setError('');
+  };
+
+  const nextStep = () => {
+    setError('');
+    if (step === 1) {
+      if (!formData.name.trim()) {
+        setError('Owner name is required.');
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email.trim())) {
+        setError('Please enter a valid email address.');
+        return;
+      }
+      const phoneRegex = /^[6-9]\d{9}$/;
+      if (!phoneRegex.test(formData.phone.trim())) {
+        setError('Please enter a valid 10-digit Indian mobile number.');
+        return;
+      }
+      if (!formData.password || formData.password.length < 6) {
+        setError('Password must be at least 6 characters.');
+        return;
+      }
+    } else if (step === 2) {
+      if (!formData.messName.trim()) {
+        setError('Mess name is required.');
+        return;
+      }
+      if (!formData.messAddress.trim()) {
+        setError('Mess address is required.');
+        return;
+      }
+    }
+    setStep(step + 1);
+  };
+
+  const prevStep = () => {
+    setError('');
+    setStep(step - 1);
+  };
 
   const handleLocationCapture = async () => {
     setIsGettingLocation(true);
@@ -93,37 +181,147 @@ export default function AuthScreen() {
     setIsLoading(true);
     setError('');
 
-    const phoneRegex = /^[6-9]\d{9}$/;
-    if (!phoneRegex.test(formData.phone)) {
-      setError("Please enter a valid 10-digit Indian mobile number.");
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email.trim())) {
+      setError('Please enter a valid email address.');
       setIsLoading(false);
       return;
     }
 
-    const endpoint = isLogin ? '/api/login' : '/api/register';
-    const payload = isLogin ? { phone: formData.phone, password: formData.password } : { ...formData, role };
+    if (isLogin) {
+      try {
+        const response = await fetch(`${API_URL}/api/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email.trim(),
+            password: formData.password,
+          }),
+        });
+        const data = await response.json();
+
+        if (response.status === 403 && data.unverified) {
+          Alert.alert('Verification Required', 'Your email is not verified yet. A 6-digit OTP has been sent to your email.');
+          showOtpScreen();
+          return;
+        }
+
+        if (response.ok) {
+          await AsyncStorage.setItem('token', data.token);
+          if (data.user.role === 'admin') router.replace('/admin');
+          else if (data.user.role === 'owner') router.replace('/owner');
+          else router.replace('/student');
+        } else {
+          setError(data.error || 'Authentication failed');
+        }
+      } catch (err) {
+        setError('Cannot connect to server. Ensure backend is running.');
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // STRICT PHONE VALIDATION (10 digits, starts with 6,7,8,9)
+      const phoneRegex = /^[6-9]\d{9}$/;
+      if (!phoneRegex.test(formData.phone.trim())) {
+        setError('Please enter a valid 10-digit Indian mobile number.');
+        setIsLoading(false);
+        return;
+      }
+
+      if (!formData.password || formData.password.length < 6) {
+        setError('Password must be at least 6 characters.');
+        setIsLoading(false);
+        return;
+      }
+
+      const payload = {
+        ...formData,
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        role,
+      };
+
+      try {
+        const response = await fetch(`${API_URL}/api/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+          Alert.alert('OTP Sent', `A 6-digit verification code was sent to ${formData.email.trim()}.`);
+          showOtpScreen();
+        } else {
+          setError(data.error || 'Registration failed');
+        }
+      } catch (err) {
+        setError('Cannot connect to server. Ensure backend is running.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otp.trim() || otp.trim().length !== 6) {
+      setError('Please enter the 6-digit OTP code.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
 
     try {
-      const response = await fetch(`${API_URL}${endpoint}`, {
+      const response = await fetch(`${API_URL}/api/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          email: formData.email.trim(),
+          otp: otp.trim(),
+        }),
       });
       const data = await response.json();
 
       if (response.ok) {
         await AsyncStorage.setItem('token', data.token);
-
         if (data.user.role === 'admin') router.replace('/admin');
         else if (data.user.role === 'owner') router.replace('/owner');
         else router.replace('/student');
       } else {
-        setError(data.error || 'Authentication failed');
+        setError(data.error || 'Invalid OTP code.');
       }
     } catch (err) {
       setError('Cannot connect to server. Ensure backend is running.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!formData.email.trim()) {
+      Alert.alert('Error', 'Please enter your email to resend OTP.');
+      return;
+    }
+
+    setIsResending(true);
+    setError('');
+    try {
+      const response = await fetch(`${API_URL}/api/resend-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email.trim() }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        Alert.alert('Success', 'A new verification code has been sent to your email.');
+      } else {
+        setError(data.error || 'Failed to resend OTP.');
+      }
+    } catch (err) {
+      setError('Could not connect to server.');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -153,10 +351,20 @@ export default function AuthScreen() {
         <View style={styles.card}>
           <View style={styles.header}>
             <View style={styles.iconCircle}>
-              <Feather name={isLogin ? "log-in" : "user-plus"} size={28} color="#4f46e5" />
+              <Feather
+                name={isVerifyingOtp ? "shield" : isLogin ? "log-in" : "user-plus"}
+                size={28}
+                color="#4f46e5"
+              />
             </View>
-            <Text style={styles.title}>{isLogin ? 'Welcome Back' : 'Join AvasariConnect'}</Text>
-            <Text style={styles.subtitle}>Your campus dining and living network</Text>
+            <Text style={styles.title}>
+              {isVerifyingOtp ? 'Verify Account' : isLogin ? 'Welcome Back' : 'Join AvasariConnect'}
+            </Text>
+            <Text style={styles.subtitle}>
+              {isVerifyingOtp
+                ? `Enter 6-digit OTP sent to\n${formData.email || 'your email'}`
+                : 'Your campus dining and living network'}
+            </Text>
           </View>
 
           {error ? (
@@ -166,18 +374,85 @@ export default function AuthScreen() {
             </View>
           ) : null}
 
-          {isLogin ? (
+          {/* ------------------ OTP SCREEN WITH ANIMATED VIEW ------------------ */}
+          {isVerifyingOtp ? (
+            <Animated.View
+              style={[
+                styles.formGroup,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <View style={styles.otpInputWrapper}>
+                <Feather name="key" size={20} color="#4f46e5" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.otpInput}
+                  placeholder="000000"
+                  placeholderTextColor="#cbd5e1"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  value={otp}
+                  onChangeText={(val) => setOtp(val.replace(/\D/g, ''))}
+                  autoFocus
+                />
+              </View>
+
+              <Text style={styles.otpHelperText}>
+                Code expires in 10 minutes. Check spam folder if necessary.
+              </Text>
+
+              <TouchableOpacity
+                style={styles.primaryBtn}
+                onPress={handleVerifyOtp}
+                disabled={isLoading || otp.length !== 6}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.primaryBtnText}>Verify Account</Text>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.otpActionRow}>
+                <TouchableOpacity onPress={hideOtpScreen} style={styles.textActionBtn}>
+                  <Feather name="arrow-left" size={14} color="#64748b" />
+                  <Text style={styles.textActionText}>Back</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleResendOtp}
+                  disabled={isResending}
+                  style={styles.textActionBtn}
+                >
+                  {isResending ? (
+                    <ActivityIndicator size="small" color="#4f46e5" />
+                  ) : (
+                    <>
+                      <Feather name="refresh-cw" size={14} color="#4f46e5" />
+                      <Text style={[styles.textActionText, { color: '#4f46e5', fontWeight: 'bold' }]}>
+                        Resend Code
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          ) : isLogin ? (
+            /* ------------------ LOGIN SCREEN ------------------ */
             <View style={styles.formGroup}>
               <View style={styles.inputWrapper}>
-                <Feather name="phone" size={18} color="#94a3b8" style={styles.inputIcon} />
+                <Feather name="mail" size={18} color="#94a3b8" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Phone Number (e.g. 9876543210)"
+                  placeholder="Email Address"
                   placeholderTextColor="#94a3b8"
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  value={formData.phone}
-                  onChangeText={(val) => handleInputChange('phone', val)}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={formData.email}
+                  onChangeText={(val) => handleInputChange('email', val)}
                 />
               </View>
 
@@ -198,12 +473,19 @@ export default function AuthScreen() {
               </TouchableOpacity>
             </View>
           ) : (
+            /* ------------------ REGISTRATION SCREENS ------------------ */
             <View style={styles.formGroup}>
               <View style={styles.roleToggleRow}>
-                <TouchableOpacity style={[styles.roleBtn, role === 'student' && styles.roleBtnActive]} onPress={() => setRole('student')}>
+                <TouchableOpacity
+                  style={[styles.roleBtn, role === 'student' && styles.roleBtnActive]}
+                  onPress={() => { setRole('student'); setError(''); }}
+                >
                   <Text style={[styles.roleBtnText, role === 'student' && styles.roleBtnTextActive]}>Student</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.roleBtn, role === 'owner' && styles.roleBtnActive]} onPress={() => setRole('owner')}>
+                <TouchableOpacity
+                  style={[styles.roleBtn, role === 'owner' && styles.roleBtnActive]}
+                  onPress={() => { setRole('owner'); setError(''); }}
+                >
                   <Text style={[styles.roleBtnText, role === 'owner' && styles.roleBtnTextActive]}>Mess Owner</Text>
                 </TouchableOpacity>
               </View>
@@ -212,22 +494,63 @@ export default function AuthScreen() {
                 <View style={styles.formGroup}>
                   <View style={styles.inputWrapper}>
                     <Feather name="user" size={18} color="#94a3b8" style={styles.inputIcon} />
-                    <TextInput style={styles.input} placeholder="Full Name" placeholderTextColor="#94a3b8" value={formData.name} onChangeText={(val) => handleInputChange('name', val)} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Full Name"
+                      placeholderTextColor="#94a3b8"
+                      value={formData.name}
+                      onChangeText={(val) => handleInputChange('name', val)}
+                    />
+                  </View>
+
+                  <View style={styles.inputWrapper}>
+                    <Feather name="mail" size={18} color="#94a3b8" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Email Address (Login ID)"
+                      placeholderTextColor="#94a3b8"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={formData.email}
+                      onChangeText={(val) => handleInputChange('email', val)}
+                    />
                   </View>
 
                   <View style={styles.inputWrapper}>
                     <Feather name="phone" size={18} color="#94a3b8" style={styles.inputIcon} />
-                    <TextInput style={styles.input} placeholder="Mobile Number" placeholderTextColor="#94a3b8" keyboardType="phone-pad" maxLength={10} value={formData.phone} onChangeText={(val) => handleInputChange('phone', val)} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Mobile Number (Direct Contact)"
+                      placeholderTextColor="#94a3b8"
+                      keyboardType="phone-pad"
+                      maxLength={10}
+                      value={formData.phone}
+                      onChangeText={(val) => handleInputChange('phone', val)}
+                    />
                   </View>
 
                   <View style={styles.inputWrapper}>
                     <Feather name="book" size={18} color="#94a3b8" style={styles.inputIcon} />
-                    <TextInput style={styles.input} placeholder="Year & Branch (e.g. 2nd Yr Computer)" placeholderTextColor="#94a3b8" value={formData.yearBranch} onChangeText={(val) => handleInputChange('yearBranch', val)} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Year & Branch (e.g. 2nd Yr Computer)"
+                      placeholderTextColor="#94a3b8"
+                      value={formData.yearBranch}
+                      onChangeText={(val) => handleInputChange('yearBranch', val)}
+                    />
                   </View>
 
                   <View style={styles.inputWrapper}>
                     <Feather name="lock" size={18} color="#94a3b8" style={styles.inputIcon} />
-                    <TextInput style={styles.input} placeholder="Create Password" placeholderTextColor="#94a3b8" secureTextEntry value={formData.password} onChangeText={(val) => handleInputChange('password', val)} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Create Password"
+                      placeholderTextColor="#94a3b8"
+                      secureTextEntry
+                      value={formData.password}
+                      onChangeText={(val) => handleInputChange('password', val)}
+                    />
                   </View>
 
                   <TouchableOpacity style={styles.primaryBtn} onPress={handleSubmit} disabled={isLoading}>
@@ -248,16 +571,54 @@ export default function AuthScreen() {
                     <View style={styles.formGroup}>
                       <View style={styles.inputWrapper}>
                         <Feather name="user" size={18} color="#94a3b8" style={styles.inputIcon} />
-                        <TextInput style={styles.input} placeholder="Owner Full Name" placeholderTextColor="#94a3b8" value={formData.name} onChangeText={(val) => handleInputChange('name', val)} />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Owner Full Name"
+                          placeholderTextColor="#94a3b8"
+                          value={formData.name}
+                          onChangeText={(val) => handleInputChange('name', val)}
+                        />
                       </View>
+
+                      <View style={styles.inputWrapper}>
+                        <Feather name="mail" size={18} color="#94a3b8" style={styles.inputIcon} />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Email Address (Login ID)"
+                          placeholderTextColor="#94a3b8"
+                          keyboardType="email-address"
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          value={formData.email}
+                          onChangeText={(val) => handleInputChange('email', val)}
+                        />
+                      </View>
+
                       <View style={styles.inputWrapper}>
                         <Feather name="phone" size={18} color="#94a3b8" style={styles.inputIcon} />
-                        <TextInput style={styles.input} placeholder="Mobile Number" placeholderTextColor="#94a3b8" keyboardType="phone-pad" maxLength={10} value={formData.phone} onChangeText={(val) => handleInputChange('phone', val)} />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Mobile Number (Direct Contact)"
+                          placeholderTextColor="#94a3b8"
+                          keyboardType="phone-pad"
+                          maxLength={10}
+                          value={formData.phone}
+                          onChangeText={(val) => handleInputChange('phone', val)}
+                        />
                       </View>
+
                       <View style={styles.inputWrapper}>
                         <Feather name="lock" size={18} color="#94a3b8" style={styles.inputIcon} />
-                        <TextInput style={styles.input} placeholder="Create Password" placeholderTextColor="#94a3b8" secureTextEntry value={formData.password} onChangeText={(val) => handleInputChange('password', val)} />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Create Password"
+                          placeholderTextColor="#94a3b8"
+                          secureTextEntry
+                          value={formData.password}
+                          onChangeText={(val) => handleInputChange('password', val)}
+                        />
                       </View>
+
                       <TouchableOpacity style={styles.blackBtn} onPress={nextStep}>
                         <Text style={styles.blackBtnText}>Next Step</Text>
                         <Feather name="chevron-right" size={18} color="#fff" />
@@ -269,14 +630,31 @@ export default function AuthScreen() {
                     <View style={styles.formGroup}>
                       <View style={styles.inputWrapper}>
                         <Feather name="coffee" size={18} color="#94a3b8" style={styles.inputIcon} />
-                        <TextInput style={styles.input} placeholder="Mess Name" placeholderTextColor="#94a3b8" value={formData.messName} onChangeText={(val) => handleInputChange('messName', val)} />
-                      </View>
-                      <View style={styles.inputWrapper}>
-                        <Feather name="map-pin" size={18} color="#94a3b8" style={styles.inputIcon} />
-                        <TextInput style={styles.input} placeholder="Full Address / Landmark" placeholderTextColor="#94a3b8" value={formData.messAddress} onChangeText={(val) => handleInputChange('messAddress', val)} />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Mess Name"
+                          placeholderTextColor="#94a3b8"
+                          value={formData.messName}
+                          onChangeText={(val) => handleInputChange('messName', val)}
+                        />
                       </View>
 
-                      <TouchableOpacity style={styles.locationBtn} onPress={handleLocationCapture} disabled={isGettingLocation}>
+                      <View style={styles.inputWrapper}>
+                        <Feather name="map-pin" size={18} color="#94a3b8" style={styles.inputIcon} />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Full Address / Landmark"
+                          placeholderTextColor="#94a3b8"
+                          value={formData.messAddress}
+                          onChangeText={(val) => handleInputChange('messAddress', val)}
+                        />
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.locationBtn}
+                        onPress={handleLocationCapture}
+                        disabled={isGettingLocation}
+                      >
                         <Feather name="map-pin" size={16} color="#4f46e5" />
                         <Text style={styles.locationBtnText}>
                           {formData.latitude ? `✅ Location captured` : isGettingLocation ? 'Detecting...' : '📍 Use Current Location'}
@@ -284,8 +662,12 @@ export default function AuthScreen() {
                       </TouchableOpacity>
 
                       <View style={styles.stepBtnRow}>
-                        <TouchableOpacity style={styles.secondaryBtn} onPress={prevStep}><Feather name="chevron-left" size={18} color="#334155" /></TouchableOpacity>
-                        <TouchableOpacity style={[styles.blackBtn, { flex: 1 }]} onPress={nextStep}><Text style={styles.blackBtnText}>Next Step</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.secondaryBtn} onPress={prevStep}>
+                          <Feather name="chevron-left" size={18} color="#334155" />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.blackBtn, { flex: 1 }]} onPress={nextStep}>
+                          <Text style={styles.blackBtnText}>Next Step</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
                   )}
@@ -294,13 +676,29 @@ export default function AuthScreen() {
                     <View style={styles.formGroup}>
                       <View style={styles.inputWrapper}>
                         <Feather name="file-text" size={18} color="#94a3b8" style={styles.inputIcon} />
-                        <TextInput style={styles.input} placeholder="FSSAI License (Optional)" placeholderTextColor="#94a3b8" value={formData.fssaiNumber} onChangeText={(val) => handleInputChange('fssaiNumber', val)} />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="FSSAI License (Optional)"
+                          placeholderTextColor="#94a3b8"
+                          value={formData.fssaiNumber}
+                          onChangeText={(val) => handleInputChange('fssaiNumber', val)}
+                        />
                       </View>
 
                       <View style={styles.stepBtnRow}>
-                        <TouchableOpacity style={styles.secondaryBtn} onPress={prevStep}><Feather name="chevron-left" size={18} color="#334155" /></TouchableOpacity>
-                        <TouchableOpacity style={[styles.primaryBtn, { flex: 1, backgroundColor: '#f97316' }]} onPress={handleSubmit} disabled={isLoading}>
-                          {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Complete Registration</Text>}
+                        <TouchableOpacity style={styles.secondaryBtn} onPress={prevStep}>
+                          <Feather name="chevron-left" size={18} color="#334155" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.primaryBtn, { flex: 1, backgroundColor: '#f97316' }]}
+                          onPress={handleSubmit}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <ActivityIndicator color="#fff" />
+                          ) : (
+                            <Text style={styles.primaryBtnText}>Complete Registration</Text>
+                          )}
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -310,13 +708,22 @@ export default function AuthScreen() {
             </View>
           )}
 
-          <View style={styles.footer}>
-            <TouchableOpacity onPress={() => { setIsLogin(!isLogin); setError(''); setStep(1); }}>
-              <Text style={styles.footerText}>
-                {isLogin ? "Don't have an account? Sign up here" : "Already have an account? Sign in"}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          {/* Bottom toggle between Login and Sign Up */}
+          {!isVerifyingOtp && (
+            <View style={styles.footer}>
+              <TouchableOpacity
+                onPress={() => {
+                  setIsLogin(!isLogin);
+                  setError('');
+                  setStep(1);
+                }}
+              >
+                <Text style={styles.footerText}>
+                  {isLogin ? "Don't have an account? Sign up here" : "Already have an account? Sign in"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
       </ScrollView>
@@ -333,7 +740,7 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', marginBottom: 24 },
   iconCircle: { backgroundColor: '#e0e7ff', padding: 16, borderRadius: 20, marginBottom: 12 },
   title: { fontSize: 24, fontWeight: '900', color: '#0f172a', textAlign: 'center' },
-  subtitle: { fontSize: 13, color: '#64748b', marginTop: 4, textAlign: 'center' },
+  subtitle: { fontSize: 13, color: '#64748b', marginTop: 4, textAlign: 'center', lineHeight: 18 },
 
   errorBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', padding: 12, borderRadius: 12, marginBottom: 16, gap: 8 },
   errorText: { color: '#dc2626', fontSize: 13, fontWeight: 'bold', flex: 1 },
@@ -342,6 +749,31 @@ const styles = StyleSheet.create({
   inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, paddingHorizontal: 16 },
   inputIcon: { marginRight: 12 },
   input: { flex: 1, paddingVertical: 14, fontSize: 15, fontWeight: 'bold', color: '#0f172a' },
+
+  otpInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eef2ff',
+    borderWidth: 2,
+    borderColor: '#6366f1',
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 4
+  },
+  otpInput: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 26,
+    fontWeight: '900',
+    letterSpacing: 10,
+    textAlign: 'center',
+    color: '#312e81',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace'
+  },
+  otpHelperText: { fontSize: 12, color: '#64748b', textAlign: 'center', marginTop: -4 },
+  otpActionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6 },
+  textActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 6 },
+  textActionText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
 
   primaryBtn: { backgroundColor: '#4f46e5', paddingVertical: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', shadowColor: '#4f46e5', shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   primaryBtnText: { color: '#ffffff', fontSize: 16, fontWeight: '900' },

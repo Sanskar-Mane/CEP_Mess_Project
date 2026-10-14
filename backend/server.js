@@ -14,6 +14,7 @@ const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 const Tesseract = require('tesseract.js');
 const cloudinary = require('cloudinary').v2;
+const nodemailer = require('nodemailer');
 
 const isCloudinaryConfigured = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
@@ -29,6 +30,81 @@ if (isCloudinaryConfigured) {
   });
   console.log('☁️ Cloudinary CDN configured and active!');
 }
+
+// Nodemailer SMTP Transport
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT, 10) || 587,
+  secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+// Helper: Send Professional OTP Verification Email
+const sendOtpEmail = async (toEmail, otp) => {
+  const mailOptions = {
+    from: process.env.SMTP_FROM || `"Avasari Connect" <${process.env.SMTP_USER || 'no-reply@avasari.connect'}>`,
+    to: toEmail,
+    subject: `${otp} is your Avasari Connect Verification Code`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Account Verification</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b; }
+          .container { max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 36px 32px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
+          .brand { text-align: center; margin-bottom: 24px; }
+          .brand-title { font-size: 24px; font-weight: 900; color: #4f46e5; margin: 0; letter-spacing: -0.5px; }
+          .brand-subtitle { font-size: 13px; color: #64748b; margin-top: 4px; font-weight: 500; }
+          .greeting { font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 12px; }
+          .message { font-size: 14px; line-height: 1.6; color: #475569; margin: 0 0 24px 0; }
+          .otp-card { background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%); border: 2px dashed #6366f1; border-radius: 16px; padding: 24px; text-align: center; margin: 24px 0; }
+          .otp-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #4f46e5; margin-bottom: 8px; }
+          .otp-code { font-size: 40px; font-weight: 900; letter-spacing: 10px; color: #1e1b4b; margin: 0; font-family: 'Courier New', Courier, monospace; }
+          .expiry-note { font-size: 13px; color: #64748b; text-align: center; margin-top: 8px; }
+          .footer { border-top: 1px solid #f1f5f9; padding-top: 20px; margin-top: 28px; font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.5; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="brand">
+            <h1 class="brand-title">Avasari Connect</h1>
+            <p class="brand-subtitle">Campus Dining & Living Network</p>
+          </div>
+          <div class="greeting">Verify your email address</div>
+          <p class="message">Thank you for connecting with Avasari Connect. Please use the verification code below to complete your registration or login verification.</p>
+          <div class="otp-card">
+            <div class="otp-label">Verification Code (OTP)</div>
+            <div class="otp-code">${otp}</div>
+            <div class="expiry-note">⏱️ Expires in 10 minutes</div>
+          </div>
+          <p class="message">If you did not request this verification code, please ignore this email or contact support if you suspect unauthorized activity.</p>
+          <div class="footer">
+            &copy; ${new Date().getFullYear()} Avasari Connect. All rights reserved.<br>
+            Government College of Engineering and Research, Avasari Khurd.
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+
+  try {
+    console.log(`📨 [OTP Dispatch] Generated OTP for ${toEmail}: ${otp}`);
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ OTP email successfully dispatched to ${toEmail}`);
+    return true;
+  } catch (mailError) {
+    console.error(`⚠️ Failed to send OTP email to ${toEmail}:`, mailError.message);
+    console.log(`ℹ️ [CONSOLE OTP FALLBACK] Email: ${toEmail} | OTP: ${otp}`);
+    return false;
+  }
+};
 
 const app = express();
 app.set('trust proxy', 1);
@@ -112,6 +188,8 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 app.use('/api/login', authLimiter);
 app.use('/api/register', authLimiter);
+app.use('/api/verify-otp', authLimiter);
+app.use('/api/resend-otp', authLimiter);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -119,9 +197,20 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 // 1. DATABASE CONNECTION
 // ==========================================
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
+  .then(async () => {
     console.log('✅ Successfully connected to MongoDB Atlas!');
     Story.collection.dropIndex('createdAt_1').catch(() => { });
+    User.collection.dropIndex('phone_1').catch(() => { });
+    try {
+      const legacyUsers = await User.find({ $or: [{ email: { $exists: false } }, { email: null }, { email: '' }] });
+      for (const u of legacyUsers) {
+        u.email = `legacy_${u.phone || u._id}@avasari.local`;
+        u.isEmailVerified = true;
+        await u.save().catch(() => {});
+      }
+    } catch (migErr) {
+      console.warn('Legacy user email migration note:', migErr.message);
+    }
     expireOutdatedSubscriptions();
     calculateTopChef();
     cleanupExpiredStories();
@@ -137,7 +226,11 @@ mongoose.connect(process.env.MONGO_URI)
 const UserSchema = new mongoose.Schema({
   role: { type: String, required: true, enum: ['student', 'owner', 'admin'] },
   name: { type: String, required: true },
-  phone: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  phone: { type: String, required: true },
+  isEmailVerified: { type: Boolean, default: false },
+  otp: { type: String },
+  otpExpires: { type: Date },
   password: { type: String, required: true },
   messName: String,
   messAddress: String,
@@ -464,7 +557,13 @@ const authenticateAdmin = (req, res, next) => {
 
 // --- VALIDATION MIDDLEWARE ---
 const validateRegister = (req, res, next) => {
-  const { phone, password, role } = req.body;
+  const { email, name, phone, password, role } = req.body;
+  if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    return res.status(400).json({ error: 'Valid email address is required.' });
+  }
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'Name is required.' });
+  }
   if (!phone || typeof phone !== 'string' || !phone.trim()) {
     return res.status(400).json({ error: 'Phone number is required.' });
   }
@@ -482,9 +581,9 @@ const validateRegister = (req, res, next) => {
 };
 
 const validateLogin = (req, res, next) => {
-  const { phone, password, role } = req.body;
-  if (!phone || typeof phone !== 'string' || !phone.trim()) {
-    return res.status(400).json({ error: 'Phone number is required.' });
+  const { email, password, role } = req.body;
+  if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    return res.status(400).json({ error: 'Valid email address is required.' });
   }
   if (!password || typeof password !== 'string' || !password.trim()) {
     return res.status(400).json({ error: 'Password is required.' });
@@ -526,13 +625,32 @@ const validateRating = (req, res, next) => {
 // --- AUTH ROUTES ---
 app.post('/api/register', validateRegister, async (req, res) => {
   try {
-    const { role, name, phone, password, messName, messAddress, fssaiNumber, yearBranch, latitude, longitude } = req.body;
+    const { role, name, email, phone, password, messName, messAddress, fssaiNumber, yearBranch, latitude, longitude } = req.body;
+    const normalizedEmail = email.toLowerCase().trim();
 
-    if (await User.findOne({ phone })) return res.status(400).json({ error: 'Phone number already registered' });
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    if (existingUser) return res.status(400).json({ error: 'Email already registered' });
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    const userData = { role, name, phone, password: hashedPassword, messName, messAddress, fssaiNumber, yearBranch };
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    const userData = {
+      role,
+      name: name.trim(),
+      email: normalizedEmail,
+      phone: phone.trim(),
+      password: hashedPassword,
+      isEmailVerified: false,
+      otp,
+      otpExpires,
+      messName,
+      messAddress,
+      fssaiNumber,
+      yearBranch
+    };
 
     if (latitude && longitude) {
       userData.location = { type: 'Point', coordinates: [longitude, latitude] };
@@ -540,23 +658,134 @@ app.post('/api/register', validateRegister, async (req, res) => {
 
     const newUser = new User(userData);
     await newUser.save();
-    const token = jwt.sign({ id: newUser._id, role: newUser.role, messName: newUser.messName }, JWT_SECRET, { expiresIn: '7d' });
-    const userResponse = { ...newUser._doc }; delete userResponse.password;
 
-    res.status(201).json({ message: 'Registration successful', user: userResponse, token });
-  } catch (error) { res.status(500).json({ error: 'Server error' }); }
+    await sendOtpEmail(normalizedEmail, otp);
+
+    res.status(201).json({
+      message: 'OTP sent to email',
+      email: normalizedEmail
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ error: 'Email already registered.' });
+    }
+    res.status(500).json({ error: 'Server error during registration' });
+  }
+});
+
+app.post('/api/verify-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and OTP are required.' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (user.isEmailVerified) {
+      const token = jwt.sign({ id: user._id, role: user.role, messName: user.messName }, JWT_SECRET, { expiresIn: '7d' });
+      const userResponse = { ...user._doc };
+      delete userResponse.password;
+      delete userResponse.otp;
+      delete userResponse.otpExpires;
+      return res.status(200).json({ message: 'Email already verified', user: userResponse, token });
+    }
+
+    if (!user.otp || !user.otpExpires) {
+      return res.status(400).json({ error: 'No active OTP found. Please request a new OTP.' });
+    }
+
+    if (new Date() > user.otpExpires) {
+      return res.status(400).json({ error: 'OTP has expired. Please request a new OTP.' });
+    }
+
+    if (user.otp !== String(otp).trim()) {
+      return res.status(400).json({ error: 'Invalid verification code. Please try again.' });
+    }
+
+    user.isEmailVerified = true;
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
+    const token = jwt.sign({ id: user._id, role: user.role, messName: user.messName }, JWT_SECRET, { expiresIn: '7d' });
+    const userResponse = { ...user._doc };
+    delete userResponse.password;
+    delete userResponse.otp;
+    delete userResponse.otpExpires;
+
+    res.status(200).json({ message: 'Email verified successfully', user: userResponse, token });
+  } catch (error) {
+    console.error('OTP verification error:', error);
+    res.status(500).json({ error: 'Server error during verification' });
+  }
 });
 
 app.post('/api/login', validateLogin, async (req, res) => {
   try {
-    const { phone, password } = req.body;
-    const user = await User.findOne({ phone });
+    const { email, password } = req.body;
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    if (!(await bcrypt.compare(password, user.password))) return res.status(400).json({ error: 'Invalid password' });
+
+    if (!(await bcrypt.compare(password, user.password))) {
+      return res.status(400).json({ error: 'Invalid password' });
+    }
+
+    if (!user.isEmailVerified) {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      user.otp = otp;
+      user.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+      await user.save();
+
+      await sendOtpEmail(normalizedEmail, otp);
+
+      return res.status(403).json({
+        error: 'Email not verified. OTP sent to your email.',
+        unverified: true,
+        email: normalizedEmail
+      });
+    }
+
     const token = jwt.sign({ id: user._id, role: user.role, messName: user.messName }, JWT_SECRET, { expiresIn: '7d' });
-    const userResponse = { ...user._doc }; delete userResponse.password;
+    const userResponse = { ...user._doc };
+    delete userResponse.password;
+    delete userResponse.otp;
+    delete userResponse.otpExpires;
+
     res.status(200).json({ message: 'Login successful', user: userResponse, token });
-  } catch (error) { res.status(500).json({ error: 'Server error' }); }
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/resend-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return res.status(400).json({ error: 'Valid email address is required.' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.otp = otp;
+    user.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+
+    await sendOtpEmail(normalizedEmail, otp);
+
+    res.status(200).json({ message: 'OTP resent to your email', email: normalizedEmail });
+  } catch (error) {
+    console.error('Resend OTP error:', error);
+    res.status(500).json({ error: 'Server error while resending OTP' });
+  }
 });
 
 app.get('/api/me', authenticateToken, async (req, res) => {
