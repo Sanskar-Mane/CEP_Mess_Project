@@ -39,7 +39,10 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
-  }
+  },
+  connectionTimeout: 8000,
+  greetingTimeout: 8000,
+  socketTimeout: 8000
 });
 
 // Verify SMTP connection on startup if credentials exist
@@ -117,7 +120,14 @@ const sendOtpEmail = async (email, otp) => {
       console.warn(`⚠️ [SMTP NOT CONFIGURED] OTP for ${email}: [ ${otp} ]`);
       return { success: true, simulated: true };
     }
-    const info = await transporter.sendMail(mailOptions);
+
+    // Guard against SMTP hanging with a strict 8-second safety timeout
+    const sendMailPromise = transporter.sendMail(mailOptions);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('SMTP send mail timed out after 8 seconds')), 8000)
+    );
+
+    const info = await Promise.race([sendMailPromise, timeoutPromise]);
     console.log(`✉️ OTP email sent to ${email} (Message ID: ${info.messageId})`);
     return { success: true, messageId: info.messageId };
   } catch (err) {

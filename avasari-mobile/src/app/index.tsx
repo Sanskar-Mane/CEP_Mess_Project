@@ -71,30 +71,57 @@ export default function AuthScreen() {
     const checkAuth = async () => {
       try {
         const token = await AsyncStorage.getItem('token');
-        if (token) {
+        if (!token) {
+          if (isMounted) setIsCheckingAuth(false);
+          return;
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+        try {
           const response = await fetch(`${API_URL}/api/me`, {
             headers: {
               'Authorization': `Bearer ${token}`
-            }
+            },
+            signal: controller.signal
           });
+          clearTimeout(timeoutId);
+
           if (response.ok) {
             const user = await response.json();
-            if (user?.role === 'admin') {
-              router.replace('/admin');
-              return;
-            } else if (user?.role === 'owner') {
-              router.replace('/owner');
-              return;
-            } else {
-              router.replace('/student');
-              return;
+            if (isMounted) {
+              if (user?.role === 'admin') {
+                router.replace('/admin');
+                return;
+              } else if (user?.role === 'owner') {
+                router.replace('/owner');
+                return;
+              } else {
+                router.replace('/student');
+                return;
+              }
             }
           } else {
+            // Invalid or expired token
             await AsyncStorage.removeItem('token');
+            if (isMounted) {
+              setIsCheckingAuth(false);
+            }
+          }
+        } catch (error) {
+          clearTimeout(timeoutId);
+          // Backend asleep, network timeout, or server error
+          await AsyncStorage.removeItem('token');
+          if (isMounted) {
+            setIsCheckingAuth(false);
           }
         }
-      } catch (err) {
-        // Network or server error - fallback to login screen
+      } catch (error) {
+        await AsyncStorage.removeItem('token').catch(() => {});
+        if (isMounted) {
+          setIsCheckingAuth(false);
+        }
       } finally {
         if (isMounted) {
           setIsCheckingAuth(false);
@@ -190,7 +217,7 @@ export default function AuthScreen() {
     else router.replace('/student');
   };
 
-  const handleSubmit = async () => {
+  const handleLogin = async () => {
     setIsLoading(true);
     setError('');
     setSuccessMsg('');
@@ -204,35 +231,26 @@ export default function AuthScreen() {
       return;
     }
 
-    if (authMode === 'register') {
-      const phoneRegex = /^[6-9]\d{9}$/;
-      if (!phoneRegex.test(formData.phone.trim())) {
-        setError('Please enter a valid 10-digit Indian mobile number.');
-        setIsLoading(false);
-        return;
-      }
-      if (!formData.password || formData.password.length < 6) {
-        setError('Password must be at least 6 characters.');
-        setIsLoading(false);
-        return;
-      }
+    if (!formData.password) {
+      setError('Please enter your password.');
+      setIsLoading(false);
+      return;
     }
 
-    const endpoint = authMode === 'login' ? '/api/login' : '/api/register';
-    const payload = authMode === 'login'
-      ? { email: cleanEmail, password: formData.password }
-      : { ...formData, email: cleanEmail, phone: formData.phone.trim(), role };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     try {
-      const response = await fetch(`${API_URL}${endpoint}`, {
+      const response = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ email: cleanEmail, password: formData.password }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (response.status === 403 && data.unverified) {
-        // Needs OTP Verification
         setOtpEmail(data.email || cleanEmail);
         setOtp('');
         setAuthMode('verifyOtp');
@@ -243,23 +261,89 @@ export default function AuthScreen() {
       }
 
       if (response.ok) {
-        if (authMode === 'register') {
-          setOtpEmail(data.email || cleanEmail);
-          setOtp('');
-          setAuthMode('verifyOtp');
-          setResendCooldown(60);
-          animateTransition();
-        } else {
-          await AsyncStorage.setItem('token', data.token);
-          routeUser(data.user);
-        }
+        await AsyncStorage.setItem('token', data.token);
+        routeUser(data.user);
       } else {
         setError(data.error || 'Authentication failed');
       }
-    } catch (err) {
-      setError('Cannot connect to server. Ensure backend is running.');
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err?.name === 'AbortError') {
+        setError('Server response timed out. The backend might be waking up, please retry.');
+      } else {
+        setError('Cannot connect to server. Ensure backend is running.');
+      }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    setIsLoading(true);
+    setError('');
+    setSuccessMsg('');
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const cleanEmail = (formData.email || '').trim().toLowerCase();
+
+    if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+      setError('Please enter a valid email address.');
+      setIsLoading(false);
+      return;
+    }
+
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(formData.phone.trim())) {
+      setError('Please enter a valid 10-digit Indian mobile number.');
+      setIsLoading(false);
+      return;
+    }
+    if (!formData.password || formData.password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      setIsLoading(false);
+      return;
+    }
+
+    const payload = { ...formData, email: cleanEmail, phone: formData.phone.trim(), role };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    try {
+      const response = await fetch(`${API_URL}/api/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      const data = await response.json();
+
+      if (response.ok) {
+        setOtpEmail(data.email || cleanEmail);
+        setOtp('');
+        setAuthMode('verifyOtp');
+        setResendCooldown(60);
+        animateTransition();
+      } else {
+        setError(data.error || 'Registration failed');
+      }
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err?.name === 'AbortError') {
+        setError('Server response timed out. The backend might be waking up, please retry.');
+      } else {
+        setError('Cannot connect to server. Ensure backend is running.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (authMode === 'login') {
+      await handleLogin();
+    } else {
+      await handleRegister();
     }
   };
 
@@ -273,13 +357,18 @@ export default function AuthScreen() {
     setError('');
     setSuccessMsg('');
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     try {
       const targetEmail = (otpEmail || formData.email).trim().toLowerCase();
       const response = await fetch(`${API_URL}/api/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: targetEmail, otp: otp.trim() }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (response.ok) {
@@ -288,8 +377,13 @@ export default function AuthScreen() {
       } else {
         setError(data.error || 'Invalid or expired OTP code.');
       }
-    } catch (err) {
-      setError('Failed to reach server. Please try again.');
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err?.name === 'AbortError') {
+        setError('Verification timed out. Please try again.');
+      } else {
+        setError('Failed to reach server. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -301,13 +395,18 @@ export default function AuthScreen() {
     setError('');
     setSuccessMsg('');
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     try {
       const targetEmail = (otpEmail || formData.email).trim().toLowerCase();
       const response = await fetch(`${API_URL}/api/resend-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: targetEmail }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (response.ok) {
@@ -316,8 +415,13 @@ export default function AuthScreen() {
       } else {
         setError(data.error || 'Unable to resend OTP at this moment.');
       }
-    } catch (err) {
-      setError('Failed to contact server. Ensure backend is active.');
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err?.name === 'AbortError') {
+        setError('Resend timed out. Please try again.');
+      } else {
+        setError('Failed to contact server. Ensure backend is active.');
+      }
     } finally {
       setIsResending(false);
     }
